@@ -140,13 +140,13 @@ export default function Setup() {
           ? profile.locations.split(',').map(s => s.trim()).filter(Boolean)
           : profile.locations,
         seniority_level: profile.seniority_levels[0] || null,
-        preferred_sectors: profile.sectors.split(',').map(s => s.trim()).filter(Boolean),
-        preferred_companies: profile.companies.split(',').map(s => s.trim()).filter(Boolean),
+        preferred_sectors: String(profile.sectors || '').split(',').map(s => s.trim()).filter(Boolean),
+        preferred_companies: String(profile.companies || '').split(',').map(s => s.trim()).filter(Boolean),
         salary_min: profile.min_salary ? parseInt(profile.min_salary) : null,
         salary_max: profile.max_salary ? parseInt(profile.max_salary) : null,
         role_description: profile.role_description || null,
-        title_include: profile.title_include.split(',').map(s => s.trim()).filter(Boolean),
-        title_exclude: profile.title_exclude.split(',').map(s => s.trim()).filter(Boolean),
+        title_include: String(profile.title_include || '').split(',').map(s => s.trim()).filter(Boolean),
+        title_exclude: String(profile.title_exclude || '').split(',').map(s => s.trim()).filter(Boolean),
       })
       showStatus('Profile saved!')
     } catch (err) {
