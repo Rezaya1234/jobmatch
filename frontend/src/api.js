@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const http = axios.create({ baseURL: '/api' })
+const http = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api' })
 
 export const createUser = (email) => http.post('/users', { email }).then(r => r.data)
 export const getUser = (id) => http.get(`/users/${id}`).then(r => r.data)
