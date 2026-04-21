@@ -107,6 +107,22 @@ async def trigger_daily_pipeline(
     return PipelineResponse(status="accepted", detail="Daily pipeline started in the background.")
 
 
+@router.post("/reset-filters/{user_id}", response_model=PipelineResponse, status_code=202)
+async def trigger_reset_filters(
+    user_id: str,
+    background_tasks: BackgroundTasks,
+    llm: LLMClient = Depends(get_llm),
+    session: AsyncSession = Depends(get_session),
+) -> PipelineResponse:
+    """Delete all job_match rows for a user so the next pipeline run re-filters everything fresh."""
+    from sqlalchemy import delete
+    from db.models import JobMatch
+    await session.execute(delete(JobMatch).where(JobMatch.user_id == user_id))
+    await session.commit()
+    background_tasks.add_task(_run_match_all, llm)
+    return PipelineResponse(status="accepted", detail="Filters reset — re-running pipeline.")
+
+
 @router.post("/rescore/{user_id}", response_model=PipelineResponse, status_code=202)
 async def trigger_rescore(
     user_id: str,

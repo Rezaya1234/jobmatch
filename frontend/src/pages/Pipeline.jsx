@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { triggerDailyPipeline, triggerCollect, getJobCount, getMatchCount } from '../api'
+import { triggerDailyPipeline, triggerCollect, triggerResetFilters, getJobCount, getMatchCount } from '../api'
 import axios from 'axios'
 
 const getPipelineStatus = () => axios.get('/api/pipeline/status').then(r => r.data)
@@ -103,6 +103,21 @@ export default function Pipeline() {
     }
   }
 
+  async function handleResetFilters() {
+    const userId = localStorage.getItem('userId')
+    if (!userId) return
+    setTriggering(true)
+    try {
+      await triggerResetFilters(userId)
+      setState(s => ({ ...s, status: 'running', step: 'Resetting filters and re-matching...', error: '' }))
+      startPolling()
+    } catch (err) {
+      setState(s => ({ ...s, status: 'error', error: err.response?.data?.detail || 'Failed to reset filters' }))
+    } finally {
+      setTriggering(false)
+    }
+  }
+
   const isRunning = state.status === 'running'
   const isDone = state.status === 'complete'
   const isError = state.status === 'error'
@@ -147,7 +162,7 @@ export default function Pipeline() {
         </div>
 
         <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button onClick={handleCollect} disabled={isRunning || triggering}
               className="bg-slate-700 text-white py-2.5 rounded-lg font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
               Collect New Jobs
@@ -169,6 +184,11 @@ export default function Pipeline() {
                   <div className="text-xs opacity-70 font-normal mt-0.5">collect + score</div>
                 </>
               )}
+            </button>
+            <button onClick={handleResetFilters} disabled={isRunning || triggering}
+              className="bg-amber-600 text-white py-2.5 rounded-lg font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
+              Reset Filters
+              <div className="text-xs opacity-70 font-normal mt-0.5">re-filter all jobs</div>
             </button>
           </div>
         </div>
