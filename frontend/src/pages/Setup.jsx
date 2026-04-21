@@ -133,6 +133,7 @@ export default function Setup() {
   async function handleSaveProfile(e) {
     e.preventDefault()
     try {
+      console.log('saving profile state:', JSON.stringify(profile))
       await upsertProfile(userId, {
         work_modes: profile.work_modes,
         job_types: profile.job_types,
