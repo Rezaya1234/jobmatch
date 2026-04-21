@@ -164,7 +164,7 @@ export default function Setup() {
       })
       showStatus('Profile saved!')
     } catch (err) {
-      showStatus(err.response?.data?.detail || 'Error saving profile')
+      showStatus(err.message || err.response?.data?.detail || 'Error saving profile')
     }
   }
 
