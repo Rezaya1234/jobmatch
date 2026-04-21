@@ -109,18 +109,19 @@ export default function Setup() {
     try {
       const extracted = await parseProfile(userId, aiText, resumeFile)
       setAiResult(extracted)
-      setProfile({
-        work_modes: extracted.work_modes || ['remote'],
-        job_types: extracted.job_types || ['full_time'],
-        locations: (extracted.locations || []).join(', '),
-        seniority_levels: extracted.seniority_level ? [extracted.seniority_level] : [],
-        sectors: (extracted.preferred_sectors || []).join(', '),
-        min_salary: extracted.salary_min || '',
-        max_salary: extracted.salary_max || '',
-        companies: (extracted.preferred_companies || []).join(', '),
-        role_description: extracted.role_description || '',
-        original_role_description: extracted.original_role_description || extracted.role_description || '',
-      })
+      setProfile(p => ({
+        ...p,
+        work_modes: extracted.work_modes || p.work_modes,
+        job_types: extracted.job_types || p.job_types,
+        locations: extracted.locations?.length ? extracted.locations.join(', ') : p.locations,
+        seniority_levels: extracted.seniority_level ? [extracted.seniority_level] : p.seniority_levels,
+        sectors: extracted.preferred_sectors?.length ? extracted.preferred_sectors.join(', ') : p.sectors,
+        min_salary: extracted.salary_min || p.min_salary,
+        max_salary: extracted.salary_max || p.max_salary,
+        companies: extracted.preferred_companies?.length ? extracted.preferred_companies.join(', ') : p.companies,
+        role_description: extracted.role_description || p.role_description,
+        original_role_description: extracted.original_role_description || extracted.role_description || p.original_role_description,
+      }))
       showStatus('Profile generated — review and save below.')
     } catch (err) {
       showStatus(err.response?.data?.detail || 'Failed to generate profile')
