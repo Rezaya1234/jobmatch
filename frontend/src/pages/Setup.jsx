@@ -164,6 +164,7 @@ export default function Setup() {
       })
       showStatus('Profile saved!')
     } catch (err) {
+      console.error('Save error:', err)
       showStatus(err.message || err.response?.data?.detail || 'Error saving profile')
     }
   }
