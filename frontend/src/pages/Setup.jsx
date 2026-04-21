@@ -133,8 +133,7 @@ export default function Setup() {
   async function handleSaveProfile(e) {
     e.preventDefault()
     try {
-      console.log('saving profile state:', JSON.stringify(profile))
-      await upsertProfile(userId, {
+      const saved = await upsertProfile(userId, {
         work_modes: profile.work_modes,
         job_types: profile.job_types,
         locations: typeof profile.locations === 'string'
@@ -148,6 +147,20 @@ export default function Setup() {
         role_description: profile.role_description || null,
         title_include: String(profile.title_include || '').split(',').map(s => s.trim()).filter(Boolean),
         title_exclude: String(profile.title_exclude || '').split(',').map(s => s.trim()).filter(Boolean),
+      })
+      setProfile({
+        work_modes: saved.work_modes || ['remote'],
+        job_types: saved.job_types || ['full_time'],
+        locations: (saved.locations || []).join(', '),
+        seniority_levels: saved.seniority_level ? [saved.seniority_level] : [],
+        sectors: (saved.preferred_sectors || []).join(', '),
+        companies: (saved.preferred_companies || []).join(', '),
+        min_salary: saved.salary_min || '',
+        max_salary: saved.salary_max || '',
+        role_description: saved.role_description || '',
+        original_role_description: saved.original_role_description || '',
+        title_include: (saved.title_include || []).join(', '),
+        title_exclude: (saved.title_exclude || []).join(', '),
       })
       showStatus('Profile saved!')
     } catch (err) {
