@@ -74,10 +74,7 @@ export default function Setup() {
             title_include: (p.title_include || []).join(', '),
             title_exclude: (p.title_exclude || []).join(', '),
           })
-          if (p.role_description) {
-            setAiText(p.role_description)
-            setAiProfile(p.role_description)
-          }
+          if (p.role_description) setAiProfile(p.role_description)
         })
         .catch(() => {})
     }
