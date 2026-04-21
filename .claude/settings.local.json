@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(claude-api)",
+      "Bash(python *)",
+      "Bash(python3 -c \"import psycopg2; print\\('ok'\\)\")",
+      "Bash(where python *)",
+      "Bash(where python3 *)",
+      "Bash(where py *)",
+      "Bash(C:/Users/rezar/AppData/Local/Python/bin/python3.exe *)",
+      "Bash(C:/Users/rezar/jobmatch/venv/Scripts/python.exe *)",
+      "Bash(C:/Users/rezar/jobmatch/venv/Scripts/pip.exe install *)",
+      "Bash(venv/Scripts/python.exe -c \"import psycopg2; conn = psycopg2.connect\\('postgresql://postgres:postgres@localhost:5432/postgres'\\); print\\('postgres connected'\\); conn.close\\(\\)\")",
+      "Bash(docker run *)",
+      "Bash(venv/Scripts/python.exe -c \"import psycopg2; conn = psycopg2.connect\\('postgresql://postgres:postgres@localhost:5432/postgres'\\); print\\('connected'\\); conn.close\\(\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import psycopg2; conn = psycopg2.connect\\('postgresql://postgres:postgres@localhost:5432/postgres'\\); conn.autocommit=True; conn.cursor\\(\\).execute\\('CREATE DATABASE jobmatch'\\); print\\('db created'\\); conn.close\\(\\)\")",
+      "Bash(venv/Scripts/python.exe -m alembic revision --autogenerate -m \"initial\")",
+      "Bash(venv/Scripts/python.exe -m alembic upgrade head)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(curl *)",
+      "Bash(taskkill /F /IM uvicorn.exe)",
+      "Bash(venv/Scripts/uvicorn.exe main:app --reload)",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)",
+      "Bash(venv/Scripts/uvicorn.exe main:app --port 8001)",
+      "Bash(venv/Scripts/uvicorn.exe main:app --port 9000)",
+      "Bash(venv/Scripts/pip.exe install *)",
+      "Bash(venv/Scripts/alembic.exe upgrade *)",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(venv/Scripts/python.exe *)",
+      "Bash(findstr :8000)"
+    ]
+  }
+}
