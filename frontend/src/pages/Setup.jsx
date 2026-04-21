@@ -5,15 +5,6 @@ const WORK_MODES = ['remote', 'hybrid', 'onsite']
 const JOB_TYPES = ['full_time', 'part_time', 'contract', 'internship']
 const SENIORITY = ['junior', 'mid', 'senior', 'lead', 'principal', 'staff']
 
-function ResultRow({ label, value }) {
-  return (
-    <div className="bg-slate-50 rounded px-3 py-2">
-      <span className="text-slate-500 text-xs uppercase tracking-wide">{label}: </span>
-      <span className="text-slate-800 font-medium">{value}</span>
-    </div>
-  )
-}
-
 function Toggle({ label, value, options, onChange }) {
   return (
     <div className="mb-4">
@@ -42,29 +33,26 @@ export default function Setup() {
   const [email, setEmail] = useState('')
   const [userId, setUserId] = useState(() => localStorage.getItem('userId') || '')
   const [status, setStatus] = useState('')
+  const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState({
     work_modes: ['remote'],
     job_types: ['full_time'],
-    locations: ['United States'],
+    locations: 'United States',
     seniority_levels: ['senior'],
     sectors: '',
     companies: '',
     min_salary: '',
     max_salary: '',
-    role_description: '',
-    original_role_description: '',
     title_include: '',
     title_exclude: '',
   })
   const [aiText, setAiText] = useState('')
   const [resumeFile, setResumeFile] = useState(null)
-  const [parsing, setParsing] = useState(false)
-  const [aiResult, setAiResult] = useState(null)
   const fileRef = useRef(null)
   const statusTimer = useRef(null)
 
-  function showStatus(msg) {
-    setStatus(msg)
+  function showStatus(msg, error = false) {
+    setStatus({ msg, error })
     if (statusTimer.current) clearTimeout(statusTimer.current)
     statusTimer.current = setTimeout(() => setStatus(''), 4000)
   }
@@ -72,20 +60,21 @@ export default function Setup() {
   useEffect(() => {
     if (userId) {
       getProfile(userId)
-        .then(p => setProfile({
-          work_modes: p.work_modes || ['remote'],
-          job_types: p.job_types || ['full_time'],
-          locations: (p.locations || []).join(', '),
-          seniority_levels: p.seniority_level ? [p.seniority_level] : ['senior'],
-          sectors: (p.preferred_sectors || []).join(', '),
-          companies: (p.preferred_companies || []).join(', '),
-          min_salary: p.salary_min || '',
-          max_salary: p.salary_max || '',
-          role_description: p.role_description || '',
-          original_role_description: p.original_role_description || '',
-          title_include: (p.title_include || []).join(', '),
-          title_exclude: (p.title_exclude || []).join(', '),
-        }))
+        .then(p => {
+          setProfile({
+            work_modes: p.work_modes || ['remote'],
+            job_types: p.job_types || ['full_time'],
+            locations: (p.locations || []).join(', '),
+            seniority_levels: p.seniority_level ? [p.seniority_level] : ['senior'],
+            sectors: (p.preferred_sectors || []).join(', '),
+            companies: (p.preferred_companies || []).join(', '),
+            min_salary: p.salary_min || '',
+            max_salary: p.salary_max || '',
+            title_include: (p.title_include || []).join(', '),
+            title_exclude: (p.title_exclude || []).join(', '),
+          })
+          if (p.role_description) setAiText(p.role_description)
+        })
         .catch(() => {})
     }
   }, [userId])
@@ -98,55 +87,34 @@ export default function Setup() {
       setUserId(user.id)
       showStatus('Logged in!')
     } catch (err) {
-      setStatus(err.response?.data?.detail || 'Error')
+      showStatus(err.response?.data?.detail || 'Error creating account', true)
     }
   }
 
-  async function handleGenerate() {
-    if (!aiText.trim() && !resumeFile) return
-    setParsing(true)
-    setStatus('')
+  async function handleSave() {
+    if (!aiText.trim() && !resumeFile) {
+      showStatus('Please describe what you are looking for before saving.', true)
+      return
+    }
+    setSaving(true)
     try {
       const extracted = await parseProfile(userId, aiText, resumeFile)
-      setAiResult(extracted)
-      setProfile(p => ({
-        ...p,
-        work_modes: extracted.work_modes || p.work_modes,
-        job_types: extracted.job_types || p.job_types,
-        locations: extracted.locations?.length ? extracted.locations.join(', ') : p.locations,
-        seniority_levels: extracted.seniority_level ? [extracted.seniority_level] : p.seniority_levels,
-        sectors: extracted.preferred_sectors?.length ? extracted.preferred_sectors.join(', ') : p.sectors,
-        min_salary: extracted.salary_min || p.min_salary,
-        max_salary: extracted.salary_max || p.max_salary,
-        companies: extracted.preferred_companies?.length ? extracted.preferred_companies.join(', ') : p.companies,
-        role_description: extracted.role_description || p.role_description,
-        original_role_description: extracted.original_role_description || extracted.role_description || p.original_role_description,
-      }))
-      showStatus('Profile generated — review and save below.')
-    } catch (err) {
-      showStatus(err.response?.data?.detail || 'Failed to generate profile')
-    } finally {
-      setParsing(false)
-    }
-  }
 
-  async function handleSaveProfile() {
-    try {
       const saved = await upsertProfile(userId, {
         work_modes: profile.work_modes,
         job_types: profile.job_types,
-        locations: typeof profile.locations === 'string'
-          ? profile.locations.split(',').map(s => s.trim()).filter(Boolean)
-          : profile.locations,
+        locations: profile.locations.split(',').map(s => s.trim()).filter(Boolean),
         seniority_level: profile.seniority_levels[0] || null,
         preferred_sectors: String(profile.sectors || '').split(',').map(s => s.trim()).filter(Boolean),
         preferred_companies: String(profile.companies || '').split(',').map(s => s.trim()).filter(Boolean),
         salary_min: profile.min_salary ? parseInt(profile.min_salary) : null,
         salary_max: profile.max_salary ? parseInt(profile.max_salary) : null,
-        role_description: profile.role_description || null,
+        role_description: extracted.role_description || null,
+        original_role_description: extracted.original_role_description || extracted.role_description || null,
         title_include: String(profile.title_include || '').split(',').map(s => s.trim()).filter(Boolean),
         title_exclude: String(profile.title_exclude || '').split(',').map(s => s.trim()).filter(Boolean),
       })
+
       setProfile({
         work_modes: saved.work_modes || ['remote'],
         job_types: saved.job_types || ['full_time'],
@@ -156,15 +124,14 @@ export default function Setup() {
         companies: (saved.preferred_companies || []).join(', '),
         min_salary: saved.salary_min || '',
         max_salary: saved.salary_max || '',
-        role_description: saved.role_description || '',
-        original_role_description: saved.original_role_description || '',
         title_include: (saved.title_include || []).join(', '),
         title_exclude: (saved.title_exclude || []).join(', '),
       })
       showStatus('Profile saved!')
     } catch (err) {
-      console.error('Save error:', err)
-      showStatus(err.message || err.response?.data?.detail || 'Error saving profile')
+      showStatus(err.response?.data?.detail || err.message || 'Error saving profile', true)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -172,14 +139,15 @@ export default function Setup() {
     <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-6">Account Setup</h1>
 
-      {/* User creation */}
+      {/* Login */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-4">1. Create Account</h2>
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">1. Account</h2>
         {userId ? (
           <div className="flex items-center gap-3">
             <span className="text-green-600 font-medium">✓ Logged in</span>
             <code className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">{userId}</code>
             <button
+              type="button"
               onClick={() => { localStorage.removeItem('userId'); setUserId('') }}
               className="text-xs text-slate-400 hover:text-red-500"
             >
@@ -206,20 +174,28 @@ export default function Setup() {
         )}
       </div>
 
-      {/* Profile */}
       {userId && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-1">2. Generate with AI</h2>
-          <p className="text-sm text-slate-500 mb-4">Describe what you're looking for, upload your resume, or both — Claude will fill in your profile.</p>
-          <textarea
-            rows={3}
-            placeholder='e.g. "I am looking for an applied AI role at a large corporation, senior level, remote, in the US"'
-            value={aiText}
-            onChange={e => setAiText(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
-          />
-          <div className="flex items-center gap-3 mb-3">
-            <label className="text-sm text-slate-600 font-medium">Resume (PDF):</label>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
+          <h2 className="text-lg font-semibold text-slate-800">2. Your Profile</h2>
+
+          {/* AI description */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Describe what you're looking for <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-slate-400 mb-2">Claude will use this to understand your background and match you to jobs.</p>
+            <textarea
+              rows={4}
+              placeholder='e.g. "I am a senior ML engineer with 7 years of experience. Looking for a remote AI role at a growth-stage startup in the US."'
+              value={aiText}
+              onChange={e => setAiText(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* Resume */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-slate-600 font-medium">Resume (PDF, optional):</label>
             <input
               ref={fileRef}
               type="file"
@@ -232,193 +208,99 @@ export default function Setup() {
                 className="text-xs text-red-400 hover:text-red-600">Remove</button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={parsing || (!aiText.trim() && !resumeFile)}
-            className="w-full bg-purple-600 text-white py-2.5 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          >
-            {parsing ? (
-              <>
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                </svg>
-                Generating...
-              </>
-            ) : 'Generate Profile with AI'}
-          </button>
 
-          {aiResult && (
-            <div className="mt-5 border-t border-slate-100 pt-5">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">What AI extracted</p>
-              <div className="space-y-2 text-sm">
-                {aiResult.role_description && (
-                  <div className="bg-purple-50 rounded-lg px-3 py-2">
-                    <span className="font-medium text-purple-800">Summary: </span>
-                    <span className="text-purple-700">{aiResult.role_description}</span>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <ResultRow label="Work mode" value={(aiResult.work_modes || []).join(', ')} />
-                  <ResultRow label="Job type" value={(aiResult.job_types || []).join(', ')} />
-                  <ResultRow label="Seniority" value={aiResult.seniority_level || '—'} />
-                  <ResultRow label="Location" value={(aiResult.locations || []).join(', ')} />
-                  <ResultRow label="Sectors" value={(aiResult.preferred_sectors || []).join(', ') || '—'} />
-                  <ResultRow label="Company size" value={(aiResult.preferred_company_sizes || []).join(', ') || '—'} />
-                  <ResultRow label="Min salary" value={aiResult.salary_min ? `$${aiResult.salary_min.toLocaleString()}` : '—'} />
-                  <ResultRow label="Max salary" value={aiResult.salary_max ? `$${aiResult.salary_max.toLocaleString()}` : '—'} />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {userId && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-800">3. Job Preferences</h2>
-            <button
-              type="button"
-              onClick={async () => {
-                const cleared = { work_modes: [], job_types: [], seniority_levels: [], locations: '', companies: '', sectors: '', min_salary: '', max_salary: '' }
-                setProfile(p => ({ ...p, ...cleared }))
-                try {
-                  await upsertProfile(userId, { work_modes: [], job_types: [], locations: [], preferred_sectors: [], preferred_companies: [], seniority_level: null, salary_min: null, salary_max: null })
-                  showStatus('All filters cleared and saved.')
-                } catch { showStatus('Cleared locally — click Save to persist.') }
-              }}
-              className="text-xs text-red-500 border border-red-200 px-3 py-1 rounded-full hover:bg-red-50 transition-colors"
-            >
-              Clear all filters
-            </button>
-          </div>
-          <div className="space-y-2">
-            {(profile.original_role_description || profile.role_description) && (
-              <div className="space-y-3 mb-4">
-                {profile.original_role_description && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Original Profile (from resume)</p>
-                    <p className="text-sm text-slate-700">{profile.original_role_description}</p>
-                  </div>
-                )}
-                {profile.role_description && profile.role_description !== profile.original_role_description && (
-                  <div className="bg-purple-50 border border-purple-300 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-1">Evolving Profile (refined by feedback)</p>
-                    <p className="text-sm text-purple-800">{profile.role_description}</p>
-                  </div>
-                )}
-                {profile.role_description && profile.role_description === profile.original_role_description && (
-                  <p className="text-xs text-slate-400 italic">Evolving profile matches original — rate more jobs to refine it.</p>
-                )}
-              </div>
-            )}
+          {/* Hard filters */}
+          <div className="border-t border-slate-100 pt-5">
+            <p className="text-sm font-semibold text-slate-700 mb-4">Job Filters</p>
             <Toggle label="Work Mode" value={profile.work_modes} options={WORK_MODES} onChange={v => setProfile(p => ({ ...p, work_modes: v }))} />
             <Toggle label="Job Type" value={profile.job_types} options={JOB_TYPES} onChange={v => setProfile(p => ({ ...p, job_types: v }))} />
             <Toggle label="Seniority" value={profile.seniority_levels} options={SENIORITY} onChange={v => setProfile(p => ({ ...p, seniority_levels: v }))} />
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-2">Locations (comma-separated)</label>
-              <input
-                type="text"
-                value={profile.locations}
+              <label className="block text-sm font-medium text-slate-700 mb-1">Locations (comma-separated)</label>
+              <input type="text" value={profile.locations}
                 onChange={e => setProfile(p => ({ ...p, locations: e.target.value }))}
                 placeholder="United States, Canada"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-2">Sectors (comma-separated)</label>
-              <input
-                type="text"
-                value={profile.sectors}
+              <label className="block text-sm font-medium text-slate-700 mb-1">Sectors (comma-separated)</label>
+              <input type="text" value={profile.sectors}
                 onChange={e => setProfile(p => ({ ...p, sectors: e.target.value }))}
                 placeholder="Fintech, SaaS, Healthcare"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Target Companies (comma-separated)
-                <span className="ml-2 text-xs text-slate-400 font-normal">leave empty to match all companies</span>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Target Companies <span className="text-xs text-slate-400 font-normal">(comma-separated, leave empty for all)</span>
               </label>
-              <input
-                type="text"
-                value={profile.companies}
+              <input type="text" value={profile.companies}
                 onChange={e => setProfile(p => ({ ...p, companies: e.target.value }))}
                 placeholder="Google, OpenAI, Anthropic"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
             <div className="mb-4 border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-3">
               <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Title Keyword Filters</p>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Must include <span className="text-xs text-slate-400 font-normal">— title must contain at least one</span>
-                </label>
-                <input
-                  type="text"
-                  value={profile.title_include}
+                <label className="block text-sm font-medium text-slate-700 mb-1">Must include</label>
+                <input type="text" value={profile.title_include}
                   onChange={e => setProfile(p => ({ ...p, title_include: e.target.value }))}
                   placeholder="engineer, scientist, manager"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Must exclude <span className="text-xs text-slate-400 font-normal">— title must NOT contain any</span>
-                </label>
-                <input
-                  type="text"
-                  value={profile.title_exclude}
+                <label className="block text-sm font-medium text-slate-700 mb-1">Must exclude</label>
+                <input type="text" value={profile.title_exclude}
                   onChange={e => setProfile(p => ({ ...p, title_exclude: e.target.value }))}
-                  placeholder="intern, director, data scientist"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
+                  placeholder="intern, director"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Min Salary (USD)</label>
-                <input
-                  type="number"
-                  value={profile.min_salary}
+                <label className="block text-sm font-medium text-slate-700 mb-1">Min Salary (USD)</label>
+                <input type="number" value={profile.min_salary}
                   onChange={e => setProfile(p => ({ ...p, min_salary: e.target.value }))}
                   placeholder="150000"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Max Salary (USD)</label>
-                <input
-                  type="number"
-                  value={profile.max_salary}
+                <label className="block text-sm font-medium text-slate-700 mb-1">Max Salary (USD)</label>
+                <input type="number" value={profile.max_salary}
                   onChange={e => setProfile(p => ({ ...p, max_salary: e.target.value }))}
                   placeholder="300000"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={handleSaveProfile}
-              className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-            >
-              Save Preferences
-            </button>
           </div>
+
+          {/* Save */}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          >
+            {saving ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                Saving...
+              </>
+            ) : 'Save Profile'}
+          </button>
         </div>
       )}
 
       {status && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-green-600 text-white rounded-xl shadow-lg text-sm font-medium">
-          {status}
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${status.error ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
+          {status.msg}
         </div>
       )}
     </div>
