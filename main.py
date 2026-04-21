@@ -39,8 +39,8 @@ app.add_middleware(
         "https://jobmatch-76c4.onrender.com",
         "https://jobmatch-dev-static.onrender.com",
     ],
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(users_router)
