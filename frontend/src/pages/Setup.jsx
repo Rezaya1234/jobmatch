@@ -130,8 +130,7 @@ export default function Setup() {
     }
   }
 
-  async function handleSaveProfile(e) {
-    e.preventDefault()
+  async function handleSaveProfile() {
     try {
       const saved = await upsertProfile(userId, {
         work_modes: profile.work_modes,
@@ -295,7 +294,7 @@ export default function Setup() {
               Clear all filters
             </button>
           </div>
-          <form onSubmit={handleSaveProfile} className="space-y-2">
+          <div className="space-y-2">
             {(profile.original_role_description || profile.role_description) && (
               <div className="space-y-3 mb-4">
                 {profile.original_role_description && (
@@ -407,12 +406,13 @@ export default function Setup() {
             </div>
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleSaveProfile}
               className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
             >
               Save Preferences
             </button>
-          </form>
+          </div>
         </div>
       )}
 
