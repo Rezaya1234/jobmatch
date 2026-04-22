@@ -33,6 +33,7 @@ Fields you may update (omit any where feedback gives no clear signal):
 
 Rules:
 - thumbs_up = liked; thumbs_down = disliked. Comments carry extra weight.
+- weight=2 means an explicit button press (strong signal); weight=1 means a passive click (weak signal). Treat weight-2 items with more confidence.
 - Only update a field when you see a clear repeated pattern (2+ data points).
 - For role_description: synthesize patterns from liked AND disliked jobs. What does this
   person consistently gravitate toward? What do they keep rejecting? Be concrete.
@@ -133,6 +134,7 @@ class FeedbackAgent:
         for feedback, job in result.all():
             rows.append({
                 "rating": feedback.rating,
+                "weight": feedback.weight or 1,
                 "comment": feedback.comment or None,
                 "job_title": job.title,
                 "company": job.company,

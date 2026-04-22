@@ -9,6 +9,7 @@ load_dotenv()  # must run before any module reads os.getenv
 from fastapi import FastAPI  # noqa: E402 — import after dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.feedback import click_router as feedback_click_router
 from api.feedback import router as feedback_router
 from api.jobs import router as jobs_router
 from api.matches import router as matches_router
@@ -47,6 +48,7 @@ app.include_router(users_router)
 app.include_router(jobs_router)
 app.include_router(matches_router)
 app.include_router(feedback_router)
+app.include_router(feedback_click_router)
 app.include_router(pipeline_router)
 
 

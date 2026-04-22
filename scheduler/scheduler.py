@@ -14,9 +14,9 @@ _scheduler = AsyncIOScheduler()
 
 
 def start() -> None:
-    hour = int(os.getenv("PIPELINE_CRON_HOUR", "8"))
+    hour = int(os.getenv("PIPELINE_CRON_HOUR", "3"))
     minute = int(os.getenv("PIPELINE_CRON_MINUTE", "0"))
-    timezone = os.getenv("PIPELINE_TIMEZONE", "UTC")
+    timezone = os.getenv("PIPELINE_TIMEZONE", "America/Chicago")
 
     _scheduler.add_job(
         _run_daily_pipeline,

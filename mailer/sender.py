@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
 
 from sendgrid import SendGridAPIClient
@@ -16,23 +17,26 @@ logger = logging.getLogger(__name__)
 TOP_N = int(os.getenv("DIGEST_TOP_N", "10"))
 FROM_EMAIL = os.getenv("FROM_EMAIL", "digest@jobmatch.app")
 FROM_NAME = os.getenv("FROM_NAME", "JobMatch")
+BACKEND_URL = os.getenv("BACKEND_URL", "").rstrip("/")
 
 
-async def send_daily_digest(user_id: str, session: AsyncSession) -> int:
+async def send_daily_digest(user_id: str, session: AsyncSession, test: bool = False) -> int:
     """
     Build and send the daily digest for one user.
     Returns 1 on success, 0 if nothing to send or on failure.
+    If test=True, includes already-emailed matches and does not update emailed_at.
     """
     user = await _get_user(user_id, session)
     if user is None:
         logger.warning("User %s not found — skipping email", user_id)
         return 0
 
-    matches = await _get_top_matches(user_id, session)
+    matches = await _get_top_matches(user_id, session, include_emailed=test)
     if not matches:
         logger.info("No scored matches to email for user %s", user_id)
         return 0
 
+    logger.info("Sending digest to %s — %d matches, BACKEND_URL=%r", user.email, len(matches), BACKEND_URL)
     items = [_to_digest_item(match, job) for match, job in matches]
     date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
 
@@ -46,11 +50,11 @@ async def send_daily_digest(user_id: str, session: AsyncSession) -> int:
         logger.exception("SendGrid call failed for user %s", user_id)
         return 0
 
-    # Mark all sent matches so they aren't re-sent tomorrow
-    now = datetime.now(timezone.utc)
-    for match, _ in matches:
-        match.emailed_at = now
-    await session.commit()
+    if not test:
+        now = datetime.now(timezone.utc)
+        for match, _ in matches:
+            match.emailed_at = now
+        await session.commit()
 
     logger.info("Digest sent to %s (%d jobs)", user.email, len(items))
     return 1
@@ -86,23 +90,27 @@ def _send_via_sendgrid(to_email: str, subject: str, html: str, plain: str) -> No
 # ------------------------------------------------------------------
 
 async def _get_user(user_id: str, session: AsyncSession) -> User | None:
-    result = await session.execute(select(User).where(User.id == user_id))
+    uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    result = await session.execute(select(User).where(User.id == uid))
     return result.scalar_one_or_none()
 
 
 async def _get_top_matches(
-    user_id: str, session: AsyncSession
+    user_id: str, session: AsyncSession, include_emailed: bool = False
 ) -> list[tuple[JobMatch, Job]]:
-    """Return top-N scored, not-yet-emailed matches joined with their job."""
+    """Return top-N scored matches joined with their job."""
+    uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    conditions = [
+        JobMatch.user_id == uid,
+        JobMatch.passed_hard_filter.is_(True),
+        JobMatch.score.isnot(None),
+    ]
+    if not include_emailed:
+        conditions.append(JobMatch.emailed_at.is_(None))
     result = await session.execute(
         select(JobMatch, Job)
         .join(Job, JobMatch.job_id == Job.id)
-        .where(
-            JobMatch.user_id == user_id,
-            JobMatch.passed_hard_filter.is_(True),
-            JobMatch.score.isnot(None),
-            JobMatch.emailed_at.is_(None),
-        )
+        .where(*conditions)
         .order_by(JobMatch.score.desc())
         .limit(TOP_N)
     )
@@ -121,4 +129,7 @@ def _to_digest_item(match: JobMatch, job: Job) -> JobDigestItem:
         salary_min=job.salary_min,
         salary_max=job.salary_max,
         salary_currency=job.salary_currency,
+        user_id=str(match.user_id),
+        job_id=str(match.job_id),
+        feedback_base_url=BACKEND_URL,
     )

@@ -1,7 +1,9 @@
 import logging
+import uuid as _uuid
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,7 @@ from llm.client import LLMClient
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users/{user_id}/feedback", tags=["feedback"])
+click_router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 _VALID_RATINGS = {"thumbs_up", "thumbs_down"}
 
@@ -26,6 +29,7 @@ class SubmitFeedbackRequest(BaseModel):
     job_id: str
     rating: str          # "thumbs_up" or "thumbs_down"
     comment: str | None = None
+    weight: int | None = None  # 1 = passive click signal, 2 = explicit button press
 
 
 class FeedbackResponse(BaseModel):
@@ -89,9 +93,22 @@ async def submit_feedback(
             match_id=str(match.id) if match else None,
         )
         session.add(feedback)
+    elif body.weight == 1:
+        # Passive click signal — never overrides an existing explicit rating
+        await session.refresh(feedback)
+        return FeedbackResponse(
+            id=str(feedback.id),
+            job_id=str(feedback.job_id),
+            job_title=job.title,
+            company=job.company,
+            rating=feedback.rating,
+            comment=feedback.comment,
+            created_at=feedback.created_at,
+        )
 
     feedback.rating = body.rating
     feedback.comment = body.comment
+    feedback.weight = body.weight
 
     await session.commit()
     await session.refresh(feedback)
@@ -163,3 +180,85 @@ async def _run_learn_and_rescore(user_id: str, llm: LLMClient) -> None:
                 logger.info("No profile updates from feedback for user %s", user_id)
         except Exception:
             logger.exception("learn_and_rescore failed for user %s", user_id)
+
+
+# ------------------------------------------------------------------
+# One-click email feedback  GET /feedback/click
+# ------------------------------------------------------------------
+
+@click_router.get("/click", response_class=HTMLResponse, include_in_schema=False)
+async def feedback_click(
+    user_id: str = Query(...),
+    job_id: str = Query(...),
+    rating: str = Query(...),
+    session: AsyncSession = Depends(get_session),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    llm: LLMClient = Depends(get_llm),
+) -> HTMLResponse:
+    """One-click feedback from email links. Returns a simple thank-you page."""
+    if rating not in _VALID_RATINGS:
+        return HTMLResponse(_thanks_page("Invalid rating.", error=True), status_code=400)
+    try:
+        uid = _uuid.UUID(user_id)
+        jid = _uuid.UUID(job_id)
+    except ValueError:
+        return HTMLResponse(_thanks_page("Invalid link.", error=True), status_code=400)
+
+    job_result = await session.execute(select(Job).where(Job.id == jid))
+    job = job_result.scalar_one_or_none()
+    if job is None:
+        return HTMLResponse(_thanks_page("Job not found.", error=True), status_code=404)
+
+    match_result = await session.execute(
+        select(JobMatch).where(JobMatch.user_id == uid, JobMatch.job_id == jid)
+    )
+    match = match_result.scalar_one_or_none()
+
+    fb_result = await session.execute(
+        select(Feedback).where(Feedback.user_id == uid, Feedback.job_id == jid)
+    )
+    feedback = fb_result.scalar_one_or_none()
+    if feedback is None:
+        feedback = Feedback(user_id=uid, job_id=jid, match_id=match.id if match else None)
+        session.add(feedback)
+    feedback.rating = rating
+
+    await session.commit()
+    logger.info("Email feedback: user=%s job=%s rating=%s", user_id, job_id, rating)
+
+    count_result = await session.scalar(
+        select(func.count()).select_from(Feedback).where(Feedback.user_id == uid)
+    )
+    if (count_result or 0) >= _AUTO_LEARN_THRESHOLD and (count_result or 0) % _AUTO_LEARN_THRESHOLD == 0:
+        background_tasks.add_task(_run_learn_and_rescore, user_id, llm)
+
+    emoji = "👍" if rating == "thumbs_up" else "👎"
+    label = "Great match" if rating == "thumbs_up" else "Not relevant"
+    return HTMLResponse(_thanks_page(f"{emoji} Got it — <strong>{label}</strong> for <em>{job.title}</em> at {job.company}. Thanks!"))
+
+
+def _thanks_page(message: str, error: bool = False) -> str:
+    color = "#dc2626" if error else "#16a34a"
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobMatch Feedback</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; background: #f5f5f5; display: flex; align-items: center;
+            justify-content: center; min-height: 100vh; margin: 0; }}
+    .card {{ background: #fff; border-radius: 12px; padding: 40px 48px; text-align: center;
+             max-width: 480px; box-shadow: 0 2px 16px rgba(0,0,0,.08); }}
+    h1 {{ color: {color}; font-size: 20px; margin-bottom: 12px; }}
+    p {{ color: #555; font-size: 15px; line-height: 1.6; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>JobMatch</h1>
+    <p>{message}</p>
+    <p style="margin-top:20px;font-size:13px;color:#aaa;">You can close this tab.</p>
+  </div>
+</body>
+</html>"""
