@@ -86,13 +86,10 @@ async def list_matches(
     min_score: float = Query(default=0.0, ge=0.0, le=1.0),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    include_disliked: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
 ) -> list[MatchResponse]:
     companies = await _get_preferred_companies(user_id, session)
-    disliked = select(Feedback.job_id).where(
-        Feedback.user_id == user_id,
-        Feedback.rating == "thumbs_down",
-    )
     stmt = (
         select(JobMatch, Job)
         .join(Job, JobMatch.job_id == Job.id)
@@ -100,10 +97,15 @@ async def list_matches(
             JobMatch.user_id == user_id,
             JobMatch.passed_hard_filter.is_(True),
             JobMatch.score >= min_score,
-            JobMatch.job_id.notin_(disliked),
             Job.is_active.is_(True),
         )
     )
+    if not include_disliked:
+        disliked = select(Feedback.job_id).where(
+            Feedback.user_id == user_id,
+            Feedback.rating == "thumbs_down",
+        )
+        stmt = stmt.where(JobMatch.job_id.notin_(disliked))
     if companies:
         stmt = stmt.where(_company_filter(companies))
     stmt = stmt.order_by(JobMatch.score.desc()).limit(limit).offset(offset)
