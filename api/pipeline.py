@@ -154,6 +154,19 @@ async def trigger_rescore(
     return PipelineResponse(status="accepted", detail="Re-scoring started.")
 
 
+@router.post("/test-email/{user_id}", response_model=PipelineResponse, status_code=200)
+async def trigger_test_email(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> PipelineResponse:
+    """Send a digest email immediately using current top matches."""
+    from mailer.sender import send_daily_digest
+    sent = await send_daily_digest(user_id, session)
+    if sent:
+        return PipelineResponse(status="sent", detail="Test email sent!")
+    return PipelineResponse(status="nothing_to_send", detail="No scored matches to email yet.")
+
+
 @router.post("/feedback/{user_id}", response_model=PipelineResponse, status_code=202)
 async def trigger_feedback_pipeline(
     user_id: str,

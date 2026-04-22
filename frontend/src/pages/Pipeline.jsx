@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { triggerDailyPipeline, triggerCollect, triggerResetFilters, getJobCount, getMatchCount } from '../api'
+import { triggerDailyPipeline, triggerCollect, triggerResetFilters, triggerTestEmail, getJobCount, getMatchCount } from '../api'
 import axios from 'axios'
 
 const getPipelineStatus = () => axios.get('/api/pipeline/status').then(r => r.data)
@@ -35,6 +35,7 @@ export default function Pipeline() {
   const [state, setState] = useState({ status: 'idle', step: '', new_jobs: 0, passed_filter: 0, scored: 0, error: '', started_at: '', finished_at: '', filter_warning: '' })
   const [totals, setTotals] = useState({ jobs: 0, matches: 0 })
   const [triggering, setTriggering] = useState(false)
+  const [emailStatus, setEmailStatus] = useState('')
   const pollRef = useRef(null)
 
   async function fetchTotals() {
@@ -103,6 +104,20 @@ export default function Pipeline() {
     }
   }
 
+  async function handleTestEmail() {
+    const userId = localStorage.getItem('userId')
+    if (!userId) return
+    setEmailStatus('sending')
+    try {
+      const res = await triggerTestEmail(userId)
+      setEmailStatus(res.status === 'sent' ? 'sent' : 'empty')
+    } catch {
+      setEmailStatus('error')
+    } finally {
+      setTimeout(() => setEmailStatus(''), 5000)
+    }
+  }
+
   async function handleResetFilters() {
     const userId = localStorage.getItem('userId')
     if (!userId) return
@@ -163,6 +178,7 @@ export default function Pipeline() {
 
         <div className="space-y-2">
           <div className="grid grid-cols-3 gap-2">
+
             <button onClick={handleCollect} disabled={isRunning || triggering}
               className="bg-slate-700 text-white py-2.5 rounded-lg font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
               Collect New Jobs
@@ -191,6 +207,10 @@ export default function Pipeline() {
               <div className="text-xs opacity-70 font-normal mt-0.5">re-filter all jobs</div>
             </button>
           </div>
+          <button onClick={handleTestEmail} disabled={isRunning || triggering || emailStatus === 'sending'}
+            className="w-full bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
+            {emailStatus === 'sending' ? 'Sending...' : emailStatus === 'sent' ? '✓ Email sent! Check your inbox' : emailStatus === 'empty' ? 'No matches to email yet' : emailStatus === 'error' ? 'Failed — check SENDGRID_API_KEY' : 'Send Test Email'}
+          </button>
         </div>
       </div>
 

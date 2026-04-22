@@ -21,6 +21,7 @@ export const triggerMatchAll = () => http.post('/pipeline/match-all').then(r => 
 export const triggerFeedbackPipeline = (id) => http.post(`/pipeline/feedback/${id}`).then(r => r.data)
 export const triggerRescore = (id) => http.post(`/pipeline/rescore/${id}`).then(r => r.data)
 export const triggerResetFilters = (id) => http.post(`/pipeline/reset-filters/${id}`).then(r => r.data)
+export const triggerTestEmail = (id) => http.post(`/pipeline/test-email/${id}`).then(r => r.data)
 export const parseProfile = (id, text, resumeFile) => {
   const form = new FormData()
   if (text) form.append('text', text)
