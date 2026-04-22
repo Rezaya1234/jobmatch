@@ -161,7 +161,7 @@ async def trigger_test_email(
 ) -> PipelineResponse:
     """Send a digest email immediately using current top matches."""
     from mailer.sender import send_daily_digest
-    sent = await send_daily_digest(user_id, session)
+    sent = await send_daily_digest(user_id, session, test=True)
     if sent:
         return PipelineResponse(status="sent", detail="Test email sent!")
     return PipelineResponse(status="nothing_to_send", detail="No scored matches to email yet.")

@@ -240,8 +240,8 @@ export default function Pipeline() {
           <span className="text-amber-500 text-xl">⚠️</span>
           <div>
             <p className="text-sm font-semibold text-amber-800">{state.filter_warning}</p>
-            <a href="/setup" className="text-xs text-amber-700 underline mt-1 inline-block">
-              Go to Setup to tighten your filters →
+            <a href="/profile" className="text-xs text-amber-700 underline mt-1 inline-block">
+              Go to Profile to tighten your filters →
             </a>
           </div>
         </div>

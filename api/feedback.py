@@ -29,6 +29,7 @@ class SubmitFeedbackRequest(BaseModel):
     job_id: str
     rating: str          # "thumbs_up" or "thumbs_down"
     comment: str | None = None
+    weight: int | None = None  # 1 = passive click signal, 2 = explicit button press
 
 
 class FeedbackResponse(BaseModel):
@@ -92,9 +93,22 @@ async def submit_feedback(
             match_id=str(match.id) if match else None,
         )
         session.add(feedback)
+    elif body.weight == 1:
+        # Passive click signal — never overrides an existing explicit rating
+        await session.refresh(feedback)
+        return FeedbackResponse(
+            id=str(feedback.id),
+            job_id=str(feedback.job_id),
+            job_title=job.title,
+            company=job.company,
+            rating=feedback.rating,
+            comment=feedback.comment,
+            created_at=feedback.created_at,
+        )
 
     feedback.rating = body.rating
     feedback.comment = body.comment
+    feedback.weight = body.weight
 
     await session.commit()
     await session.refresh(feedback)

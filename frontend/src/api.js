@@ -8,8 +8,8 @@ export const upsertProfile = (id, profile) => http.post(`/users/${id}/profile`, 
 export const getProfile = (id) => http.get(`/users/${id}/profile`).then(r => r.data)
 export const getMatches = (id, minScore = 0, limit = 50) =>
   http.get(`/users/${id}/matches`, { params: { min_score: minScore, limit } }).then(r => r.data)
-export const submitFeedback = (id, jobId, rating, comment = '') =>
-  http.post(`/users/${id}/feedback`, { job_id: jobId, rating, comment }).then(r => r.data)
+export const submitFeedback = (id, jobId, rating, comment = '', weight = null) =>
+  http.post(`/users/${id}/feedback`, { job_id: jobId, rating, comment, weight }).then(r => r.data)
 export const getFeedback = (id) => http.get(`/users/${id}/feedback`).then(r => r.data)
 export const listJobs = (search = '', limit = 100) =>
   http.get('/jobs', { params: { search, limit } }).then(r => r.data)
