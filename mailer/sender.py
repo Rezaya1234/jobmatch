@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
 
 from sendgrid import SendGridAPIClient
@@ -86,7 +87,8 @@ def _send_via_sendgrid(to_email: str, subject: str, html: str, plain: str) -> No
 # ------------------------------------------------------------------
 
 async def _get_user(user_id: str, session: AsyncSession) -> User | None:
-    result = await session.execute(select(User).where(User.id == user_id))
+    uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    result = await session.execute(select(User).where(User.id == uid))
     return result.scalar_one_or_none()
 
 
@@ -94,11 +96,12 @@ async def _get_top_matches(
     user_id: str, session: AsyncSession
 ) -> list[tuple[JobMatch, Job]]:
     """Return top-N scored, not-yet-emailed matches joined with their job."""
+    uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
     result = await session.execute(
         select(JobMatch, Job)
         .join(Job, JobMatch.job_id == Job.id)
         .where(
-            JobMatch.user_id == user_id,
+            JobMatch.user_id == uid,
             JobMatch.passed_hard_filter.is_(True),
             JobMatch.score.isnot(None),
             JobMatch.emailed_at.is_(None),
