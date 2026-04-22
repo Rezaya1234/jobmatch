@@ -115,12 +115,23 @@ async def trigger_reset_filters(
     session: AsyncSession = Depends(get_session),
 ) -> PipelineResponse:
     """Delete all job_match rows for a user so the next pipeline run re-filters everything fresh."""
-    from sqlalchemy import delete
+    if _state.status == "running":
+        return PipelineResponse(status="already_running", detail="Pipeline is already running.")
+    import uuid as _uuid
+    from sqlalchemy import delete, func, select
     from db.models import JobMatch
-    await session.execute(delete(JobMatch).where(JobMatch.user_id == user_id))
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        return PipelineResponse(status="error", detail=f"Invalid user_id: {user_id}")
+    before = await session.scalar(
+        select(func.count()).select_from(JobMatch).where(JobMatch.user_id == uid)
+    )
+    await session.execute(delete(JobMatch).where(JobMatch.user_id == uid))
     await session.commit()
+    logger.info("Reset filters for user %s — deleted %d job_match rows", user_id, before or 0)
     background_tasks.add_task(_run_match_all, llm)
-    return PipelineResponse(status="accepted", detail="Filters reset — re-running pipeline.")
+    return PipelineResponse(status="accepted", detail=f"Filters reset ({before or 0} matches cleared) — re-running pipeline.")
 
 
 @router.post("/rescore/{user_id}", response_model=PipelineResponse, status_code=202)
