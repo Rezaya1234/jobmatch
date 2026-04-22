@@ -49,7 +49,6 @@ function FeedbackRow({ match, userId, initialRating, onFeedback }) {
 function TodayCard({ match, userId, initialRating, onFeedback }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-1">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{match.company}</p>
@@ -58,43 +57,32 @@ function TodayCard({ match, userId, initialRating, onFeedback }) {
         <ScoreBadge score={match.score} />
       </div>
 
-      {/* Tags */}
       <div className="flex flex-wrap gap-2 mt-3 mb-4">
-        {match.work_mode && (
-          <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full">{match.work_mode}</span>
-        )}
-        {match.location_raw && (
-          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{match.location_raw}</span>
-        )}
+        {match.work_mode && <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full">{match.work_mode}</span>}
+        {match.location_raw && <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{match.location_raw}</span>}
         {match.salary_min && (
           <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">
             ${(match.salary_min / 1000).toFixed(0)}k{match.salary_max ? `–$${(match.salary_max / 1000).toFixed(0)}k` : '+'}
           </span>
         )}
-        {match.sector && (
-          <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full">{match.sector}</span>
-        )}
+        {match.sector && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full">{match.sector}</span>}
       </div>
 
-      {/* Why it matches */}
       <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 mb-3">
         <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Why it matches your profile</p>
         <p className="text-sm text-blue-900 leading-relaxed">{match.reasoning || 'No reasoning available yet.'}</p>
       </div>
 
-      {/* Gap analysis placeholder */}
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-3">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Gap Analysis · Coming Soon</p>
         <p className="text-sm text-slate-400">We'll highlight where your profile doesn't perfectly align with this role.</p>
       </div>
 
-      {/* Company insights placeholder */}
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-4">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Company Insights · Coming Soon</p>
         <p className="text-sm text-slate-400">Response rates and interview outcome data will appear here as the community shares results.</p>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-100">
         <FeedbackRow match={match} userId={userId} initialRating={initialRating} onFeedback={onFeedback} />
         {match.url && (
@@ -124,7 +112,7 @@ function HistoryCard({ match, rating }) {
     <div className="flex items-center justify-between py-3 px-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-800 truncate">{match.title}</p>
-        <p className="text-xs text-slate-500">{match.company} · {match.location_raw || 'Location N/A'}</p>
+        <p className="text-xs text-slate-500">{match.company}{match.location_raw ? ` · ${match.location_raw}` : ''}</p>
       </div>
       <div className="flex items-center gap-3 ml-4 shrink-0">
         {match.score != null && <ScoreBadge score={match.score} />}
@@ -139,24 +127,8 @@ function HistoryCard({ match, rating }) {
   )
 }
 
-function DislikedHistoryCard({ fb }) {
-  const dateStr = new Date(fb.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return (
-    <div className="flex items-center justify-between py-3 px-4 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-800 truncate">{fb.job_title}</p>
-        <p className="text-xs text-slate-500">{fb.company}</p>
-      </div>
-      <div className="flex items-center gap-3 ml-4 shrink-0">
-        <span className="text-xs text-slate-400">{dateStr}</span>
-        {fb.comment && <span className="text-xs text-slate-400 italic">"{fb.comment}"</span>}
-      </div>
-    </div>
-  )
-}
-
-function HistoryGroup({ title, count, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen)
+function HistoryGroup({ title, count, children }) {
+  const [open, setOpen] = useState(false)
   if (count === 0) return null
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-3">
@@ -180,7 +152,7 @@ function HistoryGroup({ title, count, children, defaultOpen = false }) {
 export default function Dashboard() {
   const userId = localStorage.getItem('userId')
   const [matches, setMatches] = useState([])
-  const [feedbackList, setFeedbackList] = useState([])
+  const [feedbackMap, setFeedbackMap] = useState({})
   const [loading, setLoading] = useState(false)
 
   async function load() {
@@ -188,11 +160,13 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const [data, fb] = await Promise.all([
-        getMatches(userId, 0, 100),
+        getMatches(userId, 0, 100, true),   // include disliked so today's full set always shows
         getFeedback(userId).catch(() => []),
       ])
       setMatches(data)
-      setFeedbackList(fb)
+      const map = {}
+      for (const f of fb) map[f.job_id] = f
+      setFeedbackMap(map)
     } finally {
       setLoading(false)
     }
@@ -209,38 +183,36 @@ export default function Dashboard() {
     )
   }
 
-  // Build feedback map: job_id → {rating, comment, created_at}
-  const feedbackMap = {}
-  for (const f of feedbackList) feedbackMap[f.job_id] = f
-
-  // Determine today's 3: most recent emailed batch
+  // Determine today's batch: most recent emailed_at date
   const emailedMatches = matches.filter(m => m.emailed_at)
   let todayMatches = []
-  let historyMatches = matches
+  let historyMatches = []
 
   if (emailedMatches.length > 0) {
-    const latestDate = emailedMatches.reduce((max, m) =>
+    const latestTs = emailedMatches.reduce((max, m) =>
       new Date(m.emailed_at) > new Date(max.emailed_at) ? m : max
     ).emailed_at
-    const latestDay = new Date(latestDate).toDateString()
-    todayMatches = emailedMatches.filter(m => new Date(m.emailed_at).toDateString() === latestDay)
+    const latestDay = new Date(latestTs).toDateString()
+    todayMatches = emailedMatches
+      .filter(m => new Date(m.emailed_at).toDateString() === latestDay)
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
     const todayIds = new Set(todayMatches.map(m => m.job_id))
-    historyMatches = matches.filter(m => !todayIds.has(m.job_id))
-  } else if (matches.length > 0) {
-    // No emails sent yet — show top 3 scored as "latest"
-    todayMatches = [...matches].sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 3)
+    historyMatches = matches.filter(m => !todayIds.has(m.job_id) && m.emailed_at)
+  } else {
+    // Pipeline hasn't emailed yet — show top 3 scored as a preview
+    todayMatches = [...matches]
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, 3)
     const todayIds = new Set(todayMatches.map(m => m.job_id))
     historyMatches = matches.filter(m => !todayIds.has(m.job_id))
   }
 
-  // History groups from matches (liked + not reviewed)
-  const likedHistory = historyMatches.filter(m => feedbackMap[m.job_id]?.rating === 'thumbs_up')
-  const notReviewedHistory = historyMatches.filter(m => !feedbackMap[m.job_id] && m.emailed_at)
+  // History groups
+  const likedHistory     = historyMatches.filter(m => feedbackMap[m.job_id]?.rating === 'thumbs_up')
+  const dislikedHistory  = historyMatches.filter(m => feedbackMap[m.job_id]?.rating === 'thumbs_down')
+  const notReviewed      = historyMatches.filter(m => !feedbackMap[m.job_id])
 
-  // Disliked: from feedback list (these are excluded from the matches API response)
-  const dislikedFeedback = feedbackList.filter(f => f.rating === 'thumbs_down')
-
-  const hasHistory = likedHistory.length > 0 || notReviewedHistory.length > 0 || dislikedFeedback.length > 0
+  const hasHistory = likedHistory.length > 0 || dislikedHistory.length > 0 || notReviewed.length > 0
 
   return (
     <div>
@@ -249,7 +221,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Your Dashboard</h1>
           {todayMatches.length > 0 && (
             <p className="text-sm text-slate-500 mt-1">
-              {emailedMatches.length > 0 ? "Today's top matches" : "Your latest matches"}
+              {emailedMatches.length > 0 ? "Today's top matches" : "Your latest matches — email digest coming soon"}
             </p>
           )}
         </div>
@@ -265,7 +237,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          {/* Today's 3 */}
+          {/* Today's matches */}
           <div className="space-y-5 mb-10">
             {todayMatches.map(m => (
               <TodayCard
@@ -281,15 +253,15 @@ export default function Dashboard() {
           {/* History */}
           {hasHistory && (
             <div>
-              <h2 className="text-base font-semibold text-slate-500 uppercase tracking-wide mb-3">History</h2>
-              <HistoryGroup title="Not Reviewed" count={notReviewedHistory.length}>
-                {notReviewedHistory.map(m => <HistoryCard key={m.match_id} match={m} />)}
+              <h2 className="text-base font-semibold text-slate-400 uppercase tracking-wide mb-3">History</h2>
+              <HistoryGroup title="Not Reviewed" count={notReviewed.length}>
+                {notReviewed.map(m => <HistoryCard key={m.match_id} match={m} />)}
               </HistoryGroup>
               <HistoryGroup title="Liked" count={likedHistory.length}>
                 {likedHistory.map(m => <HistoryCard key={m.match_id} match={m} rating="thumbs_up" />)}
               </HistoryGroup>
-              <HistoryGroup title="Disliked" count={dislikedFeedback.length}>
-                {dislikedFeedback.map(f => <DislikedHistoryCard key={f.id} fb={f} />)}
+              <HistoryGroup title="Disliked" count={dislikedHistory.length}>
+                {dislikedHistory.map(m => <HistoryCard key={m.match_id} match={m} rating="thumbs_down" />)}
               </HistoryGroup>
             </div>
           )}
