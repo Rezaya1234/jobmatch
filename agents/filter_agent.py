@@ -1,7 +1,8 @@
 import logging
+import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Job, JobMatch, UserProfile
@@ -197,9 +198,31 @@ class FilterAgent:
         self, user_id: str, job_ids: list[str] | None
     ) -> list[Job]:
         """Return jobs that don't yet have a job_match row for this user."""
-        already_matched = select(JobMatch.job_id).where(JobMatch.user_id == user_id)
+        try:
+            uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        except ValueError:
+            logger.error("Invalid user_id format: %s", user_id)
+            return []
 
-        stmt = select(Job).where(Job.id.not_in(already_matched), Job.is_active.is_(True))
+        # Debug: count active jobs and existing matches
+        active_count = await self._session.scalar(
+            select(func.count()).select_from(Job).where(Job.is_active.is_(True))
+        )
+        match_count = await self._session.scalar(
+            select(func.count()).select_from(JobMatch).where(JobMatch.user_id == uid)
+        )
+        logger.info(
+            "User %s — active jobs: %d, existing job_match rows: %d",
+            user_id, active_count or 0, match_count or 0,
+        )
+
+        # Use NOT EXISTS instead of NOT IN for correctness
+        already_matched = (
+            select(JobMatch.id)
+            .where(JobMatch.user_id == uid, JobMatch.job_id == Job.id)
+            .correlate(Job)
+        )
+        stmt = select(Job).where(not_(already_matched.exists()), Job.is_active.is_(True))
 
         if job_ids:
             stmt = stmt.where(Job.id.in_(job_ids))

@@ -32,7 +32,7 @@ function Toggle({ label, value, options, onChange }) {
 export default function Setup() {
   const [email, setEmail] = useState('')
   const [userId, setUserId] = useState(() => localStorage.getItem('userId') || '')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(null)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState({
     work_modes: ['remote'],
@@ -47,6 +47,7 @@ export default function Setup() {
     title_exclude: '',
   })
   const [aiText, setAiText] = useState('')
+  const [aiProfile, setAiProfile] = useState('')
   const [resumeFile, setResumeFile] = useState(null)
   const fileRef = useRef(null)
   const statusTimer = useRef(null)
@@ -54,7 +55,7 @@ export default function Setup() {
   function showStatus(msg, error = false) {
     setStatus({ msg, error })
     if (statusTimer.current) clearTimeout(statusTimer.current)
-    statusTimer.current = setTimeout(() => setStatus(''), 4000)
+    statusTimer.current = setTimeout(() => setStatus(null), 4000)
   }
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export default function Setup() {
             title_include: (p.title_include || []).join(', '),
             title_exclude: (p.title_exclude || []).join(', '),
           })
-          if (p.role_description) setAiText(p.role_description)
+          if (p.role_description) setAiProfile(p.role_description)
         })
         .catch(() => {})
     }
@@ -127,6 +128,7 @@ export default function Setup() {
         title_include: (saved.title_include || []).join(', '),
         title_exclude: (saved.title_exclude || []).join(', '),
       })
+      if (extracted.role_description) setAiProfile(extracted.role_description)
       showStatus('Profile saved!')
     } catch (err) {
       showStatus(err.response?.data?.detail || err.message || 'Error saving profile', true)
@@ -295,6 +297,12 @@ export default function Setup() {
               </>
             ) : 'Save Profile'}
           </button>
+          {aiProfile && (
+            <div className="border border-purple-200 bg-purple-50 rounded-xl p-4">
+              <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2">AI-Generated Job Seeker Profile</p>
+              <p className="text-sm text-purple-800 leading-relaxed">{aiProfile}</p>
+            </div>
+          )}
         </div>
       )}
 

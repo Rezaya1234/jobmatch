@@ -107,6 +107,33 @@ async def trigger_daily_pipeline(
     return PipelineResponse(status="accepted", detail="Daily pipeline started in the background.")
 
 
+@router.post("/reset-filters/{user_id}", response_model=PipelineResponse, status_code=202)
+async def trigger_reset_filters(
+    user_id: str,
+    background_tasks: BackgroundTasks,
+    llm: LLMClient = Depends(get_llm),
+    session: AsyncSession = Depends(get_session),
+) -> PipelineResponse:
+    """Delete all job_match rows for a user so the next pipeline run re-filters everything fresh."""
+    if _state.status == "running":
+        return PipelineResponse(status="already_running", detail="Pipeline is already running.")
+    import uuid as _uuid
+    from sqlalchemy import delete, func, select
+    from db.models import JobMatch
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        return PipelineResponse(status="error", detail=f"Invalid user_id: {user_id}")
+    before = await session.scalar(
+        select(func.count()).select_from(JobMatch).where(JobMatch.user_id == uid)
+    )
+    await session.execute(delete(JobMatch).where(JobMatch.user_id == uid))
+    await session.commit()
+    logger.info("Reset filters for user %s — deleted %d job_match rows", user_id, before or 0)
+    background_tasks.add_task(_run_match_all, llm)
+    return PipelineResponse(status="accepted", detail=f"Filters reset ({before or 0} matches cleared) — re-running pipeline.")
+
+
 @router.post("/rescore/{user_id}", response_model=PipelineResponse, status_code=202)
 async def trigger_rescore(
     user_id: str,
