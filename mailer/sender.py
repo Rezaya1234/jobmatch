@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 TOP_N = int(os.getenv("DIGEST_TOP_N", "10"))
 FROM_EMAIL = os.getenv("FROM_EMAIL", "digest@jobmatch.app")
 FROM_NAME = os.getenv("FROM_NAME", "JobMatch")
+BACKEND_URL = os.getenv("BACKEND_URL", "").rstrip("/")
 
 
 async def send_daily_digest(user_id: str, session: AsyncSession) -> int:
@@ -124,4 +125,7 @@ def _to_digest_item(match: JobMatch, job: Job) -> JobDigestItem:
         salary_min=job.salary_min,
         salary_max=job.salary_max,
         salary_currency=job.salary_currency,
+        user_id=str(match.user_id),
+        job_id=str(match.job_id),
+        feedback_base_url=BACKEND_URL,
     )
