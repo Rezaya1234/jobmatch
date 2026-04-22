@@ -13,6 +13,9 @@ class JobDigestItem:
     salary_min: int | None
     salary_max: int | None
     salary_currency: str | None
+    user_id: str = ""
+    job_id: str = ""
+    feedback_base_url: str = ""
 
 
 def build_html(recipient_email: str, items: list[JobDigestItem], date_str: str) -> str:
@@ -94,6 +97,18 @@ def _job_card_html(item: JobDigestItem, rank: int) -> str:
     reasoning_html = (
         f'<p class="reasoning">"{item.reasoning}"</p>' if item.reasoning else ""
     )
+    feedback_html = ""
+    if item.feedback_base_url and item.user_id and item.job_id:
+        base = item.feedback_base_url.rstrip("/")
+        up_url = f"{base}/feedback/click?user_id={item.user_id}&job_id={item.job_id}&rating=thumbs_up"
+        down_url = f"{base}/feedback/click?user_id={item.user_id}&job_id={item.job_id}&rating=thumbs_down"
+        feedback_html = f"""
+      <div style="margin-top:12px;display:flex;gap:10px;">
+        <a href="{up_url}" style="text-decoration:none;background:#dcfce7;color:#166534;
+           padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;">👍 Good match</a>
+        <a href="{down_url}" style="text-decoration:none;background:#fee2e2;color:#991b1b;
+           padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;">👎 Not relevant</a>
+      </div>"""
     return f"""
     <div class="card">
       <div class="card-rank">#{rank} Match</div>
@@ -104,6 +119,7 @@ def _job_card_html(item: JobDigestItem, rank: int) -> str:
       <div class="score-bar-bg"><div class="score-bar" style="width:{score_pct}%"></div></div>
       {reasoning_html}
       <a class="btn" href="{_esc(item.url)}" target="_blank">View Job &rarr;</a>
+      {feedback_html}
     </div>"""
 
 

@@ -247,6 +247,7 @@ class Feedback(Base):
 
     rating: Mapped[str] = mapped_column(String(20), nullable=False)  # thumbs_up | thumbs_down
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    weight: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1 = passive click, 2 = explicit button
 
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
