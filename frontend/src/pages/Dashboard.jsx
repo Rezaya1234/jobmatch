@@ -183,34 +183,44 @@ export default function Dashboard() {
     )
   }
 
-  // Determine today's batch: most recent emailed_at date
+  // Today's 3: start with the most recent emailed batch, pad with top-scored if fewer than 3
   const emailedMatches = matches.filter(m => m.emailed_at)
   let todayMatches = []
-  let historyMatches = []
 
   if (emailedMatches.length > 0) {
     const latestTs = emailedMatches.reduce((max, m) =>
       new Date(m.emailed_at) > new Date(max.emailed_at) ? m : max
     ).emailed_at
     const latestDay = new Date(latestTs).toDateString()
-    todayMatches = emailedMatches
+    const latestBatch = emailedMatches
       .filter(m => new Date(m.emailed_at).toDateString() === latestDay)
       .sort((a, b) => (b.score || 0) - (a.score || 0))
-    const todayIds = new Set(todayMatches.map(m => m.job_id))
-    historyMatches = matches.filter(m => !todayIds.has(m.job_id) && m.emailed_at)
+    todayMatches = latestBatch
+
+    // Pad to 3 with highest-scored un-emailed matches
+    if (todayMatches.length < 3) {
+      const todayIds = new Set(todayMatches.map(m => m.job_id))
+      const extras = matches
+        .filter(m => !todayIds.has(m.job_id) && !m.emailed_at)
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, 3 - todayMatches.length)
+      todayMatches = [...todayMatches, ...extras]
+    }
   } else {
-    // Pipeline hasn't emailed yet — show top 3 scored as a preview
+    // Nothing emailed yet — show top 3 scored
     todayMatches = [...matches]
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, 3)
-    const todayIds = new Set(todayMatches.map(m => m.job_id))
-    historyMatches = matches.filter(m => !todayIds.has(m.job_id))
   }
 
+  // History: everything not in today's section
+  const todayIds = new Set(todayMatches.map(m => m.job_id))
+  const historyMatches = matches.filter(m => !todayIds.has(m.job_id))
+
   // History groups
-  const likedHistory     = historyMatches.filter(m => feedbackMap[m.job_id]?.rating === 'thumbs_up')
-  const dislikedHistory  = historyMatches.filter(m => feedbackMap[m.job_id]?.rating === 'thumbs_down')
-  const notReviewed      = historyMatches.filter(m => !feedbackMap[m.job_id])
+  const likedHistory    = historyMatches.filter(m => feedbackMap[m.job_id]?.rating === 'thumbs_up')
+  const dislikedHistory = historyMatches.filter(m => feedbackMap[m.job_id]?.rating === 'thumbs_down')
+  const notReviewed     = historyMatches.filter(m => !feedbackMap[m.job_id])
 
   const hasHistory = likedHistory.length > 0 || dislikedHistory.length > 0 || notReviewed.length > 0
 
