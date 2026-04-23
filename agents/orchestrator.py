@@ -107,12 +107,35 @@ class OrchestratorAgent:
             stats.errors.append("search_agent")
 
     async def _process_user(self, user_id: str, stats: PipelineStats) -> None:
-        logger.info("User %s — filtering", user_id)
+        from mailer.sender import _email_cadence
+        from db.models import UserProfile
+        profile_result = await self._session.execute(
+            select(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        profile = profile_result.scalar_one_or_none()
+        cadence = _email_cadence(
+            getattr(profile, 'last_engaged_at', None),
+            getattr(profile, 'last_emailed_at', None),
+        )
+
+        if cadence == 'skip':
+            logger.info("User %s is inactive (cadence=skip) — skipping entirely", user_id)
+            return
+
+        # Filter is cheap (no LLM) — always run it so new jobs are tracked
+        logger.info("User %s — filtering (cadence=%s)", user_id, cadence)
         await self._emit("Applying filters (work mode, location, job type, company)...")
         filter_agent = FilterAgent(self._session)
         filter_stats = await filter_agent.run(user_id)
         passed = filter_stats["passed"]
         stats.total_passed_filter += passed
+
+        if cadence == 'reengagement':
+            # User is dormant — send re-engagement email, skip LLM scoring
+            logger.info("User %s — reengagement cadence, skipping MatchAgent", user_id)
+            emailed = await self._send_email(user_id)
+            stats.total_emailed += emailed
+            return
 
         if passed == 0 and not await self._has_pending_matches(user_id):
             logger.info("User %s — no new jobs to score", user_id)
@@ -129,6 +152,23 @@ class OrchestratorAgent:
     async def _send_email(self, user_id: str) -> int:
         from mailer.sender import send_daily_digest
         return await send_daily_digest(user_id, self._session)
+
+    # ------------------------------------------------------------------
+    # On-demand matching (triggered by dashboard visit)
+    # ------------------------------------------------------------------
+
+    async def run_user_on_demand(self, user_id: str) -> int:
+        """Filter + score for one user on dashboard visit. No email sent."""
+        logger.info("On-demand matching for user %s", user_id)
+        filter_agent = FilterAgent(self._session)
+        await filter_agent.run(user_id)
+        if not await self._has_pending_matches(user_id):
+            logger.info("User %s — no pending matches to score on-demand", user_id)
+            return 0
+        match_agent = MatchAgent(self._session, self._llm)
+        scored = await match_agent.run(user_id)
+        logger.info("On-demand scoring complete for user %s — %d scored", user_id, scored)
+        return scored
 
     # ------------------------------------------------------------------
     # On-demand feedback pipeline
