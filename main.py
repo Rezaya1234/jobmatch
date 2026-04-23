@@ -33,6 +33,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Stellapath", version="0.1.0", lifespan=lifespan)
 
+_extra_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -40,6 +41,7 @@ app.add_middleware(
         "http://localhost:5174",
         "https://jobmatch-76c4.onrender.com",
         "https://jobmatch-dev-static.onrender.com",
+        *_extra_origins,
     ],
     allow_methods=["*"],
     allow_headers=["*"],
