@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, EmailStr
@@ -230,6 +230,23 @@ Rules:
             existing_profile is None or not existing_profile.original_role_description
         ) else existing_profile.original_role_description,
     )
+
+
+# ------------------------------------------------------------------
+# Engagement tracking
+# ------------------------------------------------------------------
+
+@router.post("/{user_id}/engage", status_code=204, include_in_schema=False)
+async def record_engagement(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Called by the frontend whenever the user visits the Dashboard. Records last_engaged_at."""
+    result = await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    profile = result.scalar_one_or_none()
+    if profile is not None:
+        profile.last_engaged_at = datetime.now(timezone.utc)
+        await session.commit()
 
 
 # ------------------------------------------------------------------

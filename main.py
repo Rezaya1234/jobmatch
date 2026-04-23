@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     scheduler.stop()
 
 
-app = FastAPI(title="JobMatch", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Stellapath", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
