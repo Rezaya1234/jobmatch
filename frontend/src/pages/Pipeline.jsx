@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { triggerDailyPipeline, triggerCollect, triggerResetFilters, triggerTestEmail, getJobCount, getMatchCount } from '../api'
-import axios from 'axios'
-
-const getPipelineStatus = () => axios.get('/api/pipeline/status').then(r => r.data)
+import { triggerDailyPipeline, triggerCollect, triggerResetFilters, triggerTestEmail, getJobCount, getMatchCount, getPipelineStatus } from '../api'
 
 function StatusIcon({ status }) {
   if (status === 'complete') return <span className="text-green-500 text-xl">✓</span>

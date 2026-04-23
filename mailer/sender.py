@@ -115,7 +115,7 @@ async def _send_reengagement(user: User, profile: UserProfile | None, session: A
     logger.info("Sending re-engagement email to %s", user.email)
     html = build_reengagement_html(user.email, FRONTEND_URL)
     plain = build_reengagement_plain_text(user.email, FRONTEND_URL)
-    subject = "Your career path is waiting — come back to Stellapath"
+    subject = f"Your career path is waiting — come back to {FROM_NAME}"
     try:
         await asyncio.to_thread(_send_via_sendgrid, user.email, subject, html, plain)
     except Exception:
