@@ -113,12 +113,16 @@ async def submit_feedback(
     await session.commit()
     await session.refresh(feedback)
 
-    # Count total feedback and auto-trigger learning every N items
+    # Count only explicit (weight >= 2) feedback for auto-learn threshold
+    # Passive link clicks (weight=1) are weak signals and shouldn't trigger profile rewrites
     count_result = await session.execute(
-        select(func.count()).select_from(Feedback).where(Feedback.user_id == user_id)
+        select(func.count()).select_from(Feedback).where(
+            Feedback.user_id == user_id,
+            Feedback.weight >= 2,
+        )
     )
-    total_feedback = count_result.scalar() or 0
-    if total_feedback >= _AUTO_LEARN_THRESHOLD and total_feedback % _AUTO_LEARN_THRESHOLD == 0:
+    explicit_feedback = count_result.scalar() or 0
+    if explicit_feedback >= _AUTO_LEARN_THRESHOLD and explicit_feedback % _AUTO_LEARN_THRESHOLD == 0:
         background_tasks.add_task(_run_learn_and_rescore, user_id, llm)
 
     return FeedbackResponse(
@@ -158,24 +162,23 @@ async def list_feedback(
 
 
 async def _run_learn_and_rescore(user_id: str, llm: LLMClient) -> None:
-    """Run feedback learning then re-score matches with the updated profile."""
+    """Run feedback learning then re-score only unscored matches with the updated profile.
+
+    We do NOT wipe existing scores — doing so would make all matches invisible until
+    MatchAgent finishes (it caps at 50 per run), leaving hundreds of matches with NULL
+    scores that the matches API silently drops. Instead we update the profile and let
+    MatchAgent score any jobs that haven't been scored yet. Full rescoring of old matches
+    happens on the next daily pipeline run.
+    """
     async with AsyncSessionLocal() as session:
         from agents.feedback_agent import FeedbackAgent
         from agents.match_agent import MatchAgent
-        from sqlalchemy import update
-        from db.models import JobMatch
         try:
             updated = await FeedbackAgent(session, llm).run(user_id)
             if updated:
-                logger.info("Profile updated from feedback for user %s — re-scoring", user_id)
-                await session.execute(
-                    update(JobMatch)
-                    .where(JobMatch.user_id == user_id)
-                    .values(score=None, reasoning=None)
-                )
-                await session.commit()
+                logger.info("Profile updated from feedback for user %s — scoring pending matches", user_id)
                 scored = await MatchAgent(session, llm).run(user_id)
-                logger.info("Auto re-score complete for user %s — %d scored", user_id, scored)
+                logger.info("Auto re-score complete for user %s — %d new matches scored", user_id, scored)
             else:
                 logger.info("No profile updates from feedback for user %s", user_id)
         except Exception:
@@ -222,12 +225,16 @@ async def feedback_click(
         feedback = Feedback(user_id=uid, job_id=jid, match_id=match.id if match else None)
         session.add(feedback)
     feedback.rating = rating
+    feedback.weight = 2  # email click is an explicit user action
 
     await session.commit()
     logger.info("Email feedback: user=%s job=%s rating=%s", user_id, job_id, rating)
 
     count_result = await session.scalar(
-        select(func.count()).select_from(Feedback).where(Feedback.user_id == uid)
+        select(func.count()).select_from(Feedback).where(
+            Feedback.user_id == uid,
+            Feedback.weight >= 2,
+        )
     )
     if (count_result or 0) >= _AUTO_LEARN_THRESHOLD and (count_result or 0) % _AUTO_LEARN_THRESHOLD == 0:
         background_tasks.add_task(_run_learn_and_rescore, user_id, llm)
@@ -244,7 +251,7 @@ def _thanks_page(message: str, error: bool = False) -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JobMatch Feedback</title>
+  <title>Stellapath</title>
   <style>
     body {{ font-family: Arial, sans-serif; background: #f5f5f5; display: flex; align-items: center;
             justify-content: center; min-height: 100vh; margin: 0; }}
