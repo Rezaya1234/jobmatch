@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     scheduler.stop()
 
 
-app = FastAPI(title="Stellapath", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="JobMatch", version="0.1.0", lifespan=lifespan)
 
 _extra_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(

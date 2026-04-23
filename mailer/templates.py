@@ -27,7 +27,7 @@ def build_html(recipient_email: str, items: list[JobDigestItem], date_str: str, 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Stellapath Daily Digest</title>
+  <title>Your JobMatch Daily Digest</title>
   <style>
     body {{ font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }}
     .wrapper {{ max-width: 600px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }}
@@ -68,7 +68,7 @@ def build_html(recipient_email: str, items: list[JobDigestItem], date_str: str, 
       </div>
     </div>
     <div class="footer">
-      You&rsquo;re receiving this because you signed up for Stellapath.<br>
+      You&rsquo;re receiving this because you signed up for JobMatch.<br>
       Reply to this email to unsubscribe.
     </div>
   </div>
@@ -110,7 +110,7 @@ def build_reengagement_html(recipient_email: str, frontend_url: str) -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>We miss you — Stellapath</title>
+  <title>We miss you — JobMatch</title>
   <style>
     body {{ font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }}
     .wrapper {{ max-width: 560px; margin: 48px auto; background: #fff; border-radius: 10px; overflow: hidden; }}
@@ -132,7 +132,7 @@ def build_reengagement_html(recipient_email: str, frontend_url: str) -> str:
       <a href="{_esc(dashboard_url)}" class="cta-btn">Visit your dashboard &rarr;</a>
     </div>
     <div class="footer">
-      You&rsquo;re receiving this because you signed up for Stellapath.<br>
+      You&rsquo;re receiving this because you signed up for JobMatch.<br>
       Reply to this email to unsubscribe.
     </div>
   </div>
