@@ -137,6 +137,10 @@ class UserProfile(Base):
     title_include: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     title_exclude: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
 
+    # Engagement tracking — used to determine email send frequency
+    last_engaged_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_emailed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

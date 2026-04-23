@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getMatches, submitFeedback, getFeedback } from '../api'
+import { getMatches, submitFeedback, getFeedback, recordEngagement } from '../api'
 
 function ScoreArc({ score }) {
   const pct = Math.round((score || 0) * 100)
@@ -267,7 +267,10 @@ export default function Dashboard() {
     }
   }
 
-  useEffect(() => { load() }, [userId])
+  useEffect(() => {
+    load()
+    if (userId) recordEngagement(userId)
+  }, [userId])
 
   if (!userId) {
     return (
