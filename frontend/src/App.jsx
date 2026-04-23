@@ -21,14 +21,10 @@ function Nav() {
 
   return (
     <nav className="bg-slate-900 px-6 flex items-center sticky top-0 z-50 shadow-lg">
-      <div className="flex items-center gap-2.5 py-3 mr-6 shrink-0">
-        <div className="w-7 h-7 bg-indigo-500 rounded-lg flex items-center justify-center">
-          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-            <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
-          </svg>
+      <div className="flex items-center py-2 mr-6 shrink-0">
+        <div className="bg-white rounded-lg px-2 py-1">
+          <img src="/logo.png" alt="Stellapath" className="h-7 w-auto" />
         </div>
-        <span className="text-white font-bold text-sm tracking-tight">JobMatch</span>
       </div>
       {NAV_ITEMS.map(item => (
         <NavLink key={item.to} to={item.to} className={cls}>{item.label}</NavLink>
