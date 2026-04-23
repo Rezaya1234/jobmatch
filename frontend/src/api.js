@@ -24,6 +24,7 @@ export const triggerRescore = (id) => http.post(`/pipeline/rescore/${id}`).then(
 export const triggerResetFilters = (id) => http.post(`/pipeline/reset-filters/${id}`).then(r => r.data)
 export const triggerTestEmail = (id) => http.post(`/pipeline/test-email/${id}`).then(r => r.data)
 export const recordEngagement = (id) => http.post(`/users/${id}/engage`).catch(() => {})
+export const getActivity = (id) => http.get(`/users/${id}/qa/activity`).then(r => r.data)
 export const parseProfile = (id, text, resumeFile) => {
   const form = new FormData()
   if (text) form.append('text', text)

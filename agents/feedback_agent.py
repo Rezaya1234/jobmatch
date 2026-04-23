@@ -79,7 +79,17 @@ class FeedbackAgent:
             logger.info("No reliable signals found for user %s", user_id)
             return False
 
-        self._apply_updates(profile, updates)
+        changes = self._apply_updates(profile, updates)
+        snapshot = _format_current_profile(profile)
+
+        from db.activity import log_event
+        await log_event(
+            self._session, user_id, "profile_updated",
+            reasoning=updates.get("reasoning", ""),
+            changes=changes,
+            snapshot=snapshot,
+        )
+
         await self._session.commit()
         logger.info("Updated profile for user %s: %s", user_id, updates.get("reasoning", ""))
         return True
@@ -112,11 +122,18 @@ class FeedbackAgent:
     # Profile update
     # ------------------------------------------------------------------
 
-    def _apply_updates(self, profile: UserProfile, updates: dict) -> None:
+    def _apply_updates(self, profile: UserProfile, updates: dict) -> dict:
+        """Apply LLM-derived updates to profile. Returns a changes dict {field: {before, after}}."""
+        changes = {}
         for field in ("preferred_sectors", "company_type", "preferred_company_sizes",
                       "seniority_level", "salary_min", "salary_max", "role_description"):
             if field in updates:
-                setattr(profile, field, updates[field])
+                before = getattr(profile, field)
+                after = updates[field]
+                if before != after:
+                    changes[field] = {"before": before, "after": after}
+                setattr(profile, field, after)
+        return changes
 
     # ------------------------------------------------------------------
     # DB helpers
