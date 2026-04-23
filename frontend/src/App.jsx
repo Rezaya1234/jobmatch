@@ -16,15 +16,13 @@ const NAV_ITEMS = [
 
 function Nav() {
   const cls = ({ isActive }) => isActive
-    ? 'px-4 py-5 text-sm font-medium text-white border-b-2 border-indigo-400 transition-colors whitespace-nowrap'
-    : 'px-4 py-5 text-sm font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition-colors whitespace-nowrap'
+    ? 'px-4 py-5 text-sm font-semibold text-indigo-600 border-b-2 border-indigo-500 transition-colors whitespace-nowrap'
+    : 'px-4 py-5 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-colors whitespace-nowrap'
 
   return (
-    <nav className="bg-slate-900 px-6 flex items-center sticky top-0 z-50 shadow-lg">
-      <div className="flex items-center py-2 mr-6 shrink-0">
-        <div className="bg-white rounded-lg px-2 py-1">
-          <img src="/logo.png" alt="Stellapath" className="h-7 w-auto" />
-        </div>
+    <nav className="bg-white border-b border-slate-200 px-6 flex items-center sticky top-0 z-50 shadow-sm">
+      <div className="flex items-center py-2 mr-8 shrink-0">
+        <img src="/logo.png" alt="Stellapath" className="h-10 w-auto" />
       </div>
       {NAV_ITEMS.map(item => (
         <NavLink key={item.to} to={item.to} className={cls}>{item.label}</NavLink>
