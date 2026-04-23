@@ -11,9 +11,10 @@ export const getMatches = (id, minScore = 0, limit = 50, includeDisliked = false
 export const submitFeedback = (id, jobId, rating, comment = '', weight = null) =>
   http.post(`/users/${id}/feedback`, { job_id: jobId, rating, comment, weight }).then(r => r.data)
 export const getFeedback = (id) => http.get(`/users/${id}/feedback`).then(r => r.data)
-export const listJobs = (search = '', limit = 100) =>
-  http.get('/jobs', { params: { search, limit } }).then(r => r.data)
-export const getJobCount = () => http.get('/jobs/count').then(r => r.data)
+export const listJobs = (params = {}) =>
+  http.get('/jobs', { params }).then(r => r.data)
+export const getJobCount = (params = {}) =>
+  http.get('/jobs/count', { params }).then(r => r.data)
 export const getMatchCount = (id) => http.get(`/users/${id}/matches/count`, { params: { min_score: 0.8 } }).then(r => r.data)
 export const triggerDailyPipeline = () => http.post('/pipeline/daily').then(r => r.data)
 export const triggerCollect = () => http.post('/pipeline/collect').then(r => r.data)
