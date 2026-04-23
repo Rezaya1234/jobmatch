@@ -90,13 +90,21 @@ async def list_matches(
     session: AsyncSession = Depends(get_session),
 ) -> list[MatchResponse]:
     companies = await _get_preferred_companies(user_id, session)
+    # When min_score=0, include unscored (NULL) matches so the dashboard never goes blank
+    # while a background rescore is in progress. When min_score>0, only show scored matches.
+    from sqlalchemy import or_
+    score_clause = (
+        or_(JobMatch.score >= min_score, JobMatch.score.is_(None))
+        if min_score == 0.0
+        else JobMatch.score >= min_score
+    )
     stmt = (
         select(JobMatch, Job)
         .join(Job, JobMatch.job_id == Job.id)
         .where(
             JobMatch.user_id == user_id,
             JobMatch.passed_hard_filter.is_(True),
-            JobMatch.score >= min_score,
+            score_clause,
             Job.is_active.is_(True),
         )
     )
@@ -108,7 +116,7 @@ async def list_matches(
         stmt = stmt.where(JobMatch.job_id.notin_(disliked))
     if companies:
         stmt = stmt.where(_company_filter(companies))
-    stmt = stmt.order_by(JobMatch.score.desc()).limit(limit).offset(offset)
+    stmt = stmt.order_by(JobMatch.score.desc().nulls_last()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return [_to_response(match, job) for match, job in result.all()]
 

@@ -292,10 +292,5 @@ async def _run_rescore(user_id: str, llm: LLMClient) -> None:
 
 
 async def _run_feedback_pipeline(user_id: str, llm: LLMClient) -> None:
-    async with AsyncSessionLocal() as session:
-        orchestrator = OrchestratorAgent(session, llm)
-        try:
-            updated = await orchestrator.run_feedback_pipeline(user_id)
-            logger.info("Feedback pipeline for user %s — updated=%s", user_id, updated)
-        except Exception:
-            logger.exception("Feedback pipeline crashed for user %s", user_id)
+    from api.feedback import _run_learn_and_rescore
+    await _run_learn_and_rescore(user_id, llm)
