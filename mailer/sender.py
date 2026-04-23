@@ -15,8 +15,8 @@ from mailer.templates import JobDigestItem, build_html, build_plain_text, build_
 logger = logging.getLogger(__name__)
 
 TOP_N = int(os.getenv("DIGEST_TOP_N", "10"))
-FROM_EMAIL = os.getenv("FROM_EMAIL", "digest@stellapath.app")
-FROM_NAME = os.getenv("FROM_NAME", "Stellapath")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "digest@jobmatch.app")
+FROM_NAME = os.getenv("FROM_NAME", "JobMatch")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "").rstrip("/")
 
 
