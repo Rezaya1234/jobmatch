@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -239,14 +239,27 @@ Rules:
 @router.post("/{user_id}/engage", status_code=204, include_in_schema=False)
 async def record_engagement(
     user_id: str,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
+    llm: LLMClient = Depends(get_llm),
 ) -> None:
-    """Called by the frontend whenever the user visits the Dashboard. Records last_engaged_at."""
+    """Called by the frontend on Dashboard mount. Records engagement and triggers on-demand matching."""
     result = await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
     profile = result.scalar_one_or_none()
     if profile is not None:
         profile.last_engaged_at = datetime.now(timezone.utc)
         await session.commit()
+    background_tasks.add_task(_run_on_demand_matching, user_id, llm)
+
+
+async def _run_on_demand_matching(user_id: str, llm: LLMClient) -> None:
+    from db.database import AsyncSessionLocal
+    from agents.orchestrator import OrchestratorAgent
+    async with AsyncSessionLocal() as session:
+        try:
+            await OrchestratorAgent(session, llm).run_user_on_demand(user_id)
+        except Exception:
+            logger.exception("On-demand matching failed for user %s", user_id)
 
 
 # ------------------------------------------------------------------
