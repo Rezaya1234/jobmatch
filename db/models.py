@@ -7,6 +7,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -260,3 +261,20 @@ class Feedback(Base):
     user: Mapped["User"] = relationship(back_populates="feedbacks")
     job: Mapped["Job"] = relationship(back_populates="feedbacks")
     match: Mapped["JobMatch | None"] = relationship(back_populates="feedback")
+
+
+class ActivityLog(Base):
+    """Audit log for every user action and system event."""
+
+    __tablename__ = "activity_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Flexible per-event metadata (job info, profile diffs, email details, etc.)
+    meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

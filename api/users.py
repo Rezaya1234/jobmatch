@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_llm, get_session
+from db.activity import log_event
 from db.models import User, UserProfile
 from llm.client import LLMClient
 
@@ -248,6 +249,7 @@ async def record_engagement(
     profile = result.scalar_one_or_none()
     if profile is not None:
         profile.last_engaged_at = datetime.now(timezone.utc)
+        await log_event(session, user_id, "dashboard_visit")
         await session.commit()
     background_tasks.add_task(_run_on_demand_matching, user_id, llm)
 

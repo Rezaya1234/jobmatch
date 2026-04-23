@@ -4,6 +4,7 @@ import Jobs from './pages/Jobs'
 import Dashboard from './pages/Dashboard'
 import Pipeline from './pages/Pipeline'
 import Architecture from './pages/Architecture'
+import QA from './pages/QA'
 import './index.css'
 
 const NAV_ITEMS = [
@@ -12,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/positions',    label: 'Open Positions' },
   { to: '/architecture', label: 'Architecture' },
   { to: '/pipeline',     label: 'Pipeline' },
+  { to: '/qa',           label: 'QA' },
 ]
 
 function Nav() {
@@ -44,6 +46,7 @@ export default function App() {
             <Route path="/positions" element={<Jobs />} />
             <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/architecture" element={<Architecture />} />
+            <Route path="/qa" element={<QA />} />
           </Routes>
         </main>
       </div>

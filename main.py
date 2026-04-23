@@ -14,6 +14,7 @@ from api.feedback import router as feedback_router
 from api.jobs import router as jobs_router
 from api.matches import router as matches_router
 from api.pipeline import router as pipeline_router
+from api.qa import router as qa_router
 from api.users import router as users_router
 from scheduler import scheduler
 
@@ -50,6 +51,7 @@ app.include_router(matches_router)
 app.include_router(feedback_router)
 app.include_router(feedback_click_router)
 app.include_router(pipeline_router)
+app.include_router(qa_router)
 
 
 @app.get("/health", tags=["health"])

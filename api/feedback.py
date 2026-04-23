@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_llm, get_session
+from db.activity import log_event
 from db.database import AsyncSessionLocal
 from db.models import Feedback, Job, JobMatch
 from llm.client import LLMClient
@@ -109,6 +110,20 @@ async def submit_feedback(
     feedback.rating = body.rating
     feedback.comment = body.comment
     feedback.weight = body.weight
+
+    # Determine event type for audit log
+    if body.weight == 1:
+        event = "link_click"
+    elif body.rating == "thumbs_up":
+        event = "thumbs_up"
+    else:
+        event = "thumbs_down"
+
+    await log_event(
+        session, user_id, event,
+        job_title=job.title, company=job.company,
+        comment=body.comment or None,
+    )
 
     await session.commit()
     await session.refresh(feedback)
@@ -226,6 +241,9 @@ async def feedback_click(
         session.add(feedback)
     feedback.rating = rating
     feedback.weight = 2  # email click is an explicit user action
+
+    event = "email_thumbs_up" if rating == "thumbs_up" else "email_thumbs_down"
+    await log_event(session, uid, event, job_title=job.title, company=job.company)
 
     await session.commit()
     logger.info("Email feedback: user=%s job=%s rating=%s", user_id, job_id, rating)

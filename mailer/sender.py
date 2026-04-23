@@ -100,6 +100,10 @@ async def send_daily_digest(user_id: str, session: AsyncSession, test: bool = Fa
             match.emailed_at = now
         if profile is not None:
             profile.last_emailed_at = now
+        from db.activity import log_event
+        await log_event(session, user_id, "email_sent",
+                        job_count=len(items), cadence=cadence,
+                        jobs=[{"title": i.title, "company": i.company} for i in items])
         await session.commit()
 
     logger.info("Digest sent to %s (%d jobs)", user.email, len(items))
@@ -120,6 +124,8 @@ async def _send_reengagement(user: User, profile: UserProfile | None, session: A
     now = datetime.now(timezone.utc)
     if profile is not None:
         profile.last_emailed_at = now
+        from db.activity import log_event
+        await log_event(session, user.id, "email_sent", job_count=0, cadence="reengagement")
         await session.commit()
     logger.info("Re-engagement email sent to %s", user.email)
     return 1
