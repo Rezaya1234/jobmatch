@@ -10,6 +10,12 @@ const SORT_OPTIONS = [
   { value: 'title_asc',   label: 'Title A–Z' },
 ]
 
+const WORK_MODE_BORDER = {
+  remote: 'border-l-indigo-400',
+  hybrid: 'border-l-amber-400',
+  onsite: 'border-l-slate-300',
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -52,25 +58,41 @@ function Pagination({ page, totalPages, onChange }) {
 
   return (
     <div className="flex items-center justify-center gap-1 mt-6">
-      <button
-        onClick={() => onChange(page - 1)}
-        disabled={page === 1}
-        className={page === 1 ? disabled : inactive}
-      >
+      <button onClick={() => onChange(page - 1)} disabled={page === 1} className={page === 1 ? disabled : inactive}>
         ← Prev
       </button>
       {pages.map((p, i) =>
         p === '…'
-          ? <span key={`ellipsis-${i}`} className="px-2 text-slate-400">…</span>
+          ? <span key={`e-${i}`} className="px-2 text-slate-400">…</span>
           : <button key={p} onClick={() => onChange(p)} className={p === page ? active : inactive}>{p}</button>
       )}
-      <button
-        onClick={() => onChange(page + 1)}
-        disabled={page === totalPages}
-        className={page === totalPages ? disabled : inactive}
-      >
+      <button onClick={() => onChange(page + 1)} disabled={page === totalPages} className={page === totalPages ? disabled : inactive}>
         Next →
       </button>
+    </div>
+  )
+}
+
+function SkeletonRow() {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 border-l-4 border-l-slate-200 animate-pulse">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className="flex gap-2 mb-2">
+            <div className="h-3 bg-slate-200 rounded w-20" />
+            <div className="h-3 bg-slate-100 rounded-full w-12" />
+          </div>
+          <div className="h-4 bg-slate-200 rounded w-2/3 mb-2" />
+          <div className="flex gap-2">
+            <div className="h-3 bg-slate-100 rounded w-16" />
+            <div className="h-3 bg-slate-100 rounded w-20" />
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <div className="h-3 bg-slate-100 rounded w-16" />
+          <div className="h-6 w-6 bg-slate-100 rounded" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -78,6 +100,7 @@ function Pagination({ page, totalPages, onChange }) {
 function JobCard({ job, userId, feedbackMap, onFeedback }) {
   const existing = feedbackMap[job.id]
   const [liked, setLiked] = useState(existing?.rating === 'thumbs_up')
+  const borderColor = WORK_MODE_BORDER[job.work_mode] || 'border-l-slate-200'
 
   function handleLinkClick() {
     if (!userId || existing) return
@@ -96,13 +119,13 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
   const salary = formatSalary(job.salary_min, job.salary_max)
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
+    <div className={`bg-white rounded-xl border border-slate-200 border-l-4 ${borderColor} p-4 hover:shadow-md transition-shadow`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <p className="text-xs font-semibold text-slate-400">{job.company}</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{job.company}</p>
             {job.work_mode && (
-              <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-full">{job.work_mode}</span>
+              <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{job.work_mode}</span>
             )}
             {job.job_type && job.job_type !== 'full_time' && (
               <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full">{job.job_type.replace('_', ' ')}</span>
@@ -115,18 +138,18 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
               target="_blank"
               rel="noreferrer"
               onClick={handleLinkClick}
-              className="text-base font-semibold text-slate-900 hover:text-indigo-700 transition-colors leading-snug block"
+              className="text-sm font-semibold text-slate-900 hover:text-indigo-700 transition-colors leading-snug block mt-0.5"
             >
               {job.title}
             </a>
           ) : (
-            <p className="text-base font-semibold text-slate-900 leading-snug">{job.title}</p>
+            <p className="text-sm font-semibold text-slate-900 leading-snug mt-0.5">{job.title}</p>
           )}
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
             {job.location_raw && <span className="text-xs text-slate-500">{formatLocation(job.location_raw)}</span>}
-            {salary && <span className="text-xs text-emerald-600 font-medium">{salary}</span>}
-            {job.sector && <span className="text-xs text-purple-600">{job.sector}</span>}
+            {salary && <span className="text-xs text-emerald-600 font-semibold">{salary}</span>}
+            {job.sector && <span className="text-xs text-purple-500">{job.sector}</span>}
           </div>
         </div>
 
@@ -136,7 +159,7 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
             <button
               onClick={handleThumbsUp}
               title={liked ? 'Liked' : 'Like this job'}
-              className={`text-lg transition-all hover:scale-110 ${liked ? 'opacity-100' : 'opacity-30 hover:opacity-70'}`}
+              className={`text-lg transition-all hover:scale-110 ${liked ? 'opacity-100' : 'opacity-25 hover:opacity-60'}`}
             >
               👍
             </button>
@@ -159,12 +182,11 @@ export default function Jobs() {
   const [workMode, setWorkMode] = useState('')
   const [jobType, setJobType] = useState('')
   const [sortBy, setSortBy] = useState('date_desc')
-
   const [feedbackMap, setFeedbackMap] = useState({})
 
-  // Debounce search
   const searchTimer = useRef(null)
   const [debouncedSearch, setDebouncedSearch] = useState('')
+
   function handleSearchChange(val) {
     setSearch(val)
     clearTimeout(searchTimer.current)
@@ -201,13 +223,11 @@ export default function Jobs() {
     }
   }
 
-  // Reset to page 1 when filters/search/sort change
   useEffect(() => {
     setPage(1)
     load(1)
   }, [debouncedSearch, workMode, jobType, sortBy])
 
-  // Load new page when page changes (but not on filter change — that resets page above)
   useEffect(() => {
     load(page)
   }, [page])
@@ -232,7 +252,6 @@ export default function Jobs() {
   }
 
   const hasFilters = debouncedSearch || workMode || jobType
-
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const to = Math.min(page * PAGE_SIZE, total)
 
@@ -242,46 +261,54 @@ export default function Jobs() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Open Positions</h1>
           {!loading && total > 0 && (
-            <p className="text-sm text-slate-500 mt-1">Showing {from}–{to} of {total.toLocaleString()} positions</p>
+            <p className="text-sm text-slate-500 mt-1">
+              Showing {from}–{to} of <span className="font-semibold text-slate-700">{total.toLocaleString()}</span> positions
+            </p>
           )}
         </div>
       </div>
 
-      {/* Search + sort + filters */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 space-y-3">
         <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Search by title or company..."
-            value={search}
-            onChange={e => handleSearchChange(e.target.value)}
-            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+          <div className="relative flex-1">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search by title or company…"
+              value={search}
+              onChange={e => handleSearchChange(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
           <select
             value={sortBy}
             onChange={e => { setSortBy(e.target.value); setPage(1) }}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-700"
           >
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-400 font-medium">Mode:</span>
           {['remote', 'hybrid', 'onsite'].map(m => (
             <button key={m} onClick={() => toggleFilter(setWorkMode, workMode, m)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${workMode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors capitalize ${workMode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400 hover:text-indigo-600'}`}>
               {m}
             </button>
           ))}
-          <div className="w-px bg-slate-200 mx-1" />
+          <div className="w-px h-4 bg-slate-200 mx-1" />
+          <span className="text-xs text-slate-400 font-medium">Type:</span>
           {['full_time', 'part_time', 'contract'].map(t => (
             <button key={t} onClick={() => toggleFilter(setJobType, jobType, t)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${jobType === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${jobType === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400 hover:text-indigo-600'}`}>
               {t.replace('_', ' ')}
             </button>
           ))}
           {hasFilters && (
-            <button onClick={clearFilters} className="px-3 py-1 rounded-full text-xs font-medium text-red-500 border border-red-200 hover:bg-red-50">
+            <button onClick={clearFilters} className="px-3 py-1 rounded-full text-xs font-semibold text-rose-500 border border-rose-200 hover:bg-rose-50 ml-auto">
               Clear all
             </button>
           )}
@@ -289,15 +316,23 @@ export default function Jobs() {
       </div>
 
       {loading ? (
-        <div className="text-center py-16 text-slate-400">Loading...</div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
+        </div>
       ) : jobs.length === 0 ? (
-        <div className="text-center py-16 text-slate-500">
-          <p className="text-lg mb-2">No positions match your search.</p>
-          {hasFilters && <button onClick={clearFilters} className="text-sm text-indigo-600 hover:underline">Clear filters</button>}
+        <div className="text-center py-20">
+          <svg className="w-12 h-12 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <p className="text-base font-semibold text-slate-600 mb-1">No positions found</p>
+          {hasFilters
+            ? <button onClick={clearFilters} className="text-sm text-indigo-600 hover:underline">Clear filters</button>
+            : <p className="text-sm text-slate-400">Try adjusting your search.</p>
+          }
         </div>
       ) : (
         <>
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {jobs.map(j => (
               <JobCard
                 key={j.id}
