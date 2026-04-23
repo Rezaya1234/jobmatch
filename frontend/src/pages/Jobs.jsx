@@ -1,52 +1,78 @@
-import { useState, useEffect } from 'react'
-import { listJobs, submitFeedback, getFeedback } from '../api'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { listJobs, getJobCount, submitFeedback, getFeedback } from '../api'
+
+const PAGE_SIZE = 25
+
+const SORT_OPTIONS = [
+  { value: 'date_desc',   label: 'Newest first' },
+  { value: 'date_asc',    label: 'Oldest first' },
+  { value: 'company_asc', label: 'Company A–Z' },
+  { value: 'title_asc',   label: 'Title A–Z' },
+]
 
 function formatDate(dateStr) {
-  if (!dateStr) return 'N/A'
+  if (!dateStr) return ''
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function formatLocation(raw) {
   if (!raw) return '—'
   const lower = raw.toLowerCase().trim()
-  const remoteWords = ['remote', 'worldwide', 'anywhere', 'global', 'distributed', 'work from home']
-  if (remoteWords.some(w => lower === w || lower.includes(w))) return 'Remote'
+  if (['remote', 'worldwide', 'anywhere', 'global', 'distributed'].some(w => lower.includes(w))) return 'Remote'
   const parts = raw.split(',').map(p => p.trim())
-  const countryWords = ['usa', 'us', 'united states', 'america']
-  const filtered = parts.filter(p => !countryWords.includes(p.toLowerCase()))
-  if (filtered.length === 0) return 'USA'
-  return filtered.slice(0, 2).join(', ')
+  const skip = ['usa', 'us', 'united states', 'america']
+  const filtered = parts.filter(p => !skip.includes(p.toLowerCase()))
+  return (filtered.length ? filtered : parts).slice(0, 2).join(', ')
 }
 
-const STATE_MAP = {
-  'alabama':'AL','alaska':'AK','arizona':'AZ','arkansas':'AR','california':'CA',
-  'colorado':'CO','connecticut':'CT','delaware':'DE','florida':'FL','georgia':'GA',
-  'hawaii':'HI','idaho':'ID','illinois':'IL','indiana':'IN','iowa':'IA','kansas':'KS',
-  'kentucky':'KY','louisiana':'LA','maine':'ME','maryland':'MD','massachusetts':'MA',
-  'michigan':'MI','minnesota':'MN','mississippi':'MS','missouri':'MO','montana':'MT',
-  'nebraska':'NE','nevada':'NV','new hampshire':'NH','new jersey':'NJ','new mexico':'NM',
-  'new york':'NY','north carolina':'NC','north dakota':'ND','ohio':'OH','oklahoma':'OK',
-  'oregon':'OR','pennsylvania':'PA','rhode island':'RI','south carolina':'SC',
-  'south dakota':'SD','tennessee':'TN','texas':'TX','utah':'UT','vermont':'VT',
-  'virginia':'VA','washington':'WA','west virginia':'WV','wisconsin':'WI','wyoming':'WY',
+function formatSalary(min, max) {
+  if (!min && !max) return null
+  const fmt = n => `$${(n / 1000).toFixed(0)}k`
+  if (min && max) return `${fmt(min)}–${fmt(max)}`
+  if (min) return `${fmt(min)}+`
+  return `up to ${fmt(max)}`
 }
 
-const SORT_OPTIONS = [
-  { value: 'date_desc', label: 'Newest first' },
-  { value: 'date_asc', label: 'Oldest first' },
-  { value: 'company_asc', label: 'Company A–Z' },
-  { value: 'title_asc', label: 'Title A–Z' },
-]
+function Pagination({ page, totalPages, onChange }) {
+  if (totalPages <= 1) return null
 
-function sortJobs(jobs, sortKey) {
-  const sorted = [...jobs]
-  switch (sortKey) {
-    case 'date_desc': return sorted.sort((a, b) => new Date(b.posted_at || b.created_at) - new Date(a.posted_at || a.created_at))
-    case 'date_asc':  return sorted.sort((a, b) => new Date(a.posted_at || a.created_at) - new Date(b.posted_at || b.created_at))
-    case 'company_asc': return sorted.sort((a, b) => (a.company || '').localeCompare(b.company || ''))
-    case 'title_asc':   return sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
-    default: return sorted
-  }
+  const pages = []
+  const delta = 2
+  const left = Math.max(1, page - delta)
+  const right = Math.min(totalPages, page + delta)
+
+  if (left > 1) { pages.push(1); if (left > 2) pages.push('…') }
+  for (let i = left; i <= right; i++) pages.push(i)
+  if (right < totalPages) { if (right < totalPages - 1) pages.push('…'); pages.push(totalPages) }
+
+  const btn = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors'
+  const active = `${btn} bg-indigo-600 text-white`
+  const inactive = `${btn} text-slate-600 hover:bg-slate-100 border border-slate-200`
+  const disabled = `${btn} text-slate-300 border border-slate-100 cursor-not-allowed`
+
+  return (
+    <div className="flex items-center justify-center gap-1 mt-6">
+      <button
+        onClick={() => onChange(page - 1)}
+        disabled={page === 1}
+        className={page === 1 ? disabled : inactive}
+      >
+        ← Prev
+      </button>
+      {pages.map((p, i) =>
+        p === '…'
+          ? <span key={`ellipsis-${i}`} className="px-2 text-slate-400">…</span>
+          : <button key={p} onClick={() => onChange(p)} className={p === page ? active : inactive}>{p}</button>
+      )}
+      <button
+        onClick={() => onChange(page + 1)}
+        disabled={page === totalPages}
+        className={page === totalPages ? disabled : inactive}
+      >
+        Next →
+      </button>
+    </div>
+  )
 }
 
 function JobCard({ job, userId, feedbackMap, onFeedback }) {
@@ -67,6 +93,8 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
     } catch {}
   }
 
+  const salary = formatSalary(job.salary_min, job.salary_max)
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-3">
@@ -80,6 +108,7 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
               <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full">{job.job_type.replace('_', ' ')}</span>
             )}
           </div>
+
           {job.url ? (
             <a
               href={job.url}
@@ -93,28 +122,21 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
           ) : (
             <p className="text-base font-semibold text-slate-900 leading-snug">{job.title}</p>
           )}
-          <div className="flex flex-wrap gap-2 mt-2">
-            {job.location_raw && (
-              <span className="text-xs text-slate-500">{formatLocation(job.location_raw)}</span>
-            )}
-            {job.salary_min && (
-              <span className="text-xs text-emerald-600 font-medium">
-                ${(job.salary_min / 1000).toFixed(0)}k{job.salary_max ? `–$${(job.salary_max / 1000).toFixed(0)}k` : '+'}
-              </span>
-            )}
-            {job.sector && (
-              <span className="text-xs text-purple-600">{job.sector}</span>
-            )}
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+            {job.location_raw && <span className="text-xs text-slate-500">{formatLocation(job.location_raw)}</span>}
+            {salary && <span className="text-xs text-emerald-600 font-medium">{salary}</span>}
+            {job.sector && <span className="text-xs text-purple-600">{job.sector}</span>}
           </div>
         </div>
 
         <div className="flex flex-col items-end gap-2 shrink-0">
-          <p className="text-xs text-slate-400">{formatDate(job.posted_at || job.created_at)}</p>
+          <p className="text-xs text-slate-400 whitespace-nowrap">{formatDate(job.posted_at || job.created_at)}</p>
           {userId && (
             <button
               onClick={handleThumbsUp}
               title={liked ? 'Liked' : 'Like this job'}
-              className={`text-lg hover:scale-110 transition-transform ${liked ? 'opacity-100' : 'opacity-40 hover:opacity-80'}`}
+              className={`text-lg transition-all hover:scale-110 ${liked ? 'opacity-100' : 'opacity-30 hover:opacity-70'}`}
             >
               👍
             </button>
@@ -127,21 +149,50 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
 
 export default function Jobs() {
   const userId = localStorage.getItem('userId')
+
   const [jobs, setJobs] = useState([])
-  const [feedbackMap, setFeedbackMap] = useState({})
-  const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState('date_desc')
-  const [filters, setFilters] = useState({ work_mode: '', job_type: '', sector: '' })
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
 
-  async function load() {
+  const [search, setSearch] = useState('')
+  const [workMode, setWorkMode] = useState('')
+  const [jobType, setJobType] = useState('')
+  const [sortBy, setSortBy] = useState('date_desc')
+
+  const [feedbackMap, setFeedbackMap] = useState({})
+
+  // Debounce search
+  const searchTimer = useRef(null)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  function handleSearchChange(val) {
+    setSearch(val)
+    clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => setDebouncedSearch(val), 350)
+  }
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+
+  const buildParams = useCallback((p) => ({
+    search: debouncedSearch,
+    work_mode: workMode,
+    job_type: jobType,
+    sort_by: sortBy,
+    limit: PAGE_SIZE,
+    offset: (p - 1) * PAGE_SIZE,
+  }), [debouncedSearch, workMode, jobType, sortBy])
+
+  async function load(p) {
     setLoading(true)
     try {
-      const [data, fb] = await Promise.all([
-        listJobs('', 10000),
+      const params = buildParams(p)
+      const [data, countData, fb] = await Promise.all([
+        listJobs(params),
+        getJobCount({ search: params.search, work_mode: params.work_mode, job_type: params.job_type }),
         userId ? getFeedback(userId).catch(() => []) : Promise.resolve([]),
       ])
       setJobs(data)
+      setTotal(countData.count)
       const map = {}
       for (const f of fb) map[f.job_id] = f
       setFeedbackMap(map)
@@ -150,39 +201,50 @@ export default function Jobs() {
     }
   }
 
-  useEffect(() => { load() }, [userId])
+  // Reset to page 1 when filters/search/sort change
+  useEffect(() => {
+    setPage(1)
+    load(1)
+  }, [debouncedSearch, workMode, jobType, sortBy])
 
-  const filtered = jobs.filter(j => {
-    const q = search.toLowerCase()
-    if (q && !j.title?.toLowerCase().includes(q) && !j.company?.toLowerCase().includes(q) && !j.location_raw?.toLowerCase().includes(q)) return false
-    if (filters.work_mode && j.work_mode !== filters.work_mode) return false
-    if (filters.job_type && j.job_type !== filters.job_type) return false
-    if (filters.sector && j.sector !== filters.sector) return false
-    return true
-  })
+  // Load new page when page changes (but not on filter change — that resets page above)
+  useEffect(() => {
+    load(page)
+  }, [page])
 
-  const sorted = sortJobs(filtered, sortKey)
-  const sectors = [...new Set(jobs.map(j => j.sector).filter(Boolean))].sort()
+  function goToPage(p) {
+    setPage(p)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
-  function setFilter(key, val) {
-    setFilters(f => ({ ...f, [key]: f[key] === val ? '' : val }))
+  function toggleFilter(setter, current, val) {
+    setter(current === val ? '' : val)
+    setPage(1)
   }
 
   function clearFilters() {
-    setFilters({ work_mode: '', job_type: '', sector: '' })
     setSearch('')
+    setDebouncedSearch('')
+    setWorkMode('')
+    setJobType('')
+    setSortBy('date_desc')
+    setPage(1)
   }
 
-  const hasFilters = search || Object.values(filters).some(Boolean)
+  const hasFilters = debouncedSearch || workMode || jobType
+
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const to = Math.min(page * PAGE_SIZE, total)
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Open Positions</h1>
-          <p className="text-sm text-slate-500 mt-1">{sorted.length} of {jobs.length} positions</p>
+          {!loading && total > 0 && (
+            <p className="text-sm text-slate-500 mt-1">Showing {from}–{to} of {total.toLocaleString()} positions</p>
+          )}
         </div>
-        <button onClick={load} className="text-sm text-indigo-600 hover:underline font-medium">Refresh</button>
       </div>
 
       {/* Search + sort + filters */}
@@ -190,14 +252,14 @@ export default function Jobs() {
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Search by title, company, or location..."
+            placeholder="Search by title or company..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
             className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <select
-            value={sortKey}
-            onChange={e => setSortKey(e.target.value)}
+            value={sortBy}
+            onChange={e => { setSortBy(e.target.value); setPage(1) }}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
           >
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -206,23 +268,16 @@ export default function Jobs() {
 
         <div className="flex flex-wrap gap-2">
           {['remote', 'hybrid', 'onsite'].map(m => (
-            <button key={m} onClick={() => setFilter('work_mode', m)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filters.work_mode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+            <button key={m} onClick={() => toggleFilter(setWorkMode, workMode, m)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${workMode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
               {m}
             </button>
           ))}
           <div className="w-px bg-slate-200 mx-1" />
           {['full_time', 'part_time', 'contract'].map(t => (
-            <button key={t} onClick={() => setFilter('job_type', t)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filters.job_type === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+            <button key={t} onClick={() => toggleFilter(setJobType, jobType, t)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${jobType === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
               {t.replace('_', ' ')}
-            </button>
-          ))}
-          {sectors.length > 0 && <div className="w-px bg-slate-200 mx-1" />}
-          {sectors.map(s => (
-            <button key={s} onClick={() => setFilter('sector', s)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${filters.sector === s ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400'}`}>
-              {s}
             </button>
           ))}
           {hasFilters && (
@@ -235,23 +290,26 @@ export default function Jobs() {
 
       {loading ? (
         <div className="text-center py-16 text-slate-400">Loading...</div>
-      ) : sorted.length === 0 ? (
+      ) : jobs.length === 0 ? (
         <div className="text-center py-16 text-slate-500">
-          <p className="text-lg mb-2">No positions match your filters.</p>
-          <button onClick={clearFilters} className="text-sm text-indigo-600 hover:underline">Clear filters</button>
+          <p className="text-lg mb-2">No positions match your search.</p>
+          {hasFilters && <button onClick={clearFilters} className="text-sm text-indigo-600 hover:underline">Clear filters</button>}
         </div>
       ) : (
-        <div className="space-y-3">
-          {sorted.map(j => (
-            <JobCard
-              key={j.id}
-              job={j}
-              userId={userId}
-              feedbackMap={feedbackMap}
-              onFeedback={load}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-3">
+            {jobs.map(j => (
+              <JobCard
+                key={j.id}
+                job={j}
+                userId={userId}
+                feedbackMap={feedbackMap}
+                onFeedback={() => {}}
+              />
+            ))}
+          </div>
+          <Pagination page={page} totalPages={totalPages} onChange={goToPage} />
+        </>
       )}
     </div>
   )
