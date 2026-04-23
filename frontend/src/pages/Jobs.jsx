@@ -99,7 +99,7 @@ function SkeletonRow() {
 
 function JobCard({ job, userId, feedbackMap, onFeedback }) {
   const existing = feedbackMap[job.id]
-  const [liked, setLiked] = useState(existing?.rating === 'thumbs_up')
+  const [vote, setVote] = useState(existing?.rating ?? null) // 'thumbs_up' | 'thumbs_down' | null
   const borderColor = WORK_MODE_BORDER[job.work_mode] || 'border-l-slate-200'
 
   function handleLinkClick() {
@@ -107,11 +107,11 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
     submitFeedback(userId, job.id, 'thumbs_up', '', 1).catch(() => {})
   }
 
-  async function handleThumbsUp() {
+  async function handleVote(rating) {
     if (!userId) return
     try {
-      await submitFeedback(userId, job.id, 'thumbs_up', '', 2)
-      setLiked(true)
+      await submitFeedback(userId, job.id, rating, '', 2)
+      setVote(rating)
       onFeedback()
     } catch {}
   }
@@ -156,13 +156,22 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
         <div className="flex flex-col items-end gap-2 shrink-0">
           <p className="text-xs text-slate-400 whitespace-nowrap">{formatDate(job.posted_at || job.created_at)}</p>
           {userId && (
-            <button
-              onClick={handleThumbsUp}
-              title={liked ? 'Liked' : 'Like this job'}
-              className={`text-lg transition-all hover:scale-110 ${liked ? 'opacity-100' : 'opacity-25 hover:opacity-60'}`}
-            >
-              👍
-            </button>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => handleVote('thumbs_up')}
+                title="Good fit"
+                className={`text-base transition-all hover:scale-110 ${vote === 'thumbs_up' ? 'opacity-100' : 'opacity-20 hover:opacity-60'}`}
+              >
+                👍
+              </button>
+              <button
+                onClick={() => handleVote('thumbs_down')}
+                title="Not a fit"
+                className={`text-base transition-all hover:scale-110 ${vote === 'thumbs_down' ? 'opacity-100' : 'opacity-20 hover:opacity-60'}`}
+              >
+                👎
+              </button>
+            </div>
           )}
         </div>
       </div>
