@@ -402,7 +402,7 @@ export default function Setup() {
 
   async function handleGenerate() {
     if (!aiText.trim() && !resumeFile) {
-      showStatus('Please describe what you're looking for or upload your resume.', true)
+      showStatus("Please describe what you're looking for or upload your resume.", true)
       return
     }
     setGenerating(true)
