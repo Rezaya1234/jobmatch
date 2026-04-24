@@ -1,15 +1,15 @@
 """add matching v2 — weighted scoring, cold start, signals, shown memory
 
-Revision ID: j0k1l2m3n4o5
-Revises: i9j0k1l2m3n4
+Revision ID: k1l2m3n4o5p6
+Revises: j0k1l2m3n4o5
 Create Date: 2026-04-24
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ARRAY, JSON, UUID as PG_UUID
 
-revision = 'j0k1l2m3n4o5'
-down_revision = 'i9j0k1l2m3n4'
+revision = 'k1l2m3n4o5p6'
+down_revision = 'j0k1l2m3n4o5'
 branch_labels = None
 depends_on = None
 
