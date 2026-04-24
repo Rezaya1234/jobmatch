@@ -306,7 +306,7 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
           {/* Title + meta — fixed width so it doesn't stretch */}
           <div className="min-w-0 pr-3" style={{ width: '260px', flexShrink: 0 }}>
             <p className="text-xs font-medium text-slate-400 truncate">{match.company}</p>
-            <h3 className="text-sm font-semibold text-slate-900 leading-snug truncate">{match.title}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 leading-snug">{match.title}</h3>
             <div className="flex flex-wrap gap-1 mt-1.5">
               {match.work_mode && (
                 <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{match.work_mode}</span>
