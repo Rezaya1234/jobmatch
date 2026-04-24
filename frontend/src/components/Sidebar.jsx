@@ -119,7 +119,7 @@ export default function Sidebar({ collapsed, onToggle }) {
           {collapsed ? (
             <Icon path={ICONS.star} className="w-8 h-8 text-violet-600" />
           ) : (
-            <img src="/logo.png" alt="Stellapath" className="h-24 w-auto" />
+            <img src="/logo.png" alt="Stellapath" style={{ height: '96px', width: 'auto' }} />
           )}
         </div>
 

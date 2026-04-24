@@ -18,7 +18,7 @@ function TopBar() {
     <header className="h-24 bg-white border-b border-slate-100 flex items-center justify-between px-6 shrink-0">
       {/* Logo — shown only on mobile (sidebar handles desktop) */}
       <div className="md:hidden">
-        <img src="/logo.png" alt="Stellapath" className="h-8 w-auto" />
+        <img src="/logo.png" alt="Stellapath" style={{ height: '96px', width: 'auto' }} />
       </div>
       {/* Spacer on desktop */}
       <div className="hidden md:block" />
