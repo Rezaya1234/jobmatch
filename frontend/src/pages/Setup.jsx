@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createUser, upsertProfile, getProfile, parseProfile, enrichLinkedIn, disconnectLinkedIn } from '../api'
+import { createUser, upsertProfile, getProfile, parseProfile } from '../api'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -328,12 +328,6 @@ export default function Setup() {
   const [dragOver, setDragOver] = useState(false)
   const [titleExpanded, setTitleExpanded] = useState(true)
   const [currentStep, setCurrentStep]     = useState(1)
-  const [linkedInUrl, setLinkedInUrl]     = useState('')
-  const [linkedInLoading, setLinkedInLoading] = useState(false)
-  const [linkedInConnected, setLinkedInConnected] = useState(false)
-  const [linkedInHeadline, setLinkedInHeadline] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
-  const [displayName, setDisplayName] = useState('')
 
   const [aiText, setAiText]         = useState('')
   const [resumeFile, setResumeFile] = useState(null)
@@ -390,9 +384,6 @@ export default function Setup() {
         setAiProfile(p.role_description)
         setAiText(p.role_description)
       }
-      if (p.avatar_url) setAvatarUrl(p.avatar_url)
-      if (p.display_name) setDisplayName(p.display_name)
-      if (p.linkedin_url) { setLinkedInConnected(true); setLinkedInUrl(p.linkedin_url) }
     }).catch(() => {})
   }, [userId])
 
@@ -453,37 +444,6 @@ export default function Setup() {
     }
   }
 
-  async function handleLinkedInImport() {
-    if (!linkedInUrl.trim() || !userId) return
-    setLinkedInLoading(true)
-    try {
-      const data = await enrichLinkedIn(userId, linkedInUrl.trim())
-      if (data.display_name) setDisplayName(data.display_name)
-      if (data.avatar_url)   setAvatarUrl(data.avatar_url)
-      if (data.headline)     setLinkedInHeadline(data.headline)
-      setLinkedInConnected(true)
-      showStatus('LinkedIn profile imported!')
-    } catch (err) {
-      showStatus(err.response?.data?.detail || 'Could not import LinkedIn profile.', true)
-    } finally {
-      setLinkedInLoading(false)
-    }
-  }
-
-  async function handleLinkedInRemove() {
-    if (!userId) return
-    try {
-      await disconnectLinkedIn(userId)
-      setLinkedInConnected(false)
-      setLinkedInUrl('')
-      setAvatarUrl('')
-      setDisplayName('')
-      setLinkedInHeadline('')
-      showStatus('LinkedIn profile removed.')
-    } catch {
-      showStatus('Failed to remove LinkedIn profile.', true)
-    }
-  }
 
   function handleDrop(e) {
     e.preventDefault()
@@ -550,77 +510,6 @@ export default function Setup() {
                 className="ml-auto text-xs text-slate-400 hover:text-red-500 transition-colors">
                 Switch account
               </button>
-            </div>
-          )}
-
-          {/* ── LinkedIn ──────────────────────────────────────────────────── */}
-          {userId && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-1">
-                <svg className="w-4 h-4 text-[#0A66C2]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                </svg>
-                LinkedIn
-              </h2>
-              <p className="text-sm text-slate-500 mb-4">
-                Paste your LinkedIn profile URL to import your name, photo, and headline.
-              </p>
-
-              {linkedInConnected ? (
-                <div className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt={displayName} className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-[#0A66C2] flex items-center justify-center shrink-0">
-                        <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                        </svg>
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{displayName || 'LinkedIn imported'}</p>
-                      {linkedInHeadline && <p className="text-xs text-slate-500 truncate">{linkedInHeadline}</p>}
-                    </div>
-                  </div>
-                  <button type="button" onClick={handleLinkedInRemove}
-                    className="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0">
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    placeholder="https://www.linkedin.com/in/your-username"
-                    value={linkedInUrl}
-                    onChange={e => setLinkedInUrl(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleLinkedInImport()}
-                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0A66C2] focus:border-transparent"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleLinkedInImport}
-                    disabled={!linkedInUrl.trim() || linkedInLoading}
-                    className="flex items-center gap-1.5 bg-[#0A66C2] hover:bg-[#004182] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    {linkedInLoading ? (
-                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                      </svg>
-                    )}
-                    {linkedInLoading ? 'Importing…' : 'Import'}
-                  </button>
-                </div>
-              )}
-              <p className="text-xs text-slate-400 mt-3">
-                Pulls your name, photo, and headline. Your profile must be set to public on LinkedIn.
-              </p>
             </div>
           )}
 

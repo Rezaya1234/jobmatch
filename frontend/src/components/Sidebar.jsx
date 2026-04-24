@@ -98,19 +98,8 @@ function NavItem({ item, collapsed }) {
 // ---------------------------------------------------------------------------
 // Sidebar
 // ---------------------------------------------------------------------------
-function Avatar({ url, name, size = 8 }) {
-  const [err, setErr] = useState(false)
-  const initials = (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  const cls = `w-${size} h-${size} rounded-full shrink-0 flex items-center justify-center text-xs font-bold`
-  if (url && !err) {
-    return <img src={url} alt={name || 'avatar'} className={`${cls} object-cover border border-slate-200`} onError={() => setErr(true)} />
-  }
-  return <div className={`${cls} bg-violet-100 text-violet-700`}>{initials}</div>
-}
-
 export default function Sidebar({ collapsed, onToggle }) {
   const userId = localStorage.getItem('userId')
-  const userEmail = localStorage.getItem('userEmail') || ''
   const [profile, setProfile] = useState(null)
 
   useEffect(() => {
@@ -152,24 +141,8 @@ export default function Sidebar({ collapsed, onToggle }) {
           {ADMIN_NAV.map(item => <NavItem key={item.to} item={item} collapsed={collapsed} />)}
         </nav>
 
-        {/* Bottom card */}
-        {!collapsed && (
-          <div className="p-3 shrink-0 border-t border-slate-100">
-            {/* User identity row */}
-            {userId && (
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <Avatar url={profile?.avatar_url} name={profile?.display_name || userEmail} size={7} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-slate-700 truncate">{profile?.display_name || userEmail.split('@')[0]}</p>
-                  {profile?.display_name && <p className="text-[10px] text-slate-400 truncate">{userEmail}</p>}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {!collapsed && pct < 100 && (
-          <div className="px-3 pb-3 shrink-0">
+          <div className="p-3 shrink-0">
             <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center shrink-0">

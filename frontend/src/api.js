@@ -27,9 +27,6 @@ export const triggerTestEmail = (id) => http.post(`/pipeline/test-email/${id}`).
 export const recordEngagement = (id) => http.post(`/users/${id}/engage`).catch(() => {})
 export const getActivity = (id) => http.get(`/users/${id}/qa/activity`).then(r => r.data)
 export const getPipelineStatus = () => http.get('/pipeline/status').then(r => r.data)
-export const enrichLinkedIn = (id, linkedinUrl) =>
-  http.post(`/users/${id}/linkedin/enrich`, { linkedin_url: linkedinUrl }).then(r => r.data)
-export const disconnectLinkedIn = (id) => http.delete(`/users/${id}/linkedin`)
 export const parseProfile = (id, text, resumeFile) => {
   const form = new FormData()
   if (text) form.append('text', text)

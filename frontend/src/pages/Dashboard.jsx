@@ -793,21 +793,11 @@ export default function Dashboard() {
     <div>
       {/* Header */}
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          {profile?.avatar_url && (
-            <img
-              src={profile.avatar_url}
-              alt={profile.display_name || name || 'avatar'}
-              className="w-11 h-11 rounded-full object-cover border border-slate-200 shrink-0"
-              onError={e => { e.currentTarget.style.display = 'none' }}
-            />
-          )}
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">
-              {getGreeting()}{(profile?.display_name || name) ? `, ${profile?.display_name?.split(' ')[0] || name}` : ''}.
-            </h1>
-            <p className="text-sm text-slate-500 mt-0.5">Here are your top matches for today.</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            {getGreeting()}{name ? `, ${name}` : ''}.
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">Here are your top matches for today.</p>
         </div>
         <div className="flex flex-col items-end gap-1 text-right">
           {lastUpdated && (
