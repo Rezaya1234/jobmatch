@@ -229,8 +229,8 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
           <CompanyLogo company={match.company} url={match.url} size="sm" />
         </div>
 
-        {/* LEFT: title + company + meta */}
-        <div className="min-w-0 shrink-0" style={{ width: '220px' }}>
+        {/* LEFT: title + company + meta — wider to push "why you match" ~1in right */}
+        <div className="min-w-0 shrink-0" style={{ width: '300px' }}>
           <h3 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2">{match.title}</h3>
           <p className="text-xs text-slate-400 mt-0.5 truncate">{match.company}</p>
           <div className="flex flex-wrap gap-1 mt-1">
@@ -249,8 +249,9 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
           </div>
         </div>
 
-        {/* MIDDLE: 3 signal bullets */}
+        {/* MIDDLE: why you match label + 3 signal bullets */}
         <div className="hidden md:flex flex-1 min-w-0 flex-col justify-center gap-1.5 border-l border-slate-100 pl-3">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5">Why you match</p>
           {signals.length > 0 ? signals.map((s, i) => (
             <div key={i} className="flex items-center gap-2 min-w-0">
               <span className="w-1 h-1 rounded-full bg-violet-300 shrink-0" />
@@ -261,38 +262,67 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
           )}
         </div>
 
-        {/* RIGHT: score + thumbs + chevron */}
-        <div className="shrink-0 flex flex-col items-center gap-1.5 pl-3 border-l border-slate-100">
+        {/* RIGHT: score on top, then [👍 👎 →] in one row */}
+        <div className="shrink-0 flex flex-col items-center gap-2 pl-3 border-l border-slate-100">
           <ScoreBadge pct={pct} />
           <div className="flex items-center gap-1">
             {initialRating ? (
-              <span className="text-base">{initialRating === 'thumbs_up' ? '👍' : '👎'}</span>
+              <>
+                <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${initialRating === 'thumbs_up' ? 'text-green-600 bg-green-50' : 'text-rose-500 bg-rose-50'}`}>
+                  {initialRating === 'thumbs_up' ? (
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                    </svg>
+                  )}
+                </span>
+                <button
+                  onClick={() => onOpenDrawer(match)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-violet-500 hover:bg-violet-50 transition-colors"
+                  aria-label={`View details for ${match.title}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
             ) : (
               <>
                 <button
                   onClick={() => handleFeedback('thumbs_up')}
                   disabled={saving}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 hover:border-green-300 hover:bg-green-50 transition-all disabled:opacity-50 text-base"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-600 hover:bg-green-50 transition-all disabled:opacity-50"
                   aria-label="Good fit"
-                >👍</button>
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                  </svg>
+                </button>
                 <button
                   onClick={() => handleFeedback('thumbs_down')}
                   disabled={saving}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 transition-all disabled:opacity-50 text-base"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-300 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
                   aria-label="Not a fit"
-                >👎</button>
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => onOpenDrawer(match)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-violet-500 hover:border-violet-200 hover:bg-violet-50 transition-colors"
+                  aria-label={`View details for ${match.title}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </>
             )}
           </div>
-          <button
-            onClick={() => onOpenDrawer(match)}
-            className="text-slate-300 hover:text-violet-500 transition-colors p-1"
-            aria-label={`View details for ${match.title}`}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
         </div>
       </div>
     </div>
