@@ -1,10 +1,10 @@
-"""LinkedIn profile enrichment via Proxycurl.
+"""LinkedIn profile enrichment via RapidAPI (Real-Time LinkedIn Scraper).
 
-User provides their LinkedIn profile URL. We call Proxycurl to fetch:
+User provides their LinkedIn profile URL. We call RapidAPI to fetch:
 name, headline, profile picture, skills, summary.
 
 Required env var:
-  PROXYCURL_API_KEY — get one at https://nubela.co/proxycurl (free tier: 10 credits)
+  RAPIDAPI_KEY — from rapidapi.com after subscribing to "Real-Time LinkedIn Scraper API"
 """
 import logging
 import os
@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["linkedin"])
 
-_KEY = os.getenv("PROXYCURL_API_KEY", "")
-_PROXYCURL = "https://nubela.co/proxycurl/api/v2/linkedin"
+_KEY = os.getenv("RAPIDAPI_KEY", "")
+_API_URL = "https://linkedin-data-api.p.rapidapi.com/get-profile-data-by-url"
 
 
 class EnrichRequest(BaseModel):
@@ -52,9 +52,12 @@ async def enrich_linkedin(
 
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(
-            _PROXYCURL,
-            params={"url": body.linkedin_url, "use_cache": "if-present"},
-            headers={"Authorization": f"Bearer {_KEY}"},
+            _API_URL,
+            params={"url": body.linkedin_url},
+            headers={
+                "x-rapidapi-host": "linkedin-data-api.p.rapidapi.com",
+                "x-rapidapi-key": _KEY,
+            },
         )
 
     if resp.status_code == 404:
@@ -75,11 +78,17 @@ async def enrich_linkedin(
         )
 
     data = resp.json()
-    display_name = data.get("full_name")
-    headline     = data.get("headline")
-    avatar_url   = data.get("profile_pic_url")
-    skills       = data.get("skills") or []
-    summary      = data.get("summary") or ""
+    # RapidAPI field names
+    first = data.get("firstName") or data.get("first_name") or ""
+    last  = data.get("lastName")  or data.get("last_name")  or ""
+    display_name = data.get("full_name") or f"{first} {last}".strip() or None
+    headline     = data.get("headline") or data.get("title") or None
+    avatar_url   = (
+        data.get("profilePicture") or data.get("profile_pic_url")
+        or data.get("profilePictureUrl") or None
+    )
+    skills  = data.get("skills") or []
+    summary = data.get("summary") or data.get("about") or ""
 
     result = await session.execute(
         select(UserProfile).where(UserProfile.user_id == user_id)
