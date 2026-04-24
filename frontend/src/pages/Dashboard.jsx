@@ -115,49 +115,75 @@ function TopReasons({ match }) {
     .sort(([, a], [, b]) => b - a)
     .slice(0, 3)
 
-  // Fall back to text bullets when no dimension scores exist
-  if (sorted.length === 0) {
-    const bullets = match.reasoning
-      ? match.reasoning.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 15).slice(0, 3)
-      : []
-    if (bullets.length === 0) return null
+  // Case 1: dimension scores available — sorted by weight
+  if (sorted.length > 0) {
     return (
-      <div>
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Top reasons</p>
-        <div className="space-y-1">
-          {bullets.map((r, i) => <CheckBullet key={i} text={r} />)}
+      <div className="w-full">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Top reasons</p>
+        <div className="space-y-1.5">
+          {sorted.map(([key, val]) => {
+            const pct = Math.round(val * 100)
+            const label = DIMENSION_LABELS[key] || key.replace(/_/g, ' ')
+            const color = pct >= 70
+              ? { check: 'text-green-500', score: 'text-green-600', bar: 'bg-green-400' }
+              : pct >= 45
+              ? { check: 'text-amber-400', score: 'text-amber-600', bar: 'bg-amber-400' }
+              : { check: 'text-rose-400',  score: 'text-rose-500',  bar: 'bg-rose-400'  }
+            return (
+              <div key={key}>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <svg className={`w-3.5 h-3.5 shrink-0 ${color.check}`} viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-xs text-slate-600 flex-1 leading-snug">{label}</span>
+                  <span className={`text-xs font-semibold tabular-nums ${color.score}`}>{pct}%</span>
+                </div>
+                <div className="ml-5 h-1 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-1 rounded-full ${color.bar}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     )
   }
 
+  // Case 2: only free-text reasoning — split into bullets
+  if (match.reasoning) {
+    const bullets = match.reasoning
+      .split(/[.!?]/)
+      .map(s => s.trim())
+      .filter(s => s.length > 15)
+      .slice(0, 3)
+    if (bullets.length > 0) {
+      return (
+        <div className="w-full">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Top reasons</p>
+          <div className="space-y-1">
+            {bullets.map((r, i) => <CheckBullet key={i} text={r} />)}
+          </div>
+        </div>
+      )
+    }
+  }
+
+  // Case 3: no data yet — show pending state
   return (
-    <div>
+    <div className="w-full">
       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Top reasons</p>
       <div className="space-y-1.5">
-        {sorted.map(([key, val]) => {
-          const pct = Math.round(val * 100)
-          const label = DIMENSION_LABELS[key] || key.replace(/_/g, ' ')
-          const color = pct >= 70
-            ? { check: 'text-green-500', score: 'text-green-600', bar: 'bg-green-400' }
-            : pct >= 45
-            ? { check: 'text-amber-400', score: 'text-amber-600', bar: 'bg-amber-400' }
-            : { check: 'text-rose-400',  score: 'text-rose-500',  bar: 'bg-rose-400'  }
-          return (
-            <div key={key}>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <svg className={`w-3.5 h-3.5 shrink-0 ${color.check}`} viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                <span className="text-xs text-slate-600 flex-1 leading-snug">{label}</span>
-                <span className={`text-xs font-semibold tabular-nums ${color.score}`}>{pct}%</span>
-              </div>
-              <div className="ml-5 h-1 bg-slate-100 rounded-full overflow-hidden">
-                <div className={`h-1 rounded-full ${color.bar}`} style={{ width: `${pct}%` }} />
-              </div>
+        {Object.keys(DIMENSION_LABELS).slice(0, 3).map(key => (
+          <div key={key}>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <div className="w-3.5 h-3.5 rounded-full bg-slate-200 shrink-0" />
+              <span className="text-xs text-slate-400 flex-1">{DIMENSION_LABELS[key]}</span>
+              <span className="text-xs text-slate-300">—</span>
             </div>
-          )
-        })}
+            <div className="ml-5 h-1 bg-slate-100 rounded-full" />
+          </div>
+        ))}
+        <p className="text-[10px] text-slate-300 mt-1">Full analysis after LLM scoring</p>
       </div>
     </div>
   )
