@@ -115,11 +115,11 @@ export default function Sidebar({ collapsed, onToggle }) {
         }`}
       >
         {/* Logo */}
-        <div className={`flex items-center h-14 border-b border-slate-100 shrink-0 ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
+        <div className={`flex items-center h-24 border-b border-slate-100 shrink-0 ${collapsed ? 'justify-center px-0' : 'px-4'}`}>
           {collapsed ? (
-            <Icon path={ICONS.star} className="w-6 h-6 text-violet-600" />
+            <Icon path={ICONS.star} className="w-8 h-8 text-violet-600" />
           ) : (
-            <img src="/logo.png" alt="Stellapath" className="h-8 w-auto" />
+            <img src="/logo.png" alt="Stellapath" className="h-24 w-auto" />
           )}
         </div>
 
