@@ -6,3 +6,19 @@ body {
   background: #f8fafc;
   color: #1e293b;
 }
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Focus rings — purple, 2px */
+:focus-visible {
+  outline: 2px solid #7c3aed;
+  outline-offset: 2px;
+}
