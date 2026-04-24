@@ -78,6 +78,8 @@ async def enrich_linkedin(
         )
 
     data = resp.json()
+    logger.info("LinkedIn raw response keys: %s", list(data.keys()))
+    logger.info("LinkedIn raw response: %s", str(data)[:1000])
     # RapidAPI field names
     first = data.get("firstName") or data.get("first_name") or ""
     last  = data.get("lastName")  or data.get("last_name")  or ""
