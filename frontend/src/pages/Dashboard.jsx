@@ -199,16 +199,20 @@ function SkeletonCard() {
 
 function JobCard({ match, userId, profile, initialRating, removing, onReact, onOpenDrawer }) {
   const [saving, setSaving] = useState(false)
+  const [localRating, setLocalRating] = useState(null)
   const pct = Math.round((match.score || 0) * 100)
   const signals = buildSignals(match, profile)
+  const rating = localRating || initialRating
 
-  async function handleFeedback(rating) {
-    if (saving) return
+  async function handleFeedback(r) {
+    if (saving || localRating) return
+    setLocalRating(r)  // instant visual feedback before API responds
     setSaving(true)
     try {
-      await submitFeedback(userId, match.job_id, rating, '', 2)
-      onReact(rating, match.job_id)
+      await submitFeedback(userId, match.job_id, r, '', 2)
+      onReact(r, match.job_id)
     } catch {
+      setLocalRating(null)
       setSaving(false)
     }
   }
@@ -266,10 +270,10 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
         <div className="shrink-0 flex flex-col items-center gap-2 pl-3 border-l border-slate-100">
           <ScoreBadge pct={pct} />
           <div className="flex items-center gap-1">
-            {initialRating ? (
+            {rating ? (
               <>
-                <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${initialRating === 'thumbs_up' ? 'text-green-600 bg-green-50' : 'text-rose-500 bg-rose-50'}`}>
-                  {initialRating === 'thumbs_up' ? (
+                <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${rating === 'thumbs_up' ? 'text-green-600 bg-green-50' : 'text-rose-500 bg-rose-50'}`}>
+                  {rating === 'thumbs_up' ? (
                     <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
                     </svg>
