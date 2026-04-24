@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { triggerDailyPipeline, triggerCollect, triggerResetFilters, triggerTestEmail, getJobCount, getMatchCount, getPipelineStatus } from '../api'
+import { triggerDailyPipeline, triggerCollect, triggerResetFilters, triggerTestEmail, triggerCompanyInsights, getJobCount, getMatchCount, getPipelineStatus } from '../api'
 
 function StatusIcon({ status }) {
   if (status === 'complete') return <span className="text-green-500 text-xl">✓</span>
@@ -33,6 +33,7 @@ export default function Pipeline() {
   const [totals, setTotals] = useState({ jobs: 0, matches: 0 })
   const [triggering, setTriggering] = useState(false)
   const [emailStatus, setEmailStatus] = useState('')
+  const [insightsStatus, setInsightsStatus] = useState('')
   const pollRef = useRef(null)
 
   async function fetchTotals() {
@@ -112,6 +113,18 @@ export default function Pipeline() {
       setEmailStatus('error')
     } finally {
       setTimeout(() => setEmailStatus(''), 5000)
+    }
+  }
+
+  async function handleCompanyInsights() {
+    setInsightsStatus('running')
+    try {
+      await triggerCompanyInsights()
+      setInsightsStatus('accepted')
+    } catch {
+      setInsightsStatus('error')
+    } finally {
+      setTimeout(() => setInsightsStatus(''), 5000)
     }
   }
 
@@ -204,10 +217,16 @@ export default function Pipeline() {
               <div className="text-xs opacity-70 font-normal mt-0.5">re-filter all jobs</div>
             </button>
           </div>
-          <button onClick={handleTestEmail} disabled={isRunning || triggering || emailStatus === 'sending'}
-            className="w-full bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
-            {emailStatus === 'sending' ? 'Sending...' : emailStatus === 'sent' ? '✓ Email sent! Check your inbox' : emailStatus === 'empty' ? 'No matches to email yet' : emailStatus === 'error' ? 'Failed — check SENDGRID_API_KEY' : 'Send Test Email'}
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={handleTestEmail} disabled={isRunning || triggering || emailStatus === 'sending'}
+              className="bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
+              {emailStatus === 'sending' ? 'Sending...' : emailStatus === 'sent' ? '✓ Email sent!' : emailStatus === 'empty' ? 'No matches yet' : emailStatus === 'error' ? 'Failed' : 'Send Test Email'}
+            </button>
+            <button onClick={handleCompanyInsights} disabled={insightsStatus === 'running'}
+              className="bg-violet-600 text-white py-2 rounded-lg font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
+              {insightsStatus === 'running' ? 'Starting...' : insightsStatus === 'accepted' ? '✓ Started' : insightsStatus === 'error' ? 'Failed' : 'Refresh Insights'}
+            </button>
+          </div>
         </div>
       </div>
 

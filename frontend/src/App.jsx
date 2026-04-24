@@ -7,6 +7,8 @@ import Pipeline from './pages/Pipeline'
 import Architecture from './pages/Architecture'
 import QA from './pages/QA'
 import Matches from './pages/Matches'
+import CompanyInsights from './pages/CompanyInsights'
+import CompanyDetail from './pages/CompanyDetail'
 import Sidebar from './components/Sidebar'
 import './index.css'
 
@@ -89,7 +91,8 @@ export default function App() {
                 <Route path="/pipeline" element={<Pipeline />} />
                 <Route path="/architecture" element={<Architecture />} />
                 <Route path="/qa" element={<QA />} />
-                <Route path="/insights" element={<ComingSoon title="Company Insights" />} />
+                <Route path="/insights" element={<CompanyInsights />} />
+                <Route path="/insights/:slug" element={<CompanyDetail />} />
                 <Route path="/resources" element={<ComingSoon title="Resources" />} />
                 <Route path="/settings" element={<ComingSoon title="Settings" />} />
                 <Route path="/applications" element={<ComingSoon title="Applications" />} />

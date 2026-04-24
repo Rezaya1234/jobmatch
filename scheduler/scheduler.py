@@ -19,6 +19,8 @@ def start() -> None:
     timezone = os.getenv("PIPELINE_TIMEZONE", "America/Chicago")
     recap_hour = int(os.getenv("RECAP_CRON_HOUR", "9"))
     recap_day = os.getenv("RECAP_CRON_DAY_OF_WEEK", "sun")
+    insights_hour = int(os.getenv("INSIGHTS_CRON_HOUR", "6"))
+    insights_day = os.getenv("INSIGHTS_CRON_DAY_OF_WEEK", "sun")
 
     _scheduler.add_job(
         _run_daily_pipeline,
@@ -32,10 +34,18 @@ def start() -> None:
         id="weekly_recap",
         replace_existing=True,
     )
+    _scheduler.add_job(
+        _run_company_insights,
+        CronTrigger(day_of_week=insights_day, hour=insights_hour, minute=30, timezone=timezone),
+        id="company_insights",
+        replace_existing=True,
+    )
     _scheduler.start()
     logger.info(
-        "Scheduler started — daily pipeline at %02d:%02d %s, weekly recap %s at %02d:00",
+        "Scheduler started — daily pipeline at %02d:%02d %s, weekly recap %s at %02d:00, "
+        "company insights %s at %02d:30",
         hour, minute, timezone, recap_day.upper(), recap_hour,
+        insights_day.upper(), insights_hour,
     )
 
 
@@ -54,6 +64,19 @@ async def _run_daily_pipeline() -> None:
             logger.info("Scheduler: pipeline complete — %s", stats)
         except Exception:
             logger.exception("Scheduler: daily pipeline crashed")
+
+
+async def _run_company_insights() -> None:
+    logger.info("Scheduler: starting company insights generation")
+    from agents.company_insight_agent import CompanyInsightAgent
+    llm = get_llm()
+    async with AsyncSessionLocal() as session:
+        agent = CompanyInsightAgent(session, llm)
+        try:
+            count = await agent.run()
+            logger.info("Scheduler: company insights complete — %d processed", count)
+        except Exception:
+            logger.exception("Scheduler: company insights crashed")
 
 
 async def _run_weekly_recap() -> None:

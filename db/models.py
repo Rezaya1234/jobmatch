@@ -291,3 +291,42 @@ class ActivityLog(Base):
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CompanyInsight(Base):
+    """Pre-computed weekly hiring intelligence per company."""
+
+    __tablename__ = "company_insights"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    company_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hiring_outlook: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    hiring_outlook_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    interview_difficulty: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_rate: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    time_to_hire: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    hiring_trend: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    overall_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rating_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    pros: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    cons: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    signals: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    hiring_areas: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    risks: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    active_job_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    hq_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    company_size: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    company_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    generated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

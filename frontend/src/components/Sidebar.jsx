@@ -33,7 +33,7 @@ const PRIMARY_NAV = [
   { to: '/matches',      label: 'Saved Jobs',        icon: 'saved' },
   { to: '/applications', label: 'Applications',      icon: 'applications', soon: true },
   { to: '/feedback',     label: 'Feedback',          icon: 'feedback',     soon: true },
-  { to: '/insights',     label: 'Company Insights',  icon: 'insights',     soon: true },
+  { to: '/insights',     label: 'Company Insights',  icon: 'insights' },
 ]
 
 const SECONDARY_NAV = [

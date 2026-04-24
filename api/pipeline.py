@@ -167,6 +167,16 @@ async def trigger_test_email(
     return PipelineResponse(status="nothing_to_send", detail="No scored matches to email yet.")
 
 
+@router.post("/company-insights", response_model=PipelineResponse, status_code=202)
+async def trigger_company_insights(
+    background_tasks: BackgroundTasks,
+    llm: LLMClient = Depends(get_llm),
+) -> PipelineResponse:
+    """Generate/refresh company insights for all qualifying companies."""
+    background_tasks.add_task(_run_company_insights, llm)
+    return PipelineResponse(status="accepted", detail="Company insights generation started.")
+
+
 @router.post("/feedback/{user_id}", response_model=PipelineResponse, status_code=202)
 async def trigger_feedback_pipeline(
     user_id: str,
@@ -294,3 +304,15 @@ async def _run_rescore(user_id: str, llm: LLMClient) -> None:
 async def _run_feedback_pipeline(user_id: str, llm: LLMClient) -> None:
     from api.feedback import _run_learn_and_rescore
     await _run_learn_and_rescore(user_id, llm)
+
+
+async def _run_company_insights(llm: LLMClient) -> None:
+    from agents.company_insight_agent import CompanyInsightAgent
+    logger.info("Company insights pipeline started")
+    async with AsyncSessionLocal() as session:
+        agent = CompanyInsightAgent(session, llm)
+        try:
+            count = await agent.run()
+            logger.info("Company insights pipeline complete — %d companies processed", count)
+        except Exception:
+            logger.exception("Company insights pipeline crashed")
