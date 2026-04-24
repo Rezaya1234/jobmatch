@@ -62,8 +62,8 @@ function ScoreRing({ pct }) {
   const circ = 2 * Math.PI * r
   const offset = circ - (pct / 100) * circ
   return (
-    <div className="relative w-14 h-14 shrink-0">
-      <svg viewBox="0 0 56 56" className="w-14 h-14" style={{ transform: 'rotate(-90deg)' }}>
+    <div className="relative shrink-0" style={{ width: 73, height: 73 }}>
+      <svg viewBox="0 0 56 56" style={{ width: 73, height: 73, transform: 'rotate(-90deg)' }}>
         <circle cx="28" cy="28" r={r} fill="none" stroke="#ede9fe" strokeWidth="5" />
         <circle
           cx="28" cy="28" r={r}
@@ -73,7 +73,7 @@ function ScoreRing({ pct }) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-800">
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-800">
         {pct}%
       </span>
     </div>
@@ -296,8 +296,8 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
       )}
 
       <div className="p-4 flex items-center gap-3">
-        {/* Company logo */}
-        <div className="self-start mt-0.5">
+        {/* Company logo — offset down to align with job title line */}
+        <div className="self-start mt-5 shrink-0">
           <CompanyLogo company={match.company} url={match.url} size="md" />
         </div>
 
