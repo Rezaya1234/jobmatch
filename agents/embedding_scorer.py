@@ -5,9 +5,13 @@ Lazy-loaded on first use. Falls back to neutral 0.7 if model unavailable.
 import asyncio
 import logging
 
-import numpy as np
-
 logger = logging.getLogger(__name__)
+
+try:
+    import numpy as np
+    _NUMPY_AVAILABLE = True
+except ImportError:
+    _NUMPY_AVAILABLE = False
 
 _MODEL = None
 _MODEL_NAME = "all-MiniLM-L6-v2"
@@ -29,6 +33,8 @@ def _load_model():
 
 
 def _run_similarity(job_texts: list[str], profile_text: str) -> list[float]:
+    if not _NUMPY_AVAILABLE:
+        return [0.7] * len(job_texts)
     model = _load_model()
     if model is None:
         return [0.7] * len(job_texts)
