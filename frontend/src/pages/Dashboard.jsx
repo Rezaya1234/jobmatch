@@ -263,8 +263,8 @@ function JobCard({ match, userId, initialRating, removing, onReact, onOpenDrawer
           </div>
         </div>
 
-        {/* Top reasons column — hidden on small screens */}
-        <div className="hidden lg:flex w-52 shrink-0 border-l border-slate-100 pl-4 self-stretch items-center">
+        {/* Top reasons column — hidden on mobile */}
+        <div className="hidden md:flex w-52 shrink-0 border-l border-slate-100 pl-4 self-stretch items-center">
           <TopReasons match={match} />
         </div>
 
