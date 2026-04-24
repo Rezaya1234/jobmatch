@@ -395,47 +395,47 @@ function MatchFunnel({ matches, feedback }) {
   const clickRate = Math.round((reacted / shown) * 100)
   const likeRate = reacted > 0 ? Math.round(((liked + disliked) / reacted) * 100) : 0
 
-  const steps = [
-    { label: 'Shown',   value: shown,            color: '#7c3aed' },
-    { label: 'Clicked', value: reacted,           color: '#8b5cf6', rate: `${clickRate}%` },
-    { label: 'Reacted', value: liked + disliked,  color: '#a78bfa', rate: `${likeRate}%` },
-  ]
+  // Inset values as % of height (0 = full height edge, 50 = zero height)
+  // Each stage's right edge = next stage's left edge → seamless connected funnel
+  const i0 = 0                                                          // left edge of stage 1 (full height)
+  const i1 = Math.max(8,  Math.min(40, (1 - reacted / shown) * 44))    // join between stage 1→2
+  const i2 = Math.max(i1 + 6, Math.min(44, (1 - (liked + disliked) / shown) * 44)) // join between stage 2→3
+  const i3 = Math.min(47, i2 + 4)                                       // right edge of stage 3
 
-  const MAX_H = 88
-  const MIN_H = 22
-  const maxVal = shown || 1
+  const stages = [
+    { value: shown,            label: 'Jobs shown',   sub: null,                color: '#7c3aed', l: i0, r: i1 },
+    { value: reacted,          label: 'Jobs opened',  sub: `${clickRate}% of shown`, color: '#8b5cf6', l: i1, r: i2 },
+    { value: liked + disliked, label: 'Reactions',    sub: `${likeRate}% of opened`, color: '#a78bfa', l: i2, r: i3 },
+  ]
 
   return (
     <div>
-      {/* Horizontal funnel — bars decrease in height, all vertically centered */}
-      <div className="flex items-center gap-2" style={{ height: MAX_H }}>
-        {steps.map((step, i) => {
-          const barH = Math.max(MIN_H, Math.round((step.value / maxVal) * MAX_H))
-          return (
-            <div key={i} className="contents">
-              {i > 0 && (
-                <div className="shrink-0 flex flex-col items-center justify-center gap-0.5" style={{ width: 28 }}>
-                  <span className="text-[10px] font-semibold text-slate-400 leading-none">{step.rate}</span>
-                  <svg className="w-3 h-3 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              )}
-              <div className="flex-1 flex items-center justify-center" style={{ height: MAX_H }}>
-                <div
-                  className="w-full rounded-xl flex flex-col items-center justify-center gap-0.5"
-                  style={{ height: barH, backgroundColor: step.color }}
-                >
-                  <span className="text-white font-bold text-xl leading-none">{step.value}</span>
-                  <span className="text-white/70 text-[10px] font-medium">{step.label}</span>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+      {/* Trapezoid funnel — clip-path creates connected narrowing shape */}
+      <div className="flex gap-1" style={{ height: 72 }}>
+        {stages.map((s, i) => (
+          <div
+            key={i}
+            className="flex-1"
+            style={{
+              backgroundColor: s.color,
+              clipPath: `polygon(0% ${s.l}%, 100% ${s.r}%, 100% ${100 - s.r}%, 0% ${100 - s.l}%)`,
+            }}
+          />
+        ))}
       </div>
 
-      {/* Liked / Disliked */}
+      {/* Counts + labels below each stage */}
+      <div className="flex gap-1 mt-3">
+        {stages.map((s, i) => (
+          <div key={i} className="flex-1 text-center">
+            <p className="text-2xl font-bold text-slate-800 leading-none">{s.value}</p>
+            <p className="text-xs font-medium text-slate-600 mt-0.5">{s.label}</p>
+            {s.sub && <p className="text-[10px] text-slate-400 mt-0.5">{s.sub}</p>}
+          </div>
+        ))}
+      </div>
+
+      {/* Liked / Disliked breakdown */}
       <div className="mt-4 pt-3 border-t border-slate-100 flex gap-5">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
