@@ -96,51 +96,87 @@ function CheckBullet({ text }) {
 }
 
 // ---------------------------------------------------------------------------
-// Top Reasons — sorted by dimension score weight
+// Why You Match — sentences from reasoning sorted by dimension weight
 // ---------------------------------------------------------------------------
 
-const DIMENSION_LABELS = {
-  skills_match:       'Skills match',
-  experience_level:   'Experience level',
-  industry_alignment: 'Industry alignment',
-  salary:             'Salary fit',
-  function_type:      'Function type',
-  career_trajectory:  'Career trajectory',
+const DIMENSION_KEYWORDS = {
+  skills_match:       ['skill', 'proficien', 'expertise', 'knowledge', 'technical', 'certif', 'background', 'familiar', 'tool', 'stack'],
+  experience_level:   ['year', 'senior', 'junior', 'level', 'experienc', 'veteran', 'seasoned', 'proven'],
+  industry_alignment: ['industr', 'sector', 'domain', 'field', 'vertical', 'market'],
+  salary:             ['salary', 'compensation', 'pay', 'remuneration', 'package'],
+  function_type:      ['role', 'function', 'position', 'responsibilit', 'account', 'manage', 'lead'],
+  career_trajectory:  ['career', 'growth', 'trajectory', 'progression', 'advancement', 'leadership', 'strateg'],
 }
 
-function TopReasons({ match }) {
-  const scores = match.dimension_scores || {}
-  const sorted = Object.entries(scores)
-    .filter(([, v]) => typeof v === 'number')
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3)
+function sentenceToDimension(sentence, scores) {
+  const lower = sentence.toLowerCase()
+  let bestDim = null, bestScore = -1
+  for (const [dim, keywords] of Object.entries(DIMENSION_KEYWORDS)) {
+    if (keywords.some(k => lower.includes(k))) {
+      const s = scores[dim] ?? 0
+      if (s > bestScore) { bestScore = s; bestDim = dim }
+    }
+  }
+  return bestScore >= 0 ? bestScore : Math.max(...Object.values(scores), 0)
+}
 
-  // Case 1: dimension scores available — sorted by weight
-  if (sorted.length > 0) {
+function WhyYouMatch({ match }) {
+  const scores = match.dimension_scores || {}
+  const hasScores = Object.keys(scores).length > 0
+
+  // Best case: reasoning text + dimension scores → sort sentences by which dimension they reflect
+  if (match.reasoning) {
+    const sentences = match.reasoning
+      .replace(/\n+/g, ' ')
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 20 && s.length < 160)
+
+    if (sentences.length > 0) {
+      const ranked = sentences
+        .map(s => ({ text: s, weight: hasScores ? sentenceToDimension(s, scores) : 0 }))
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 3)
+
+      return (
+        <div className="w-full">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Why you match</p>
+          <div className="space-y-1.5">
+            {ranked.map((item, i) => (
+              <div key={i} className="flex items-start gap-1.5">
+                <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-xs text-slate-600 leading-snug">{item.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+  }
+
+  // Fallback: only dimension scores, no reasoning text yet
+  if (hasScores) {
+    const top3 = Object.entries(scores)
+      .filter(([, v]) => typeof v === 'number')
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
     return (
       <div className="w-full">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Top reasons</p>
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Why you match</p>
         <div className="space-y-1.5">
-          {sorted.map(([key, val]) => {
+          {top3.map(([key, val]) => {
             const pct = Math.round(val * 100)
-            const label = DIMENSION_LABELS[key] || key.replace(/_/g, ' ')
-            const color = pct >= 70
-              ? { check: 'text-green-500', score: 'text-green-600', bar: 'bg-green-400' }
-              : pct >= 45
-              ? { check: 'text-amber-400', score: 'text-amber-600', bar: 'bg-amber-400' }
-              : { check: 'text-rose-400',  score: 'text-rose-500',  bar: 'bg-rose-400'  }
+            const labels = { skills_match: 'Skills match', experience_level: 'Experience level', industry_alignment: 'Industry alignment', salary: 'Salary fit', function_type: 'Function type', career_trajectory: 'Career trajectory' }
+            const color = pct >= 70 ? 'text-green-500' : pct >= 45 ? 'text-amber-400' : 'text-rose-400'
             return (
-              <div key={key}>
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <svg className={`w-3.5 h-3.5 shrink-0 ${color.check}`} viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-xs text-slate-600 flex-1 leading-snug">{label}</span>
-                  <span className={`text-xs font-semibold tabular-nums ${color.score}`}>{pct}%</span>
-                </div>
-                <div className="ml-5 h-1 bg-slate-100 rounded-full overflow-hidden">
-                  <div className={`h-1 rounded-full ${color.bar}`} style={{ width: `${pct}%` }} />
-                </div>
+              <div key={key} className="flex items-center gap-1.5">
+                <svg className={`w-3.5 h-3.5 shrink-0 ${color}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-xs text-slate-600 flex-1">{labels[key] || key}</span>
+                <span className={`text-xs font-semibold tabular-nums ${pct >= 70 ? 'text-green-600' : 'text-amber-600'}`}>{pct}%</span>
               </div>
             )
           })}
@@ -149,42 +185,11 @@ function TopReasons({ match }) {
     )
   }
 
-  // Case 2: only free-text reasoning — split into bullets
-  if (match.reasoning) {
-    const bullets = match.reasoning
-      .split(/[.!?]/)
-      .map(s => s.trim())
-      .filter(s => s.length > 15)
-      .slice(0, 3)
-    if (bullets.length > 0) {
-      return (
-        <div className="w-full">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Top reasons</p>
-          <div className="space-y-1">
-            {bullets.map((r, i) => <CheckBullet key={i} text={r} />)}
-          </div>
-        </div>
-      )
-    }
-  }
-
-  // Case 3: no data yet — show pending state
+  // Pending — analysis hasn't run yet
   return (
     <div className="w-full">
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Top reasons</p>
-      <div className="space-y-1.5">
-        {Object.keys(DIMENSION_LABELS).slice(0, 3).map(key => (
-          <div key={key}>
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <div className="w-3.5 h-3.5 rounded-full bg-slate-200 shrink-0" />
-              <span className="text-xs text-slate-400 flex-1">{DIMENSION_LABELS[key]}</span>
-              <span className="text-xs text-slate-300">—</span>
-            </div>
-            <div className="ml-5 h-1 bg-slate-100 rounded-full" />
-          </div>
-        ))}
-        <p className="text-[10px] text-slate-300 mt-1">Full analysis after LLM scoring</p>
-      </div>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Why you match</p>
+      <p className="text-xs text-slate-300 leading-relaxed">Full match analysis pending — check back after the next pipeline run.</p>
     </div>
   )
 }
@@ -266,32 +271,35 @@ function JobCard({ match, userId, initialRating, removing, onReact, onOpenDrawer
           <CompanyLogo company={match.company} url={match.url} size="md" />
         </div>
 
-        {/* Title + meta */}
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-slate-400 truncate">{match.company}</p>
-          <h3 className="text-sm font-semibold text-slate-900 leading-snug truncate">{match.title}</h3>
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {match.work_mode && (
-              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{match.work_mode}</span>
-            )}
-            {match.location_raw && (
-              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{match.location_raw}</span>
-            )}
-            {(match.salary_min || match.salary_max) && (
-              <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-                ${match.salary_min ? `${(match.salary_min / 1000).toFixed(0)}k` : '?'}
-                {match.salary_max ? `–$${(match.salary_max / 1000).toFixed(0)}k` : '+'}
-              </span>
-            )}
-            {match.sector && (
-              <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{match.sector}</span>
-            )}
+        {/* Center: title + why you match — share the remaining space */}
+        <div className="flex-1 min-w-0 flex items-stretch gap-0">
+          {/* Title + meta — fixed width so it doesn't stretch */}
+          <div className="min-w-0 pr-3" style={{ width: '210px', flexShrink: 0 }}>
+            <p className="text-xs font-medium text-slate-400 truncate">{match.company}</p>
+            <h3 className="text-sm font-semibold text-slate-900 leading-snug truncate">{match.title}</h3>
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {match.work_mode && (
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{match.work_mode}</span>
+              )}
+              {match.location_raw && (
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{match.location_raw}</span>
+              )}
+              {(match.salary_min || match.salary_max) && (
+                <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                  ${match.salary_min ? `${(match.salary_min / 1000).toFixed(0)}k` : '?'}
+                  {match.salary_max ? `–$${(match.salary_max / 1000).toFixed(0)}k` : '+'}
+                </span>
+              )}
+              {match.sector && (
+                <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{match.sector}</span>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Top reasons column — hidden on mobile */}
-        <div className="hidden md:flex w-52 shrink-0 border-l border-slate-100 pl-4 self-stretch items-center">
-          <TopReasons match={match} />
+          {/* Why you match — fills remaining space, hidden on mobile */}
+          <div className="hidden md:flex flex-1 min-w-0 border-l border-slate-100 pl-3 items-center">
+            <WhyYouMatch match={match} />
+          </div>
         </div>
 
         {/* Score ring */}
