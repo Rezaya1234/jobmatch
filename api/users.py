@@ -37,6 +37,8 @@ class ProfileRequest(BaseModel):
     locations: list[str]    # ["New York", "San Francisco"] — empty = anywhere
     job_types: list[str]    # ["full_time"]
     preferred_companies: list[str] = []  # ["Google", "OpenAI"] — empty = any company
+    excluded_companies: list[str] = []   # companies to always skip
+    visa_sponsorship_required: bool = False  # skip jobs that explicitly deny sponsorship
 
     # Soft preferences
     seniority_level: str | None = None
@@ -50,6 +52,8 @@ class ProfileRequest(BaseModel):
     original_role_description: str | None = None
     title_include: list[str] = []
     title_exclude: list[str] = []
+    years_experience: int | None = None
+    role_type: str | None = None  # "ic", "manager", "executive", "either"
 
 
 class ProfileResponse(ProfileRequest):
@@ -295,10 +299,14 @@ def _profile_response(profile: UserProfile) -> ProfileResponse:
         company_type=profile.company_type,
         preferred_company_sizes=profile.preferred_company_sizes or [],
         preferred_companies=profile.preferred_companies or [],
+        excluded_companies=profile.excluded_companies or [],
+        visa_sponsorship_required=profile.visa_sponsorship_required or False,
         role_description=profile.role_description,
         original_role_description=profile.original_role_description,
         title_include=profile.title_include or [],
         title_exclude=profile.title_exclude or [],
+        years_experience=getattr(profile, "years_experience", None),
+        role_type=getattr(profile, "role_type", None),
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )

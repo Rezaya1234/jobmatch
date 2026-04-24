@@ -1,121 +1,133 @@
-import asyncio
+"""
+Match Agent — multi-head LLM scoring with explicit dimension weights.
+Single batch LLM call per user. Weighted scores computed in code, not by LLM.
+"""
 import json
 import logging
-from itertools import islice
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agents.profile_agent import DEFAULT_WEIGHTS
 from db.models import Job, JobMatch, UserProfile
 from llm.client import LLMClient, Message, ModelTier
 
 logger = logging.getLogger(__name__)
 
-_BATCH_SIZE = 10          # jobs scored per LLM call (smaller = more detail per job)
-_MAX_CONCURRENT = 4       # parallel LLM calls
-_DESC_CHAR_LIMIT = 800    # truncate long descriptions
+_TOP_K = 10               # hard cap — never pass more than this to LLM
+_DESC_CHAR_LIMIT = 800
+_EMBEDDING_THRESHOLD = 0.65
+
+ALLOWED_DIMENSIONS = [
+    "skills_match",
+    "industry_alignment",
+    "experience_level",
+    "function_type",
+    "salary",
+    "career_trajectory",
+]
+
+_COST_PER_BATCH_USD = 0.00125  # approximate Haiku cost per 10-job batch
 
 
 class MatchAgent:
-    """
-    Scores jobs that passed the hard filter against a user's soft preferences.
-    Uses the LLM abstraction layer — works with any provider.
-    """
-
     def __init__(self, session: AsyncSession, llm: LLMClient) -> None:
         self._session = session
         self._llm = llm
 
     async def run(self, user_id: str) -> int:
-        """Score all unscored, passed-filter jobs for a user. Returns count scored."""
+        """Score top candidates in a single LLM call. Returns count scored."""
         profile = await self._get_profile(user_id)
         if profile is None:
             logger.warning("No profile for user %s — skipping matching", user_id)
             return 0
 
-        matches = await self._get_unscored_matches(user_id)
+        weights = self._resolve_weights(profile)
+        if not _validate_weights(weights):
+            logger.warning("Invalid weights for user %s — falling back to defaults", user_id)
+            weights = DEFAULT_WEIGHTS.copy()
+
+        matches = await self._get_top_candidates(user_id)
         if not matches:
-            logger.info("No unscored matches for user %s", user_id)
+            logger.info("No unscored candidates for user %s", user_id)
             return 0
 
         jobs_by_id = await self._load_jobs([str(m.job_id) for m in matches])
-        feedback_map, liked_jobs, disliked_jobs = await self._get_feedback_with_examples(user_id)
-        system_prompt = _build_system_prompt(profile, liked_jobs, disliked_jobs)
 
-        batches = list(_batched(matches, _BATCH_SIZE))
-        sem = asyncio.Semaphore(_MAX_CONCURRENT)
+        try:
+            raw_scores = await self._score_batch(profile, jobs_by_id, weights)
+        except Exception:
+            logger.exception("Batch scoring failed for user %s", user_id)
+            return 0
 
-        async def score_batch_safe(batch):
-            batch_jobs = [jobs_by_id[str(m.job_id)] for m in batch if str(m.job_id) in jobs_by_id]
-            if not batch_jobs:
-                return {}
-            async with sem:
-                try:
-                    return await self._score_batch(system_prompt, batch_jobs)
-                except Exception:
-                    logger.exception("Scoring batch failed for user %s", user_id)
-                    return {}
-
-        results_list = await asyncio.gather(*[score_batch_safe(b) for b in batches])
+        # Weighted scores computed in code — LLM returns raw per-dimension values only
+        weighted: dict[str, float] = {
+            job_id: sum(dim_scores.get(d, 0.5) * weights.get(d, 0.0) for d in ALLOWED_DIMENSIONS)
+            for job_id, dim_scores in raw_scores.items()
+        }
+        normalized = _normalize(weighted)
 
         scored = 0
-        for batch, scores in zip(batches, results_list):
-            for match in batch:
-                job_id = str(match.job_id)
-                rating = feedback_map.get(job_id)
-                if rating == "thumbs_down":
-                    match.score = 0.0
-                    match.reasoning = "Marked as not a fit."
-                    scored += 1
-                    continue
-                result = scores.get(job_id)
-                if result:
-                    match.score = max(0.0, min(1.0, float(result["score"])))
-                    match.reasoning = result.get("reasoning")
-                    scored += 1
+        for match in matches:
+            job_id = str(match.job_id)
+            if job_id not in raw_scores:
+                continue
+            dim_scores = raw_scores[job_id]
+            match.dimension_scores = {d: dim_scores.get(d) for d in ALLOWED_DIMENSIONS}
+            match.weights_used = weights
+            match.weighted_score = round(weighted.get(job_id, 0.0), 4)
+            match.normalized_score = round(normalized.get(job_id, 0.0), 4)
+            match.score = match.normalized_score
+            match.low_confidence = _is_low_confidence(dim_scores)
+            scored += 1
 
         await self._session.commit()
-        logger.info("Scored %d jobs for user %s", scored, user_id)
+
+        from db.activity import log_event
+        await log_event(self._session, user_id, "llm_scored",
+                        jobs_scored=scored, estimated_cost_usd=round(_COST_PER_BATCH_USD, 5))
+        await self._session.commit()
+
+        logger.info("Scored %d jobs for user %s (cold_start=%s)", scored, user_id, profile.cold_start)
         return scored
 
-    # ------------------------------------------------------------------
-    # LLM scoring
-    # ------------------------------------------------------------------
+    def _resolve_weights(self, profile: UserProfile) -> dict[str, float]:
+        if profile.cold_start or not profile.learned_weights:
+            return DEFAULT_WEIGHTS.copy()
+        return profile.learned_weights
 
     async def _score_batch(
-        self, system_prompt: str, jobs: list[Job]
-    ) -> dict[str, dict]:
-        """Call the LLM to score a batch of jobs. Returns {job_id: {score, reasoning}}."""
-        payload = [_format_job(j) for j in jobs]
-        prompt = (
-            f"Score these {len(payload)} jobs against the candidate's preferences:\n"
-            + json.dumps(payload, indent=2)
+        self, profile: UserProfile, jobs_by_id: dict[str, Job], weights: dict
+    ) -> dict[str, dict[str, float]]:
+        job_list = [_format_job(j) for j in jobs_by_id.values()]
+        system = _build_system_prompt(profile, weights)
+        user_prompt = (
+            f"Score these {len(job_list)} jobs. Return ONLY a valid JSON array.\n"
+            "Each element must have: job_id (string), "
+            + ", ".join(f"{d} (float 0.0-1.0)" for d in ALLOWED_DIMENSIONS)
+            + ".\n\n"
+            + json.dumps(job_list, indent=2)
         )
-
         response = await self._llm.complete(
-            messages=[Message(role="user", content=prompt)],
-            system=system_prompt,
+            messages=[Message(role="user", content=user_prompt)],
+            system=system,
             tier=ModelTier.FAST,
+            max_tokens=4096,
         )
+        items = _parse_json_array(response)
+        result: dict[str, dict[str, float]] = {}
+        for item in items:
+            if not isinstance(item, dict) or "job_id" not in item:
+                continue
+            dim_scores = {
+                d: float(item[d])
+                for d in ALLOWED_DIMENSIONS
+                if d in item and isinstance(item[d], (int, float))
+            }
+            result[str(item["job_id"])] = dim_scores
+        return result
 
-        results = _parse_json_array(response)
-        return {
-            r["job_id"]: {"score": r["score"], "reasoning": r.get("reasoning", "")}
-            for r in results
-            if isinstance(r, dict) and "job_id" in r and "score" in r
-        }
-
-    # ------------------------------------------------------------------
-    # DB helpers
-    # ------------------------------------------------------------------
-
-    async def _get_profile(self, user_id: str) -> UserProfile | None:
-        result = await self._session.execute(
-            select(UserProfile).where(UserProfile.user_id == user_id)
-        )
-        return result.scalar_one_or_none()
-
-    async def _get_unscored_matches(self, user_id: str) -> list[JobMatch]:
+    async def _get_top_candidates(self, user_id: str) -> list[JobMatch]:
         result = await self._session.execute(
             select(JobMatch)
             .join(Job, JobMatch.job_id == Job.id)
@@ -124,141 +136,99 @@ class MatchAgent:
                 JobMatch.passed_hard_filter.is_(True),
                 JobMatch.score.is_(None),
                 Job.is_active.is_(True),
+                or_(
+                    JobMatch.embedding_score.is_(None),
+                    JobMatch.embedding_score >= _EMBEDDING_THRESHOLD,
+                ),
             )
-            .order_by(Job.posted_at.desc().nulls_last())
-            .limit(50)
+            .order_by(
+                JobMatch.embedding_score.desc().nulls_last(),
+                JobMatch.heuristic_score.desc().nulls_last(),
+                Job.posted_at.desc().nulls_last(),
+            )
+            .limit(_TOP_K)
         )
         return list(result.scalars().all())
 
-    async def _load_jobs(self, job_ids: list[str]) -> dict[str, Job]:
+    async def _get_profile(self, user_id: str) -> UserProfile | None:
         result = await self._session.execute(
-            select(Job).where(Job.id.in_(job_ids))
+            select(UserProfile).where(UserProfile.user_id == user_id)
         )
+        return result.scalar_one_or_none()
+
+    async def _load_jobs(self, job_ids: list[str]) -> dict[str, Job]:
+        result = await self._session.execute(select(Job).where(Job.id.in_(job_ids)))
         return {str(j.id): j for j in result.scalars().all()}
 
-    async def _get_feedback_with_examples(
-        self, user_id: str
-    ) -> tuple[dict[str, str], list[dict], list[dict]]:
-        """Returns (feedback_map, liked_job_examples, disliked_job_examples)."""
-        from db.models import Feedback
-        result = await self._session.execute(
-            select(Feedback, Job)
-            .join(Job, Feedback.job_id == Job.id)
-            .where(Feedback.user_id == user_id)
-            .order_by(Feedback.created_at.desc())
-        )
-        feedback_map: dict[str, str] = {}
-        liked: list[dict] = []
-        disliked: list[dict] = []
-        for fb, job in result.all():
-            job_id = str(job.id)
-            feedback_map[job_id] = fb.rating
-            entry = {
-                "title": job.title,
-                "company": job.company,
-                "sector": job.sector,
-                "work_mode": job.work_mode,
-                "company_size": job.company_size,
-                "description_snippet": (job.description or "")[:300],
-            }
-            if fb.comment:
-                entry["user_comment"] = fb.comment
-            if fb.rating == "thumbs_up":
-                liked.append(entry)
-            else:
-                disliked.append(entry)
-        return feedback_map, liked[:10], disliked[:10]
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-# ------------------------------------------------------------------
-# Prompt builder
-# ------------------------------------------------------------------
-
-def _build_system_prompt(
-    profile: UserProfile,
-    liked_jobs: list[dict] | None = None,
-    disliked_jobs: list[dict] | None = None,
-) -> str:
+def _build_system_prompt(profile: UserProfile, weights: dict) -> str:
     lines = []
     if profile.role_description:
-        lines.append(f"- Background & goal: {profile.role_description}")
+        lines.append(f"Background: {profile.role_description}")
     if profile.seniority_level:
-        lines.append(f"- Seniority: {profile.seniority_level}")
+        lines.append(f"Seniority: {profile.seniority_level}")
     if profile.salary_min or profile.salary_max:
-        lo = profile.salary_min or "unspecified"
-        hi = profile.salary_max or "unspecified"
-        lines.append(f"- Salary range: {lo}–{hi} {profile.salary_currency}")
+        lo = profile.salary_min or "?"
+        hi = profile.salary_max or "?"
+        lines.append(f"Salary range: {lo}–{hi} {profile.salary_currency}")
     if profile.preferred_sectors:
-        lines.append(f"- Preferred sectors: {', '.join(profile.preferred_sectors)}")
-    if profile.company_type:
-        lines.append(f"- Company type preference: {profile.company_type}")
-    if profile.preferred_company_sizes:
-        lines.append(f"- Preferred company sizes: {', '.join(profile.preferred_company_sizes)}")
+        lines.append(f"Preferred sectors: {', '.join(profile.preferred_sectors)}")
+    if profile.years_experience:
+        lines.append(f"Years of experience: {profile.years_experience}")
 
-    prefs = "\n".join(lines) if lines else "No specific soft preferences set."
+    profile_str = "\n".join(lines) or "No profile data."
+    weight_str = "\n".join(f"  {d}: {v:.2f}" for d, v in weights.items())
 
-    feedback_section = ""
-    if liked_jobs:
-        liked_summary = "\n".join(
-            f"  - {j['title']} at {j['company']}"
-            + (f" [{j['sector']}]" if j.get("sector") else "")
-            + (f" — user said: \"{j['user_comment']}\"" if j.get("user_comment") else "")
-            for j in liked_jobs
-        )
-        feedback_section += f"\nJobs this candidate LIKED (👍) — score similar jobs higher:\n{liked_summary}\n"
-    if disliked_jobs:
-        disliked_summary = "\n".join(
-            f"  - {j['title']} at {j['company']}"
-            + (f" [{j['sector']}]" if j.get("sector") else "")
-            + (f" — user said: \"{j['user_comment']}\"" if j.get("user_comment") else "")
-            for j in disliked_jobs
-        )
-        feedback_section += f"\nJobs this candidate DISLIKED (👎) — score similar jobs lower:\n{disliked_summary}\n"
+    return f"""You are a job-matching expert. Score each job on exactly these 6 dimensions.
 
-    if feedback_section:
-        feedback_section = (
-            "\nLEARNED PREFERENCES FROM FEEDBACK (this overrides generic scoring):\n"
-            + feedback_section
-            + "\nUse these examples to calibrate: if a new job resembles a liked job, score higher; "
-            "if it resembles a disliked job, score lower.\n"
-        )
+CANDIDATE PROFILE:
+{profile_str}
 
-    return f"""\
-You are a strict job matching expert. Score each job against the candidate's background, target role, and past feedback.
+DIMENSION WEIGHTS (reference only — do NOT compute weighted totals):
+{weight_str}
 
-Candidate profile:
-{prefs}
-{feedback_section}
-SCORING RULES — follow these exactly:
-- 0.9–1.0: Almost perfect fit. Strongly resembles liked jobs. Role, domain, seniority all match.
-- 0.7–0.89: Good fit. Most criteria match, minor gaps.
-- 0.5–0.69: Partial fit. Some overlap but notable mismatches.
-- 0.3–0.49: Poor fit. Mostly irrelevant.
-- 0.0–0.29: Very poor fit. Wrong domain, wrong level, or resembles disliked jobs.
+STRICT RULES:
+- Score ONLY these dimensions: {', '.join(ALLOWED_DIMENSIONS)}
+- Do NOT invent new dimensions or criteria
+- Do NOT compute weighted totals — return raw per-dimension scores only
+- Do NOT hallucinate information not in the job description
+- If a dimension cannot be evaluated, return 0.5
+- Use the full 0.0–1.0 range — do not cluster scores
+- Return ONLY valid JSON — no prose, no markdown"""
 
-YOU MUST spread scores across this full range. Do NOT cluster around 0.6–0.75.
-
-Return ONLY a valid JSON array — no prose, no markdown.
-Each element: job_id (string), score (number), reasoning (string, one sentence)."""
-
-
-# ------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------
 
 def _format_job(job: Job) -> dict:
     return {
         "job_id": str(job.id),
         "title": job.title,
         "company": job.company,
-        "sector": job.sector,
-        "company_type": job.company_type,
-        "company_size": job.company_size,
+        "description": (job.description or "")[:_DESC_CHAR_LIMIT],
         "salary_min": job.salary_min,
         "salary_max": job.salary_max,
-        "salary_currency": job.salary_currency,
-        "description": (job.description or "")[:_DESC_CHAR_LIMIT],
+        "sector": job.sector,
     }
+
+
+def _validate_weights(weights: dict) -> bool:
+    if not weights or set(weights.keys()) != set(ALLOWED_DIMENSIONS):
+        return False
+    return abs(sum(weights.values()) - 1.0) < 0.01
+
+
+def _is_low_confidence(dim_scores: dict) -> bool:
+    return sum(1 for d in ALLOWED_DIMENSIONS if d not in dim_scores) > 2
+
+
+def _normalize(scores: dict[str, float]) -> dict[str, float]:
+    if not scores:
+        return {}
+    lo, hi = min(scores.values()), max(scores.values())
+    span = hi - lo if hi > lo else 1.0
+    return {k: round((v - lo) / span, 4) for k, v in scores.items()}
 
 
 def _parse_json_array(text: str) -> list[dict]:
@@ -267,14 +237,8 @@ def _parse_json_array(text: str) -> list[dict]:
         logger.warning("No JSON array in match agent response")
         return []
     try:
-        data = json.loads(text[start : end + 1])
-        return [item for item in data if isinstance(item, dict)]
+        data = json.loads(text[start: end + 1])
+        return [i for i in data if isinstance(i, dict)]
     except json.JSONDecodeError:
-        logger.warning("Failed to parse JSON from match agent response")
+        logger.warning("Failed to parse match agent JSON")
         return []
-
-
-def _batched(iterable, n: int):
-    it = iter(iterable)
-    while batch := list(islice(it, n)):
-        yield batch

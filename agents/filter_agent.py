@@ -88,6 +88,14 @@ class FilterAgent:
         if not result.passed:
             return result
 
+        result = self._check_visa_sponsorship(job, profile)
+        if not result.passed:
+            return result
+
+        result = self._check_excluded_companies(job, profile)
+        if not result.passed:
+            return result
+
         return FilterResult(passed=True)
 
     def _check_job_type(self, job: Job, profile: UserProfile) -> FilterResult:
@@ -183,6 +191,43 @@ class FilterAgent:
             passed=False,
             reason=f"company '{job.company}' not in preferred companies {profile.preferred_companies}",
         )
+
+    def _check_visa_sponsorship(self, job: Job, profile: UserProfile) -> FilterResult:
+        if not getattr(profile, "visa_sponsorship_required", False):
+            return FilterResult(passed=True)
+        desc = (job.description or "").lower()
+        _NO_SPONSORSHIP_PHRASES = (
+            "no visa sponsorship",
+            "not able to sponsor",
+            "unable to sponsor",
+            "cannot sponsor",
+            "will not sponsor",
+            "sponsorship not available",
+            "must be authorized to work",
+            "must be legally authorized",
+            "not eligible for sponsorship",
+            "citizen or permanent resident",
+        )
+        for phrase in _NO_SPONSORSHIP_PHRASES:
+            if phrase in desc:
+                return FilterResult(
+                    passed=False,
+                    reason=f"job explicitly states no visa sponsorship (matched: '{phrase}')",
+                )
+        return FilterResult(passed=True)
+
+    def _check_excluded_companies(self, job: Job, profile: UserProfile) -> FilterResult:
+        excluded = getattr(profile, "excluded_companies", None) or []
+        if not excluded or not job.company:
+            return FilterResult(passed=True)
+        job_company = job.company.lower()
+        for excl in excluded:
+            if excl.lower().strip() in job_company or job_company in excl.lower().strip():
+                return FilterResult(
+                    passed=False,
+                    reason=f"company '{job.company}' is on user's excluded list",
+                )
+        return FilterResult(passed=True)
 
     # ------------------------------------------------------------------
     # DB helpers

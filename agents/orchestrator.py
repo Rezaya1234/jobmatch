@@ -1,6 +1,22 @@
+"""
+Orchestrator — coordinates the daily matching pipeline.
+
+Pipeline per user:
+  filter (hard constraints, no LLM)
+    → heuristic scoring (no LLM, no API)
+    → embedding scoring (local model)
+    → LLM scoring (only if ≥3 candidates)
+    → 3-job delivery selection with 6-step fallback
+    → mark shown_at / delivered_at
+    → send email
+
+No job is ever shown twice (shown_at is permanent).
+"""
 import logging
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +30,8 @@ from llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
 
-
-_SCORE_LIMIT_PER_RUN = 50  # max jobs scored per user per pipeline run
+_DELIVERY_TARGET = 3        # guaranteed daily delivery count
+_MIN_CANDIDATES_FOR_LLM = 3  # skip LLM if fewer candidates pass filtering
 
 
 @dataclass
@@ -39,7 +55,7 @@ class PipelineStats:
 class OrchestratorAgent:
     """
     Coordinates the daily pipeline:
-      search → (per user) filter → match → email
+      search → (per user) filter → heuristic → embedding → match → deliver
 
     Feedback processing runs separately via run_feedback_pipeline(),
     triggered when a user submits feedback.
@@ -77,7 +93,7 @@ class OrchestratorAgent:
         return stats
 
     async def run_user_matching(self, stats: PipelineStats | None = None) -> PipelineStats:
-        """Step 2: filter + score new jobs for every user with a profile."""
+        """Filter + score new jobs for every user with a profile."""
         if stats is None:
             stats = PipelineStats()
         users = await self._get_users_with_profiles()
@@ -96,7 +112,7 @@ class OrchestratorAgent:
 
     async def _run_search(self, stats: PipelineStats) -> None:
         logger.info("Fetching jobs from company career pages")
-        await self._emit("Fetching jobs from 21 company career pages...")
+        await self._emit("Fetching jobs from company career pages...")
         try:
             agent = JobSearchAgent(self._session)
             stats.new_jobs = await agent.run()
@@ -108,50 +124,205 @@ class OrchestratorAgent:
 
     async def _process_user(self, user_id: str, stats: PipelineStats) -> None:
         from mailer.sender import _email_cadence
-        from db.models import UserProfile
-        profile_result = await self._session.execute(
-            select(UserProfile).where(UserProfile.user_id == user_id)
-        )
-        profile = profile_result.scalar_one_or_none()
+
+        profile = await self._get_profile(user_id)
         cadence = _email_cadence(
-            getattr(profile, 'last_engaged_at', None),
-            getattr(profile, 'last_emailed_at', None),
+            getattr(profile, "last_engaged_at", None) if profile else None,
+            getattr(profile, "last_emailed_at", None) if profile else None,
         )
 
-        if cadence == 'skip':
+        if cadence == "skip":
             logger.info("User %s is inactive (cadence=skip) — skipping entirely", user_id)
             return
 
-        # Filter is cheap (no LLM) — always run it so new jobs are tracked
-        logger.info("User %s — filtering (cadence=%s)", user_id, cadence)
+        # Step 1: Hard filter (cheap, always run so new jobs are tracked)
         await self._emit("Applying filters (work mode, location, job type, company)...")
         filter_agent = FilterAgent(self._session)
         filter_stats = await filter_agent.run(user_id)
         passed = filter_stats["passed"]
         stats.total_passed_filter += passed
 
-        if cadence == 'reengagement':
-            # User is dormant — send re-engagement email, skip LLM scoring
-            logger.info("User %s — reengagement cadence, skipping MatchAgent", user_id)
+        if cadence == "reengagement":
+            # User is dormant — send re-engagement email, skip scoring
+            logger.info("User %s — reengagement cadence, skipping scoring", user_id)
             emailed = await self._send_email(user_id)
             stats.total_emailed += emailed
             return
 
-        if passed == 0 and not await self._has_pending_matches(user_id):
-            logger.info("User %s — no new jobs to score", user_id)
-            return
+        # Step 2: Heuristic scoring (no LLM)
+        if profile is not None:
+            await self._score_heuristic(user_id, profile)
 
-        await self._emit(f"Scoring up to {_SCORE_LIMIT_PER_RUN} newest jobs with AI...")
-        match_agent = MatchAgent(self._session, self._llm)
-        scored = await match_agent.run(user_id)
-        stats.total_scored += scored
+        # Step 3: Embedding scoring (local model, async)
+        if profile is not None:
+            await self._score_embeddings(user_id, profile)
 
+        # Step 4: LLM scoring — only if enough unshown candidates
+        pending = await self._count_pending_llm_candidates(user_id)
+        if pending >= _MIN_CANDIDATES_FOR_LLM:
+            await self._emit(f"Scoring top candidates with AI ({pending} candidates)...")
+            match_agent = MatchAgent(self._session, self._llm)
+            scored = await match_agent.run(user_id)
+            stats.total_scored += scored
+        else:
+            logger.info(
+                "User %s — only %d LLM candidates (min %d), skipping LLM",
+                user_id, pending, _MIN_CANDIDATES_FOR_LLM,
+            )
+
+        # Step 5: Select delivery jobs with 6-step fallback
+        delivery_matches = await self._select_delivery_jobs(user_id)
+        if delivery_matches:
+            now = datetime.now(timezone.utc)
+            for match in delivery_matches:
+                match.shown_at = now
+                match.delivered_at = now
+            await self._session.commit()
+            logger.info("User %s — %d jobs marked for delivery", user_id, len(delivery_matches))
+
+        # Step 6: Send email
         emailed = await self._send_email(user_id)
         stats.total_emailed += emailed
 
-    async def _send_email(self, user_id: str) -> int:
-        from mailer.sender import send_daily_digest
-        return await send_daily_digest(user_id, self._session)
+    # ------------------------------------------------------------------
+    # Heuristic scoring
+    # ------------------------------------------------------------------
+
+    async def _score_heuristic(self, user_id: str, profile: UserProfile) -> None:
+        from agents.heuristic_scorer import score_heuristic
+        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        result = await self._session.execute(
+            select(JobMatch, Job)
+            .join(Job, JobMatch.job_id == Job.id)
+            .where(
+                JobMatch.user_id == uid,
+                JobMatch.passed_hard_filter.is_(True),
+                JobMatch.heuristic_score.is_(None),
+                JobMatch.shown_at.is_(None),
+            )
+        )
+        rows = result.all()
+        if not rows:
+            return
+        for match, job in rows:
+            match.heuristic_score = score_heuristic(job, profile)
+        await self._session.commit()
+        logger.debug("User %s — heuristic scored %d matches", user_id, len(rows))
+
+    # ------------------------------------------------------------------
+    # Embedding scoring
+    # ------------------------------------------------------------------
+
+    async def _score_embeddings(self, user_id: str, profile: UserProfile) -> None:
+        from agents.embedding_scorer import compute_embedding_scores
+        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        result = await self._session.execute(
+            select(JobMatch, Job)
+            .join(Job, JobMatch.job_id == Job.id)
+            .where(
+                JobMatch.user_id == uid,
+                JobMatch.passed_hard_filter.is_(True),
+                JobMatch.embedding_score.is_(None),
+                JobMatch.shown_at.is_(None),
+            )
+        )
+        rows = result.all()
+        if not rows:
+            return
+        profile_text = profile.role_description or ""
+        job_texts = [
+            f"{job.title} {(job.description or '')}"[:500]
+            for _, job in rows
+        ]
+        scores = await compute_embedding_scores(job_texts, profile_text)
+        for (match, _), score in zip(rows, scores):
+            match.embedding_score = score
+        await self._session.commit()
+        logger.debug("User %s — embedding scored %d matches", user_id, len(rows))
+
+    # ------------------------------------------------------------------
+    # 3-job delivery selection with 6-step fallback
+    # ------------------------------------------------------------------
+
+    async def _select_delivery_jobs(
+        self, user_id: str, target: int = _DELIVERY_TARGET
+    ) -> list[JobMatch]:
+        """
+        Return up to `target` unshown matches using 6-step fallback:
+          1. LLM scored, score >= 0.70
+          2. LLM scored, score >= 0.50
+          3. LLM scored, score >= 0.30
+          4. LLM scored, any score (including low_confidence)
+          5. Heuristic/embedding scored only (no LLM)
+          6. Any hard-filter-passed job
+        Each step adds only jobs not already selected.
+        """
+        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        selected: list[JobMatch] = []
+        selected_ids: list = []
+
+        async def _fetch(extra_wheres, order_clauses) -> list[JobMatch]:
+            needed = target - len(selected)
+            if needed <= 0:
+                return []
+            stmt = (
+                select(JobMatch)
+                .join(Job, JobMatch.job_id == Job.id)
+                .where(
+                    JobMatch.user_id == uid,
+                    JobMatch.passed_hard_filter.is_(True),
+                    JobMatch.shown_at.is_(None),
+                    Job.is_active.is_(True),
+                    *extra_wheres,
+                )
+                .order_by(*order_clauses)
+                .limit(needed * 2)  # fetch extra to account for dedup
+            )
+            if selected_ids:
+                stmt = stmt.where(JobMatch.id.notin_(selected_ids))
+            result = await self._session.execute(stmt)
+            return list(result.scalars().all())
+
+        def _absorb(rows: list[JobMatch]) -> None:
+            for r in rows:
+                if r.id not in selected_ids and len(selected) < target:
+                    selected.append(r)
+                    selected_ids.append(r.id)
+
+        # Steps 1-4: LLM-scored, progressive score thresholds
+        for threshold in (0.70, 0.50, 0.30, 0.0):
+            if len(selected) >= target:
+                break
+            rows = await _fetch(
+                [JobMatch.score.isnot(None), JobMatch.score >= threshold],
+                [JobMatch.score.desc()],
+            )
+            _absorb(rows)
+
+        # Step 5: heuristic/embedding scored, no LLM score yet
+        if len(selected) < target:
+            rows = await _fetch(
+                [JobMatch.score.is_(None), JobMatch.heuristic_score.isnot(None)],
+                [
+                    JobMatch.embedding_score.desc().nulls_last(),
+                    JobMatch.heuristic_score.desc().nulls_last(),
+                ],
+            )
+            _absorb(rows)
+
+        # Step 6: any hard-filter-passed job
+        if len(selected) < target:
+            rows = await _fetch(
+                [],
+                [Job.posted_at.desc().nulls_last()],
+            )
+            _absorb(rows)
+
+        logger.info(
+            "User %s — delivery selection: %d/%d jobs (steps completed)",
+            user_id, len(selected), target,
+        )
+        return selected
 
     # ------------------------------------------------------------------
     # On-demand matching (triggered by dashboard visit)
@@ -160,11 +331,22 @@ class OrchestratorAgent:
     async def run_user_on_demand(self, user_id: str) -> int:
         """Filter + score for one user on dashboard visit. No email sent."""
         logger.info("On-demand matching for user %s", user_id)
+        profile = await self._get_profile(user_id)
+
         filter_agent = FilterAgent(self._session)
         await filter_agent.run(user_id)
-        if not await self._has_pending_matches(user_id):
-            logger.info("User %s — no pending matches to score on-demand", user_id)
+
+        if profile is not None:
+            await self._score_heuristic(user_id, profile)
+            await self._score_embeddings(user_id, profile)
+
+        pending = await self._count_pending_llm_candidates(user_id)
+        if pending < _MIN_CANDIDATES_FOR_LLM:
+            logger.info(
+                "User %s — only %d candidates on-demand, skipping LLM", user_id, pending
+            )
             return 0
+
         match_agent = MatchAgent(self._session, self._llm)
         scored = await match_agent.run(user_id)
         logger.info("On-demand scoring complete for user %s — %d scored", user_id, scored)
@@ -174,37 +356,55 @@ class OrchestratorAgent:
     # On-demand feedback pipeline
     # ------------------------------------------------------------------
 
-    async def run_feedback_pipeline(self, user_id: str) -> bool:
+    async def run_feedback_pipeline(self, user_id: str, signal_type: str | None = None) -> bool:
         """
         Process a user's feedback and update their soft preferences.
-        Call this after a user submits thumbs up/down via the API.
+        Call this after a user submits thumbs up/down or a high-value signal.
+        signal_type: 'applied' or 'interview' triggers immediate weight update.
         """
-        logger.info("Running feedback pipeline for user %s", user_id)
+        logger.info("Running feedback pipeline for user %s (signal=%s)", user_id, signal_type)
         agent = FeedbackAgent(self._session, self._llm)
-        updated = await agent.run(user_id)
+        updated = await agent.run(user_id, signal_type=signal_type)
         if updated:
-            logger.info("Soft preferences updated for user %s", user_id)
+            logger.info("Weights/preferences updated for user %s", user_id)
         return updated
+
+    # ------------------------------------------------------------------
+    # Email
+    # ------------------------------------------------------------------
+
+    async def _send_email(self, user_id: str) -> int:
+        from mailer.sender import send_daily_digest
+        return await send_daily_digest(user_id, self._session)
 
     # ------------------------------------------------------------------
     # DB helpers
     # ------------------------------------------------------------------
 
-    async def _has_pending_matches(self, user_id: str) -> bool:
+    async def _count_pending_llm_candidates(self, user_id: str) -> int:
+        """Count unshown, hard-filter-passed jobs that haven't been LLM-scored yet."""
+        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         result = await self._session.execute(
             select(func.count()).select_from(JobMatch)
             .join(Job, JobMatch.job_id == Job.id)
             .where(
-                JobMatch.user_id == user_id,
+                JobMatch.user_id == uid,
                 JobMatch.passed_hard_filter.is_(True),
                 JobMatch.score.is_(None),
+                JobMatch.shown_at.is_(None),
                 Job.is_active.is_(True),
             )
         )
-        return (result.scalar() or 0) > 0
+        return result.scalar() or 0
+
+    async def _get_profile(self, user_id: str) -> UserProfile | None:
+        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        result = await self._session.execute(
+            select(UserProfile).where(UserProfile.user_id == uid)
+        )
+        return result.scalar_one_or_none()
 
     async def _get_users_with_profiles(self) -> list[User]:
-        """Return only users who have a profile set up."""
         result = await self._session.execute(
             select(User).join(UserProfile, User.id == UserProfile.user_id)
         )

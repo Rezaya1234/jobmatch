@@ -100,6 +100,88 @@ def build_plain_text(recipient_email: str, items: list[JobDigestItem], date_str:
 
 
 # ------------------------------------------------------------------
+# Weekly recap email (high-score shown jobs with no interaction)
+# ------------------------------------------------------------------
+
+def build_weekly_recap_html(recipient_email: str, items: list[JobDigestItem], date_str: str, frontend_url: str) -> str:
+    job_cards = "\n".join(_job_card_html(i, rank) for rank, i in enumerate(items, start=1))
+    dashboard_url = f"{frontend_url}/dashboard" if frontend_url else "#"
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Weekly Job Recap — JobMatch</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }}
+    .wrapper {{ max-width: 600px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }}
+    .header {{ background: #fff; border-bottom: 1px solid #e5e5e5; padding: 24px 32px; }}
+    .header h1 {{ margin: 0; font-size: 18px; color: #1a1a2e; }}
+    .header p {{ margin: 4px 0 0; color: #888; font-size: 13px; }}
+    .body {{ padding: 24px 32px; }}
+    .card {{ border: 1px solid #e5e5e5; border-radius: 8px; padding: 20px; margin-bottom: 16px; }}
+    .card-rank {{ font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }}
+    .card-title {{ font-size: 17px; font-weight: bold; color: #1a1a2e; margin: 0 0 3px; }}
+    .card-company {{ font-size: 13px; color: #666; margin: 0 0 12px; }}
+    .card-meta {{ font-size: 12px; color: #888; margin-bottom: 10px; }}
+    .card-meta span {{ margin-right: 12px; }}
+    .score-bar-bg {{ background: #e5e5e5; border-radius: 4px; height: 5px; margin-bottom: 8px; }}
+    .score-bar {{ border-radius: 4px; height: 5px; }}
+    .score-label {{ font-size: 11px; color: #888; margin-bottom: 10px; }}
+    .reasoning {{ font-size: 13px; color: #444; font-style: italic; margin-bottom: 14px; line-height: 1.5; }}
+    .btn-primary {{ display: inline-block; background: #6366f1; color: #fff !important; padding: 10px 20px;
+                   border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; }}
+    .cta-block {{ text-align: center; padding: 20px 0 8px; }}
+    .cta-btn {{ display: inline-block; background: #6366f1; color: #fff !important; padding: 12px 28px;
+               border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 700; }}
+    .footer {{ text-align: center; padding: 20px; font-size: 12px; color: #bbb; border-top: 1px solid #f0f0f0; }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Jobs you haven&rsquo;t checked yet</h1>
+      <p>Week of {date_str} &mdash; {len(items)} high-match job{"s" if len(items) != 1 else ""} still waiting for you</p>
+    </div>
+    <div class="body">
+      {job_cards}
+      <div class="cta-block">
+        <a href="{_esc(dashboard_url)}" class="cta-btn">Review all matches &rarr;</a>
+      </div>
+    </div>
+    <div class="footer">
+      You&rsquo;re receiving this because you signed up for JobMatch.<br>
+      Reply to this email to unsubscribe.
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+def build_weekly_recap_plain_text(recipient_email: str, items: list[JobDigestItem], date_str: str, frontend_url: str) -> str:
+    dashboard_url = f"{frontend_url}/dashboard" if frontend_url else ""
+    lines = [
+        f"JOBS YOU HAVEN'T CHECKED YET — week of {date_str}",
+        f"{len(items)} high-match job{'s' if len(items) != 1 else ''} still waiting",
+        "=" * 60,
+    ]
+    for rank, item in enumerate(items, start=1):
+        lines.append(f"\n#{rank} — {item.title} at {item.company}")
+        lines.append(f"Match score: {int(item.score * 100)}%")
+        if item.reasoning:
+            lines.append(f"Why: {item.reasoning}")
+        meta = _meta_parts(item)
+        if meta:
+            lines.append("  ".join(meta))
+        lines.append(item.url)
+        lines.append("-" * 60)
+    if dashboard_url:
+        lines.append(f"\nReview all your matches: {dashboard_url}")
+    lines.append("\nReply to unsubscribe.")
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------------
 # Re-engagement email (sent when user hasn't visited in 30+ days)
 # ------------------------------------------------------------------
 

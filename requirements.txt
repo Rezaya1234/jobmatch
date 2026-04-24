@@ -14,3 +14,5 @@ pytest-asyncio
 httpx
 pypdf
 python-multipart
+sentence-transformers
+numpy

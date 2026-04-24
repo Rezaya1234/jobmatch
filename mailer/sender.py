@@ -10,7 +10,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Job, JobMatch, User, UserProfile
-from mailer.templates import JobDigestItem, build_html, build_plain_text, build_reengagement_html, build_reengagement_plain_text
+from mailer.templates import (
+    JobDigestItem,
+    build_html,
+    build_plain_text,
+    build_reengagement_html,
+    build_reengagement_plain_text,
+    build_weekly_recap_html,
+    build_weekly_recap_plain_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +118,59 @@ async def send_daily_digest(user_id: str, session: AsyncSession, test: bool = Fa
     return 1
 
 
+async def send_weekly_recap(user_id: str, session: AsyncSession) -> int:
+    """
+    Send a weekly recap of high-scoring shown jobs that the user never clicked or rated.
+    Returns 1 on success, 0 if nothing to send / skipped / failed.
+    """
+    from datetime import timedelta
+    user = await _get_user(user_id, session)
+    if user is None:
+        return 0
+
+    uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    result = await session.execute(
+        select(JobMatch, Job)
+        .join(Job, JobMatch.job_id == Job.id)
+        .where(
+            JobMatch.user_id == uid,
+            JobMatch.shown_at.isnot(None),
+            JobMatch.shown_at >= cutoff,
+            JobMatch.recap_sent_at.is_(None),
+            # No interaction: not clicked, not rated (emailed but never fed back)
+            JobMatch.score.isnot(None),
+        )
+        .order_by(JobMatch.score.desc())
+        .limit(5)
+    )
+    matches = list(result.all())
+    if not matches:
+        logger.info("No recap-eligible jobs for user %s", user_id)
+        return 0
+
+    items = [_to_digest_item(match, job) for match, job in matches]
+    date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
+    html = build_weekly_recap_html(user.email, items, date_str, FRONTEND_URL)
+    plain = build_weekly_recap_plain_text(user.email, items, date_str, FRONTEND_URL)
+    subject = f"Jobs you haven't checked yet — weekly recap"
+
+    try:
+        await asyncio.to_thread(_send_via_sendgrid, user.email, subject, html, plain)
+    except Exception:
+        logger.exception("SendGrid recap failed for user %s", user_id)
+        return 0
+
+    now = datetime.now(timezone.utc)
+    for match, _ in matches:
+        match.recap_sent_at = now
+    from db.activity import log_event
+    await log_event(session, user_id, "recap_sent", job_count=len(items))
+    await session.commit()
+    logger.info("Weekly recap sent to %s (%d jobs)", user.email, len(items))
+    return 1
+
+
 async def _send_reengagement(user: User, profile: UserProfile | None, session: AsyncSession) -> int:
     """Send a 'we miss you' email with no job listings, just a dashboard link."""
     logger.info("Sending re-engagement email to %s", user.email)
@@ -171,18 +232,46 @@ async def _get_profile(user_id: str, session: AsyncSession) -> UserProfile | Non
 async def _get_top_matches(
     user_id: str, session: AsyncSession, include_emailed: bool = False
 ) -> list[tuple[JobMatch, Job]]:
+    """
+    Return jobs to include in the daily digest.
+    Prefers jobs the orchestrator marked with delivered_at (3-job guaranteed set).
+    Falls back to top-scored unshown matches if no delivered batch exists.
+    """
     uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-    conditions = [
+
+    # Primary: orchestrator-selected delivery jobs
+    delivery_conditions = [
+        JobMatch.user_id == uid,
+        JobMatch.passed_hard_filter.is_(True),
+        JobMatch.delivered_at.isnot(None),
+        JobMatch.emailed_at.is_(None),
+    ]
+    result = await session.execute(
+        select(JobMatch, Job)
+        .join(Job, JobMatch.job_id == Job.id)
+        .where(*delivery_conditions)
+        .order_by(
+            JobMatch.score.desc().nulls_last(),
+            JobMatch.heuristic_score.desc().nulls_last(),
+        )
+        .limit(TOP_N)
+    )
+    rows = list(result.all())
+    if rows:
+        return rows
+
+    # Fallback: top-scored matches not yet emailed (for test mode / legacy)
+    fallback_conditions = [
         JobMatch.user_id == uid,
         JobMatch.passed_hard_filter.is_(True),
         JobMatch.score.isnot(None),
     ]
     if not include_emailed:
-        conditions.append(JobMatch.emailed_at.is_(None))
+        fallback_conditions.append(JobMatch.emailed_at.is_(None))
     result = await session.execute(
         select(JobMatch, Job)
         .join(Job, JobMatch.job_id == Job.id)
-        .where(*conditions)
+        .where(*fallback_conditions)
         .order_by(JobMatch.score.desc())
         .limit(TOP_N)
     )

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_llm, get_session
 from db.activity import log_event
 from db.database import AsyncSessionLocal
-from db.models import Feedback, Job, JobMatch
+from db.models import Feedback, FeedbackSignal, Job, JobMatch
 from llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -176,20 +176,67 @@ async def list_feedback(
     ]
 
 
-async def _run_learn_and_rescore(user_id: str, llm: LLMClient) -> None:
-    """Run feedback learning then re-score only unscored matches with the updated profile.
+_VALID_SIGNALS = {"click", "applied", "interview"}
+_IMMEDIATE_SIGNAL_TYPES = {"applied", "interview"}
 
-    We do NOT wipe existing scores — doing so would make all matches invisible until
-    MatchAgent finishes (it caps at 50 per run), leaving hundreds of matches with NULL
-    scores that the matches API silently drops. Instead we update the profile and let
-    MatchAgent score any jobs that haven't been scored yet. Full rescoring of old matches
-    happens on the next daily pipeline run.
+
+class SignalRequest(BaseModel):
+    job_id: str
+    signal_type: str   # "click", "applied", "interview"
+
+
+@router.post("/signal", status_code=status.HTTP_201_CREATED)
+async def record_signal(
+    user_id: str,
+    body: SignalRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    llm: LLMClient = Depends(get_llm),
+) -> dict:
     """
+    Record a high-value behavioral signal (click, applied, interview).
+    'applied' and 'interview' trigger immediate weight update.
+    """
+    if body.signal_type not in _VALID_SIGNALS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"signal_type must be one of {sorted(_VALID_SIGNALS)}",
+        )
+
+    job_result = await session.execute(select(Job).where(Job.id == body.job_id))
+    job = job_result.scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    sig = FeedbackSignal(
+        user_id=user_id,
+        job_id=body.job_id,
+        signal_type=body.signal_type,
+    )
+    session.add(sig)
+    await log_event(
+        session, user_id, body.signal_type,
+        job_title=job.title, company=job.company,
+    )
+    await session.commit()
+
+    if body.signal_type in _IMMEDIATE_SIGNAL_TYPES:
+        background_tasks.add_task(
+            _run_learn_and_rescore, user_id, llm, signal_type=body.signal_type
+        )
+
+    return {"status": "recorded", "signal_type": body.signal_type}
+
+
+async def _run_learn_and_rescore(
+    user_id: str, llm: LLMClient, signal_type: str | None = None
+) -> None:
+    """Run feedback learning then re-score only unscored matches with the updated profile."""
     async with AsyncSessionLocal() as session:
         from agents.feedback_agent import FeedbackAgent
         from agents.match_agent import MatchAgent
         try:
-            updated = await FeedbackAgent(session, llm).run(user_id)
+            updated = await FeedbackAgent(session, llm).run(user_id, signal_type=signal_type)
             if updated:
                 logger.info("Profile updated from feedback for user %s — scoring pending matches", user_id)
                 scored = await MatchAgent(session, llm).run(user_id)
