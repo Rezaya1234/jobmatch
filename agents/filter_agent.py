@@ -59,6 +59,15 @@ class FilterAgent:
             "User %s — filtered %d jobs: %d passed, %d failed",
             user_id, len(jobs), counts["passed"], counts["failed"],
         )
+        if len(jobs) > 0:
+            from db.activity import log_event
+            await log_event(
+                self._session, user_id, "filter_run",
+                total=len(jobs),
+                passed=counts["passed"],
+                failed=counts["failed"],
+            )
+            await self._session.commit()
         return counts
 
     # ------------------------------------------------------------------

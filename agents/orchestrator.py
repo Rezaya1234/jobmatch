@@ -174,9 +174,23 @@ class OrchestratorAgent:
         delivery_matches = await self._select_delivery_jobs(user_id)
         if delivery_matches:
             now = datetime.now(timezone.utc)
+            jobs_by_id = await self._load_jobs([str(m.job_id) for m in delivery_matches])
             for match in delivery_matches:
                 match.shown_at = now
                 match.delivered_at = now
+            from db.activity import log_event
+            await log_event(
+                self._session, user_id, "jobs_delivered",
+                job_count=len(delivery_matches),
+                jobs=[{
+                    "job_id": str(m.job_id),
+                    "title": jobs_by_id[str(m.job_id)].title if str(m.job_id) in jobs_by_id else "?",
+                    "company": jobs_by_id[str(m.job_id)].company if str(m.job_id) in jobs_by_id else "?",
+                    "score": m.score,
+                    "heuristic_score": m.heuristic_score,
+                    "dimension_scores": m.dimension_scores,
+                } for m in delivery_matches],
+            )
             await self._session.commit()
             logger.info("User %s — %d jobs marked for delivery", user_id, len(delivery_matches))
 
@@ -380,6 +394,12 @@ class OrchestratorAgent:
     # ------------------------------------------------------------------
     # DB helpers
     # ------------------------------------------------------------------
+
+    async def _load_jobs(self, job_ids: list[str]) -> dict[str, Job]:
+        if not job_ids:
+            return {}
+        result = await self._session.execute(select(Job).where(Job.id.in_(job_ids)))
+        return {str(j.id): j for j in result.scalars().all()}
 
     async def _count_pending_llm_candidates(self, user_id: str) -> int:
         """Count unshown, hard-filter-passed jobs that haven't been LLM-scored yet."""

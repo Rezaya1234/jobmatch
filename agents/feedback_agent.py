@@ -95,14 +95,30 @@ class FeedbackAgent:
 
         # Apply changes
         changed = False
-        if new_weights != (profile.learned_weights or DEFAULT_WEIGHTS):
+        from db.activity import log_event
+
+        old_weights = dict(profile.learned_weights or DEFAULT_WEIGHTS)
+        if new_weights != old_weights:
             profile.learned_weights = new_weights
             changed = True
+            await log_event(
+                self._session, user_id, "weights_updated",
+                weights=new_weights,
+                weights_before=old_weights,
+                signal_count=total_signals,
+                cold_start=profile.cold_start,
+            )
 
         if profile_updates:
             changes = _apply_profile_updates(profile, profile_updates)
             if changes:
                 changed = True
+                await log_event(
+                    self._session, user_id, "profile_updated",
+                    changes=changes,
+                    reasoning=profile_updates.get("reasoning", ""),
+                    snapshot=_format_profile(profile),
+                )
 
         # Update signal count and graduate from cold start
         profile.feedback_signal_count = total_signals
@@ -110,16 +126,12 @@ class FeedbackAgent:
             profile.cold_start = False
             logger.info("User %s graduated from cold start (%d signals)", user_id, total_signals)
             changed = True
+            await log_event(
+                self._session, user_id, "cold_start_graduated",
+                signal_count=total_signals,
+            )
 
         if changed:
-            from db.activity import log_event
-            await log_event(
-                self._session, user_id, "weights_updated",
-                weights=new_weights,
-                signal_count=total_signals,
-                cold_start=profile.cold_start,
-                reasoning=profile_updates.get("reasoning", "") if profile_updates else "",
-            )
             await self._session.commit()
 
         return changed
