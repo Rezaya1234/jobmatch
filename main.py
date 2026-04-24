@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.feedback import click_router as feedback_click_router
 from api.feedback import router as feedback_router
 from api.jobs import router as jobs_router
+from api.linkedin import router as linkedin_router
 from api.matches import router as matches_router
 from api.pipeline import router as pipeline_router
 from api.qa import router as qa_router
@@ -54,6 +55,7 @@ app.include_router(feedback_router)
 app.include_router(feedback_click_router)
 app.include_router(pipeline_router)
 app.include_router(qa_router)
+app.include_router(linkedin_router, prefix="/api")
 
 
 @app.get("/health", tags=["health"])

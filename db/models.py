@@ -130,6 +130,11 @@ class UserProfile(Base):
     title_include: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     title_exclude: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
 
+    # LinkedIn integration
+    linkedin_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     # Cold start + adaptive weight management
     cold_start: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     feedback_signal_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

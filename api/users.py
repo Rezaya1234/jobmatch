@@ -54,6 +54,9 @@ class ProfileRequest(BaseModel):
     title_exclude: list[str] = []
     years_experience: int | None = None
     role_type: str | None = None  # "ic", "manager", "executive", "either"
+    linkedin_url: str | None = None
+    avatar_url: str | None = None
+    display_name: str | None = None
 
 
 class ProfileResponse(ProfileRequest):
@@ -307,6 +310,9 @@ def _profile_response(profile: UserProfile) -> ProfileResponse:
         title_exclude=profile.title_exclude or [],
         years_experience=getattr(profile, "years_experience", None),
         role_type=getattr(profile, "role_type", None),
+        linkedin_url=getattr(profile, "linkedin_url", None),
+        avatar_url=getattr(profile, "avatar_url", None),
+        display_name=getattr(profile, "display_name", None),
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )
