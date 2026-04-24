@@ -151,6 +151,24 @@ async def submit_feedback(
     )
 
 
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_feedback(
+    user_id: str,
+    job_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    fb_result = await session.execute(
+        select(Feedback).where(
+            Feedback.user_id == user_id,
+            Feedback.job_id == job_id,
+        )
+    )
+    feedback = fb_result.scalar_one_or_none()
+    if feedback is not None:
+        await session.delete(feedback)
+        await session.commit()
+
+
 @router.get("", response_model=list[FeedbackResponse])
 async def list_feedback(
     user_id: str,

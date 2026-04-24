@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { getMatches, submitFeedback, getFeedback, recordEngagement, getProfile } from '../api'
+import { getMatches, submitFeedback, deleteFeedback, getFeedback, recordEngagement, getProfile } from '../api'
 import DetailsDrawer from '../components/DetailsDrawer'
 import CompanyLogo from '../components/CompanyLogo'
 
@@ -205,14 +205,20 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
   const rating = initialRating || localRating
 
   async function handleFeedback(r) {
-    if (saving || localRating) return
-    setLocalRating(r)  // instant visual feedback before API responds
+    if (saving) return
+    const current = initialRating || localRating
+    const next = current === r ? null : r  // clicking same thumb cancels it
+    setLocalRating(next)
     setSaving(true)
     try {
-      await submitFeedback(userId, match.job_id, r, '', 2)
-      onReact(r, match.job_id)
+      if (next === null) {
+        await deleteFeedback(userId, match.job_id)
+      } else {
+        await submitFeedback(userId, match.job_id, next, '', 2)
+      }
+      onReact(next, match.job_id)
     } catch {
-      setLocalRating(null)
+      setLocalRating(current)
       setSaving(false)
     }
   }
@@ -270,62 +276,43 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
         <div className="shrink-0 flex flex-col items-center gap-2 pl-3 border-l border-slate-100">
           <ScoreBadge pct={pct} />
           <div className="flex items-center gap-1">
-            {rating ? (
-              <>
-                <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${rating === 'thumbs_up' ? 'text-green-600 bg-green-50' : 'text-rose-500 bg-rose-50'}`}>
-                  {rating === 'thumbs_up' ? (
-                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                    </svg>
-                  )}
-                </span>
-                <button
-                  onClick={() => onOpenDrawer(match)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-violet-500 hover:bg-violet-50 transition-colors"
-                  aria-label={`View details for ${match.title}`}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => handleFeedback('thumbs_up')}
-                  disabled={saving}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-600 hover:bg-green-50 transition-all disabled:opacity-50"
-                  aria-label="Good fit"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => handleFeedback('thumbs_down')}
-                  disabled={saving}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-300 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-50"
-                  aria-label="Not a fit"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => onOpenDrawer(match)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-violet-500 hover:border-violet-200 hover:bg-violet-50 transition-colors"
-                  aria-label={`View details for ${match.title}`}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => handleFeedback('thumbs_up')}
+              disabled={saving}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${
+                rating === 'thumbs_up'
+                  ? 'border-green-300 text-green-600 bg-green-50'
+                  : 'border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-600 hover:bg-green-50'
+              }`}
+              aria-label="Good fit"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => handleFeedback('thumbs_down')}
+              disabled={saving}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${
+                rating === 'thumbs_down'
+                  ? 'border-rose-300 text-rose-500 bg-rose-50'
+                  : 'border-slate-200 text-slate-400 hover:border-rose-300 hover:text-rose-500 hover:bg-rose-50'
+              }`}
+              aria-label="Not a fit"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => onOpenDrawer(match)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-violet-500 hover:border-violet-200 hover:bg-violet-50 transition-colors"
+              aria-label={`View details for ${match.title}`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -775,8 +762,11 @@ export default function Dashboard() {
   }, [userId])
 
   function handleReact(rating, jobId) {
+    if (rating === null) {
+      setFeedback(prev => prev.filter(f => f.job_id !== jobId))
+      return
+    }
     addToast(rating === 'thumbs_up' ? "Got it — we'll show more like this" : "Noted — we'll adjust your matches")
-    // Only persist feedback — card stays visible with colored thumb
     setFeedback(prev => [...prev.filter(f => f.job_id !== jobId), { job_id: jobId, rating }])
   }
 

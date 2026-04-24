@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { listJobs, getJobCount, submitFeedback, getFeedback } from '../api'
+import { listJobs, getJobCount, submitFeedback, deleteFeedback, getFeedback } from '../api'
 
 const PAGE_SIZE = 25
 
@@ -109,11 +109,19 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
 
   async function handleVote(rating) {
     if (!userId) return
+    const next = vote === rating ? null : rating
+    const prev = vote
+    setVote(next)
     try {
-      await submitFeedback(userId, job.id, rating, '', 2)
-      setVote(rating)
+      if (next === null) {
+        await deleteFeedback(userId, job.id)
+      } else {
+        await submitFeedback(userId, job.id, next, '', 2)
+      }
       onFeedback()
-    } catch {}
+    } catch {
+      setVote(prev)
+    }
   }
 
   const salary = formatSalary(job.salary_min, job.salary_max)
@@ -156,20 +164,32 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
         <div className="flex flex-col items-end gap-2 shrink-0">
           <p className="text-xs text-slate-400 whitespace-nowrap">{formatDate(job.posted_at || job.created_at)}</p>
           {userId && (
-            <div className="flex gap-1.5">
+            <div className="flex gap-1">
               <button
                 onClick={() => handleVote('thumbs_up')}
                 title="Good fit"
-                className={`text-base transition-all hover:scale-110 ${vote === 'thumbs_up' ? 'opacity-100' : 'opacity-20 hover:opacity-60'}`}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all ${
+                  vote === 'thumbs_up'
+                    ? 'border-green-300 text-green-600 bg-green-50'
+                    : 'border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-600 hover:bg-green-50'
+                }`}
               >
-                👍
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                </svg>
               </button>
               <button
                 onClick={() => handleVote('thumbs_down')}
                 title="Not a fit"
-                className={`text-base transition-all hover:scale-110 ${vote === 'thumbs_down' ? 'opacity-100' : 'opacity-20 hover:opacity-60'}`}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all ${
+                  vote === 'thumbs_down'
+                    ? 'border-rose-300 text-rose-500 bg-rose-50'
+                    : 'border-slate-200 text-slate-400 hover:border-rose-300 hover:text-rose-500 hover:bg-rose-50'
+                }`}
               >
-                👎
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                </svg>
               </button>
             </div>
           )}
