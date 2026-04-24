@@ -772,15 +772,7 @@ export default function Dashboard() {
 
   function handleReact(rating, jobId) {
     addToast(rating === 'thumbs_up' ? "Got it — we'll show more like this" : "Noted — we'll adjust your matches")
-    setDisplayed(prev => prev.map(d => d.match.job_id === jobId ? { ...d, removing: true } : d))
-    setTimeout(() => {
-      setDisplayed(prev => {
-        const filtered = prev.filter(d => d.match.job_id !== jobId)
-        const next = queue[0]
-        setQueue(q => q.slice(1))
-        return next ? [...filtered, { match: next, removing: false }] : filtered
-      })
-    }, 220)
+    // Only persist feedback — card stays visible with colored thumb
     setFeedback(prev => [...prev.filter(f => f.job_id !== jobId), { job_id: jobId, rating }])
   }
 
