@@ -55,7 +55,7 @@ app.include_router(feedback_router)
 app.include_router(feedback_click_router)
 app.include_router(pipeline_router)
 app.include_router(qa_router)
-app.include_router(linkedin_router, prefix="/api")
+app.include_router(linkedin_router)
 
 
 @app.get("/health", tags=["health"])

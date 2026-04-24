@@ -1,22 +1,17 @@
-"""LinkedIn OAuth 2.0 (Sign In with LinkedIn using OpenID Connect).
+"""LinkedIn profile enrichment via Proxycurl.
 
-Scopes used: openid profile email
-Returns: display_name, avatar_url via OIDC userinfo endpoint.
+User provides their LinkedIn profile URL. We call Proxycurl to fetch:
+name, headline, profile picture, skills, summary.
 
-Required env vars:
-  LINKEDIN_CLIENT_ID     — from your LinkedIn Developer App
-  LINKEDIN_CLIENT_SECRET — from your LinkedIn Developer App
-  API_BASE_URL           — e.g. https://your-backend.onrender.com
-  FRONTEND_URL           — e.g. https://your-frontend.onrender.com
+Required env var:
+  PROXYCURL_API_KEY — get one at https://nubela.co/proxycurl (free tier: 10 credits)
 """
 import logging
 import os
-import secrets
-from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, Query
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,92 +20,94 @@ from db.models import UserProfile
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/linkedin", tags=["linkedin"])
+router = APIRouter(tags=["linkedin"])
 
-_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID", "")
-_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", "")
-_API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
-_FRONTEND = os.getenv("FRONTEND_URL", "http://localhost:5173")
-
-_REDIRECT_URI = f"{_API_BASE}/api/linkedin/callback"
-_AUTH_URL = "https://www.linkedin.com/oauth/v2/authorization"
-_TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
-_USERINFO_URL = "https://api.linkedin.com/v2/userinfo"
+_KEY = os.getenv("PROXYCURL_API_KEY", "")
+_PROXYCURL = "https://nubela.co/proxycurl/api/v2/linkedin"
 
 
-@router.get("/connect")
-async def linkedin_connect(user_id: str = Query(...)) -> RedirectResponse:
-    if not _CLIENT_ID:
-        return RedirectResponse(f"{_FRONTEND}/profile?linkedin=not_configured")
-    state = f"{user_id}:{secrets.token_urlsafe(16)}"
-    params = {
-        "response_type": "code",
-        "client_id": _CLIENT_ID,
-        "redirect_uri": _REDIRECT_URI,
-        "scope": "openid profile email",
-        "state": state,
-    }
-    return RedirectResponse(f"{_AUTH_URL}?{urlencode(params)}")
+class EnrichRequest(BaseModel):
+    linkedin_url: str
 
 
-@router.get("/callback")
-async def linkedin_callback(
-    code: str = Query(...),
-    state: str = Query(...),
+class EnrichResponse(BaseModel):
+    display_name: str | None
+    headline: str | None
+    avatar_url: str | None
+    linkedin_url: str
+    skills: list[str]
+
+
+@router.post("/users/{user_id}/linkedin/enrich", response_model=EnrichResponse)
+async def enrich_linkedin(
+    user_id: str,
+    body: EnrichRequest,
     session: AsyncSession = Depends(get_session),
-) -> RedirectResponse:
-    user_id = state.split(":")[0]
-
-    async with httpx.AsyncClient(timeout=10) as client:
-        # Exchange code → access token
-        token_resp = await client.post(
-            _TOKEN_URL,
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": _REDIRECT_URI,
-                "client_id": _CLIENT_ID,
-                "client_secret": _CLIENT_SECRET,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+) -> EnrichResponse:
+    if not _KEY:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="LinkedIn enrichment is not configured on this server yet.",
         )
-        if token_resp.status_code != 200:
-            logger.error("LinkedIn token exchange failed: %s", token_resp.text)
-            return RedirectResponse(f"{_FRONTEND}/profile?linkedin=error")
 
-        access_token = token_resp.json().get("access_token")
-
-        # Fetch profile via OIDC userinfo
-        info_resp = await client.get(
-            _USERINFO_URL,
-            headers={"Authorization": f"Bearer {access_token}"},
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(
+            _PROXYCURL,
+            params={"url": body.linkedin_url, "use_cache": "if-present"},
+            headers={"Authorization": f"Bearer {_KEY}"},
         )
-        if info_resp.status_code != 200:
-            logger.error("LinkedIn userinfo failed: %s", info_resp.text)
-            return RedirectResponse(f"{_FRONTEND}/profile?linkedin=error")
 
-        info = info_resp.json()
+    if resp.status_code == 404:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            detail="LinkedIn profile not found. Make sure your profile is public.",
+        )
+    if resp.status_code == 429:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please try again in a moment.",
+        )
+    if resp.status_code != 200:
+        logger.error("Proxycurl %s: %s", resp.status_code, resp.text[:200])
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail="Could not fetch LinkedIn profile. Try again.",
+        )
 
-    display_name = info.get("name")
-    avatar_url = info.get("picture")
+    data = resp.json()
+    display_name = data.get("full_name")
+    headline     = data.get("headline")
+    avatar_url   = data.get("profile_pic_url")
+    skills       = data.get("skills") or []
+    summary      = data.get("summary") or ""
 
     result = await session.execute(
         select(UserProfile).where(UserProfile.user_id == user_id)
     )
     profile = result.scalar_one_or_none()
     if profile is not None:
+        profile.linkedin_url = body.linkedin_url
         if display_name:
             profile.display_name = display_name
         if avatar_url:
             profile.avatar_url = avatar_url
+        # Pre-fill role_description only if user hasn't written one yet
+        if not profile.role_description and (summary or headline):
+            profile.role_description = summary or headline
         await session.commit()
-        logger.info("LinkedIn connected for user %s — name=%s", user_id, display_name)
+        logger.info("LinkedIn enriched for user %s — %s", user_id, display_name)
 
-    return RedirectResponse(f"{_FRONTEND}/profile?linkedin=connected")
+    return EnrichResponse(
+        display_name=display_name,
+        headline=headline,
+        avatar_url=avatar_url,
+        linkedin_url=body.linkedin_url,
+        skills=skills if isinstance(skills, list) else [],
+    )
 
 
-@router.delete("/disconnect/{user_id}", status_code=204)
-async def linkedin_disconnect(
+@router.delete("/users/{user_id}/linkedin", status_code=204)
+async def disconnect_linkedin(
     user_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> None:
@@ -120,6 +117,6 @@ async def linkedin_disconnect(
     profile = result.scalar_one_or_none()
     if profile is not None:
         profile.linkedin_url = None
-        profile.avatar_url = None
+        profile.avatar_url   = None
         profile.display_name = None
         await session.commit()
