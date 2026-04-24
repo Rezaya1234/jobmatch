@@ -96,6 +96,74 @@ function CheckBullet({ text }) {
 }
 
 // ---------------------------------------------------------------------------
+// Top Reasons — sorted by dimension score weight
+// ---------------------------------------------------------------------------
+
+const DIMENSION_LABELS = {
+  skills_match:       'Skills match',
+  experience_level:   'Experience level',
+  industry_alignment: 'Industry alignment',
+  salary:             'Salary fit',
+  function_type:      'Function type',
+  career_trajectory:  'Career trajectory',
+}
+
+function TopReasons({ match }) {
+  const scores = match.dimension_scores || {}
+  const sorted = Object.entries(scores)
+    .filter(([, v]) => typeof v === 'number')
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+
+  // Fall back to text bullets when no dimension scores exist
+  if (sorted.length === 0) {
+    const bullets = match.reasoning
+      ? match.reasoning.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 15).slice(0, 3)
+      : []
+    if (bullets.length === 0) return null
+    return (
+      <div>
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Top reasons</p>
+        <div className="space-y-1">
+          {bullets.map((r, i) => <CheckBullet key={i} text={r} />)}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Top reasons</p>
+      <div className="space-y-1.5">
+        {sorted.map(([key, val]) => {
+          const pct = Math.round(val * 100)
+          const label = DIMENSION_LABELS[key] || key.replace(/_/g, ' ')
+          const color = pct >= 70
+            ? { check: 'text-green-500', score: 'text-green-600', bar: 'bg-green-400' }
+            : pct >= 45
+            ? { check: 'text-amber-400', score: 'text-amber-600', bar: 'bg-amber-400' }
+            : { check: 'text-rose-400',  score: 'text-rose-500',  bar: 'bg-rose-400'  }
+          return (
+            <div key={key}>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <svg className={`w-3.5 h-3.5 shrink-0 ${color.check}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="text-xs text-slate-600 flex-1 leading-snug">{label}</span>
+                <span className={`text-xs font-semibold tabular-nums ${color.score}`}>{pct}%</span>
+              </div>
+              <div className="ml-5 h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-1 rounded-full ${color.bar}`} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Purple circle check (for insights)
 // ---------------------------------------------------------------------------
 
@@ -150,10 +218,6 @@ function JobCard({ match, userId, initialRating, removing, onReact, onOpenDrawer
     }
   }
 
-  const reasons = match.reasoning
-    ? match.reasoning.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 15).slice(0, 3)
-    : []
-
   return (
     <div
       className={`
@@ -199,15 +263,10 @@ function JobCard({ match, userId, initialRating, removing, onReact, onOpenDrawer
           </div>
         </div>
 
-        {/* WHY YOU MATCH bullets — hidden on small screens */}
-        {reasons.length > 0 && (
-          <div className="hidden lg:block w-44 shrink-0 border-l border-slate-100 pl-3 self-stretch flex flex-col justify-center">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Why you match</p>
-            <div className="space-y-1">
-              {reasons.map((r, i) => <CheckBullet key={i} text={r} />)}
-            </div>
-          </div>
-        )}
+        {/* Top reasons column — hidden on small screens */}
+        <div className="hidden lg:flex w-52 shrink-0 border-l border-slate-100 pl-4 self-stretch items-center">
+          <TopReasons match={match} />
+        </div>
 
         {/* Score ring */}
         <div className="shrink-0 flex items-center justify-center px-3 border-l border-slate-100">
