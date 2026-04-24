@@ -96,7 +96,7 @@ function CheckBullet({ text }) {
 }
 
 // ---------------------------------------------------------------------------
-// Why You Match — sentences from reasoning sorted by dimension weight
+// Why You Match — job+profile sentence builder, sorted by dimension weight
 // ---------------------------------------------------------------------------
 
 const DIMENSION_KEYWORDS = {
@@ -108,23 +108,61 @@ const DIMENSION_KEYWORDS = {
   career_trajectory:  ['career', 'growth', 'trajectory', 'progression', 'advancement', 'leadership', 'strateg'],
 }
 
-function sentenceToDimension(sentence, scores) {
-  const lower = sentence.toLowerCase()
-  let bestDim = null, bestScore = -1
-  for (const [dim, keywords] of Object.entries(DIMENSION_KEYWORDS)) {
-    if (keywords.some(k => lower.includes(k))) {
-      const s = scores[dim] ?? 0
-      if (s > bestScore) { bestScore = s; bestDim = dim }
+function buildDimSentence(dim, match, profile) {
+  const k = (n) => Math.round(n / 1000)
+  switch (dim) {
+    case 'skills_match': {
+      const desc = profile?.role_description
+      if (desc) {
+        const snippet = desc.replace(/\s+/g, ' ').trim().slice(0, 60).replace(/\s\S*$/, '')
+        return `Your background in ${snippet}… aligns with this role's skill requirements`
+      }
+      return 'Your skill set closely matches what this role requires'
     }
+    case 'experience_level': {
+      const years = profile?.years_experience
+      const level = profile?.seniority_level
+      if (years && level) return `The role targets ${level}-level candidates — your ${years} years of experience is a strong fit`
+      if (years) return `Your ${years} years of experience matches the seniority this role requires`
+      if (level) return `Your ${level}-level seniority aligns with what this role is looking for`
+      return 'Your experience level is well-suited to this position'
+    }
+    case 'industry_alignment': {
+      const sector = match.sector
+      const preferred = profile?.preferred_sectors || []
+      if (sector && preferred.some(s => s.toLowerCase().includes(sector.toLowerCase()) || sector.toLowerCase().includes(s.toLowerCase()))) {
+        return `${sector} is one of your preferred sectors — strong industry alignment`
+      }
+      if (sector) return `This role is in ${sector}, which fits your industry profile`
+      return 'Strong industry and domain alignment with your background'
+    }
+    case 'salary': {
+      const min = match.salary_min, max = match.salary_max, target = profile?.salary_min
+      if (min && max && target) return `Salary $${k(min)}k–$${k(max)}k meets your $${k(target)}k+ target`
+      if (min && max) return `Salary range $${k(min)}k–$${k(max)}k aligns with your expectations`
+      if (target) return `Compensation package meets your $${k(target)}k+ salary target`
+      return 'Compensation aligns with your salary expectations'
+    }
+    case 'function_type': {
+      const title = match.title || ''
+      if (title) return `${title} function matches your target role type`
+      return 'The role function aligns with your career focus'
+    }
+    case 'career_trajectory': {
+      const level = profile?.seniority_level
+      if (level) return `Career trajectory is aligned with your growth path as a ${level}`
+      return 'This role supports your long-term career trajectory'
+    }
+    default:
+      return `Strong alignment on ${dim.replace(/_/g, ' ')}`
   }
-  return bestScore >= 0 ? bestScore : Math.max(...Object.values(scores), 0)
 }
 
-function WhyYouMatch({ match }) {
+function WhyYouMatch({ match, profile }) {
   const scores = match.dimension_scores || {}
   const hasScores = Object.keys(scores).length > 0
 
-  // Best case: reasoning text + dimension scores → sort sentences by which dimension they reflect
+  // Best path: reasoning text from LLM — sort sentences by the dimension they relate to
   if (match.reasoning) {
     const sentences = match.reasoning
       .replace(/\n+/g, ' ')
@@ -133,10 +171,16 @@ function WhyYouMatch({ match }) {
       .filter(s => s.length > 20 && s.length < 160)
 
     if (sentences.length > 0) {
-      const ranked = sentences
-        .map(s => ({ text: s, weight: hasScores ? sentenceToDimension(s, scores) : 0 }))
-        .sort((a, b) => b.weight - a.weight)
-        .slice(0, 3)
+      const ranked = sentences.map(text => {
+        let bestScore = 0
+        if (hasScores) {
+          const lower = text.toLowerCase()
+          for (const [dim, kws] of Object.entries(DIMENSION_KEYWORDS)) {
+            if (kws.some(k => lower.includes(k))) bestScore = Math.max(bestScore, scores[dim] ?? 0)
+          }
+        }
+        return { text, weight: bestScore }
+      }).sort((a, b) => b.weight - a.weight).slice(0, 3)
 
       return (
         <div className="w-full">
@@ -156,40 +200,26 @@ function WhyYouMatch({ match }) {
     }
   }
 
-  // Fallback: only dimension scores, no reasoning text yet
-  if (hasScores) {
-    const top3 = Object.entries(scores)
-      .filter(([, v]) => typeof v === 'number')
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-    return (
-      <div className="w-full">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Why you match</p>
-        <div className="space-y-1.5">
-          {top3.map(([key, val]) => {
-            const pct = Math.round(val * 100)
-            const labels = { skills_match: 'Skills match', experience_level: 'Experience level', industry_alignment: 'Industry alignment', salary: 'Salary fit', function_type: 'Function type', career_trajectory: 'Career trajectory' }
-            const color = pct >= 70 ? 'text-green-500' : pct >= 45 ? 'text-amber-400' : 'text-rose-400'
-            return (
-              <div key={key} className="flex items-center gap-1.5">
-                <svg className={`w-3.5 h-3.5 shrink-0 ${color}`} viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                <span className="text-xs text-slate-600 flex-1">{labels[key] || key}</span>
-                <span className={`text-xs font-semibold tabular-nums ${pct >= 70 ? 'text-green-600' : 'text-amber-600'}`}>{pct}%</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
+  // No LLM reasoning — construct sentences from job + profile data, sorted by dimension score
+  const dimOrder = hasScores
+    ? Object.entries(scores).filter(([, v]) => typeof v === 'number').sort(([, a], [, b]) => b - a).map(([k]) => k)
+    : ['skills_match', 'experience_level', 'industry_alignment']
 
-  // Pending — analysis hasn't run yet
+  const bullets = dimOrder.slice(0, 3).map(dim => buildDimSentence(dim, match, profile))
+
   return (
     <div className="w-full">
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Why you match</p>
-      <p className="text-xs text-slate-300 leading-relaxed">Full match analysis pending — check back after the next pipeline run.</p>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Why you match</p>
+      <div className="space-y-1.5">
+        {bullets.map((text, i) => (
+          <div key={i} className="flex items-start gap-1.5">
+            <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            <span className="text-xs text-slate-600 leading-snug">{text}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -234,7 +264,7 @@ function SkeletonCard() {
 // Job Card (horizontal)
 // ---------------------------------------------------------------------------
 
-function JobCard({ match, userId, initialRating, removing, onReact, onOpenDrawer }) {
+function JobCard({ match, userId, profile, initialRating, removing, onReact, onOpenDrawer }) {
   const [saving, setSaving] = useState(false)
   const pct = Math.round((match.score || 0) * 100)
 
@@ -298,7 +328,7 @@ function JobCard({ match, userId, initialRating, removing, onReact, onOpenDrawer
 
           {/* Why you match — fills remaining space, hidden on mobile */}
           <div className="hidden md:flex flex-1 min-w-0 border-l border-slate-100 pl-3 items-center">
-            <WhyYouMatch match={match} />
+            <WhyYouMatch match={match} profile={profile} />
           </div>
         </div>
 
@@ -881,6 +911,7 @@ export default function Dashboard() {
                 key={match.job_id}
                 match={match}
                 userId={userId}
+                profile={profile}
                 initialRating={feedbackMap[match.job_id]?.rating || null}
                 removing={removing}
                 onReact={handleReact}
