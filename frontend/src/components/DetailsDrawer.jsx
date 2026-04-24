@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { submitFeedback } from '../api'
+import CompanyLogo from './CompanyLogo'
 
 const DIMENSIONS = [
   { key: 'skills_match',       label: 'Skills match' },
@@ -70,7 +71,6 @@ export default function DetailsDrawer({ job, userId, onClose, onFeedback }) {
     onClose()
   }
 
-  const initials = (job.company || '?').slice(0, 2).toUpperCase()
 
   return (
     <>
@@ -92,9 +92,7 @@ export default function DetailsDrawer({ job, userId, onClose, onFeedback }) {
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center text-sm font-bold shrink-0">
-              {initials}
-            </div>
+            <CompanyLogo company={job.company} url={job.url} size="md" />
             <div>
               <h2 className="text-base font-semibold text-slate-900 leading-snug">{job.title}</h2>
               <p className="text-sm text-slate-500">{job.company}</p>
