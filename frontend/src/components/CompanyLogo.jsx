@@ -1,19 +1,34 @@
 import { useState } from 'react'
 
-function getDomain(url) {
+function getDomainFromUrl(url) {
   if (!url) return null
   try {
     const hostname = new URL(url).hostname.toLowerCase()
-    // Strip common job-portal subdomains to get the root company domain
     return hostname.replace(/^(jobs|careers|apply|work|talent|recruiting|hire|www)\./i, '')
   } catch {
     return null
   }
 }
 
+function guessDomainFromName(company) {
+  if (!company) return null
+  const cleaned = company
+    .toLowerCase()
+    .replace(/\s+(inc|corp|ltd|llc|group|technologies|technology|solutions|services|company|co)\.?\s*$/i, '')
+    .trim()
+    .replace(/[^a-z0-9]/g, '')
+  return cleaned ? `${cleaned}.com` : null
+}
+
+const LOGO_SOURCES = (domain) => [
+  `https://logo.clearbit.com/${domain}`,
+  `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+]
+
 export default function CompanyLogo({ company, url, size = 'md' }) {
-  const [error, setError] = useState(false)
-  const domain = getDomain(url)
+  const [srcIndex, setSrcIndex] = useState(0)
+
+  const domain = getDomainFromUrl(url) || guessDomainFromName(company)
   const initials = (company || '?').slice(0, 2).toUpperCase()
 
   const sizeClasses = {
@@ -28,8 +43,9 @@ export default function CompanyLogo({ company, url, size = 'md' }) {
   }
 
   const containerClass = `${sizeClasses[size]} flex items-center justify-center shrink-0 overflow-hidden`
+  const sources = domain ? LOGO_SOURCES(domain) : []
 
-  if (!domain || error) {
+  if (!domain || srcIndex >= sources.length) {
     return (
       <div className={`${containerClass} bg-violet-100 text-violet-700 font-bold`}>
         {initials}
@@ -40,10 +56,10 @@ export default function CompanyLogo({ company, url, size = 'md' }) {
   return (
     <div className={`${containerClass} bg-white border border-slate-100`}>
       <img
-        src={`https://logo.clearbit.com/${domain}`}
+        src={sources[srcIndex]}
         alt={company}
         className={`${imgSizeClasses[size]} object-contain`}
-        onError={() => setError(true)}
+        onError={() => setSrcIndex(i => i + 1)}
       />
     </div>
   )
