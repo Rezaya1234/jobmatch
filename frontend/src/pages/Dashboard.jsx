@@ -202,7 +202,7 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
   const [localRating, setLocalRating] = useState(null)
   const pct = Math.round((match.score || 0) * 100)
   const signals = buildSignals(match, profile)
-  const rating = localRating || initialRating
+  const rating = initialRating || localRating
 
   async function handleFeedback(r) {
     if (saving || localRating) return
