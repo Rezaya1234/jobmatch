@@ -233,8 +233,8 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
           <CompanyLogo company={match.company} url={match.url} size="sm" />
         </div>
 
-        {/* LEFT: title + company + meta — wider to push "why you match" ~1in right */}
-        <div className="min-w-0 shrink-0" style={{ width: '300px' }}>
+        {/* LEFT: title + company + meta — wider to push "why you match" ~2in right */}
+        <div className="min-w-0 shrink-0" style={{ width: '396px' }}>
           <h3 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2">{match.title}</h3>
           <p className="text-xs text-slate-400 mt-0.5 truncate">{match.company}</p>
           <div className="flex flex-wrap gap-1 mt-1">
@@ -390,20 +390,20 @@ function MatchFunnel({ matches, feedback }) {
             <p className="text-2xl font-bold text-slate-800 leading-none">{s.value}</p>
             <p className="text-xs font-medium text-slate-600 mt-0.5">{s.label}</p>
             {s.sub && <p className="text-[10px] text-slate-400 mt-0.5">{s.sub}</p>}
+            {i === 2 && (
+              <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1 items-center">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                  <span className="text-xs text-slate-500">Liked: <strong className="text-slate-700">{liked}</strong></span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+                  <span className="text-xs text-slate-500">Disliked: <strong className="text-slate-700">{disliked}</strong></span>
+                </div>
+              </div>
+            )}
           </div>
         ))}
-      </div>
-
-      {/* Liked / Disliked breakdown */}
-      <div className="mt-4 pt-3 border-t border-slate-100 flex gap-5">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-          <span className="text-xs text-slate-500">Liked: <strong className="text-slate-700">{liked}</strong></span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
-          <span className="text-xs text-slate-500">Disliked: <strong className="text-slate-700">{disliked}</strong></span>
-        </div>
       </div>
 
       {/* Insight */}
