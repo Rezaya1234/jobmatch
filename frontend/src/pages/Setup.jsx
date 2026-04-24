@@ -643,10 +643,15 @@ export default function Setup() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Visa / Work authorization</label>
-                  <select value={profile.visa} onChange={e => set('visa', e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white appearance-none bg-[url('data:image/svg+xml;utf8,<svg fill=\"none\" stroke=\"%23999\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 9l-7 7-7-7\"/></svg>')] bg-no-repeat bg-[right_12px_center] bg-[length:16px]">
-                    {VISA_OPTIONS.map(o => <option key={o}>{o}</option>)}
-                  </select>
+                  <div className="relative">
+                    <select value={profile.visa} onChange={e => set('visa', e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2.5 pr-8 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white appearance-none">
+                      {VISA_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                    </select>
+                    <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </div>
               </div>
 
