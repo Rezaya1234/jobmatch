@@ -383,8 +383,6 @@ function MatchFunnel({ matches, feedback }) {
   const reacted = feedback.length
   const liked = feedback.filter(f => f.rating === 'thumbs_up').length
   const disliked = feedback.filter(f => f.rating === 'thumbs_down').length
-  const clickRate = shown > 0 ? Math.round((reacted / shown) * 100) : 0
-  const likeRate = reacted > 0 ? Math.round((liked / reacted) * 100) : 0
 
   if (shown === 0) {
     return (
@@ -394,52 +392,50 @@ function MatchFunnel({ matches, feedback }) {
     )
   }
 
+  const clickRate = Math.round((reacted / shown) * 100)
+  const likeRate = reacted > 0 ? Math.round(((liked + disliked) / reacted) * 100) : 0
+
   const steps = [
-    {
-      iconPath: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
-      label: 'Shown',
-      value: shown,
-      rate: null,
-    },
-    {
-      iconPath: 'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5',
-      label: 'Clicked',
-      value: reacted,
-      rate: `${clickRate}% of shown`,
-    },
-    {
-      iconPath: 'M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5',
-      label: 'Reacted',
-      value: liked + disliked,
-      rate: `${likeRate}% liked`,
-    },
+    { label: 'Shown',   value: shown,            color: '#7c3aed' },
+    { label: 'Clicked', value: reacted,           color: '#8b5cf6', rate: `${clickRate}%` },
+    { label: 'Reacted', value: liked + disliked,  color: '#a78bfa', rate: `${likeRate}%` },
   ]
+
+  const MAX_H = 88
+  const MIN_H = 22
+  const maxVal = shown || 1
 
   return (
     <div>
-      <div className="space-y-1">
-        {steps.map((step, i) => (
-          <div key={i}>
-            {i > 0 && <div className="w-px h-3 bg-slate-200 ml-5" />}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-violet-50 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={step.iconPath} />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-700">{step.label}</span>
-                  <span className="text-sm font-semibold text-slate-900">{step.value}</span>
+      {/* Horizontal funnel — bars decrease in height, all vertically centered */}
+      <div className="flex items-center gap-2" style={{ height: MAX_H }}>
+        {steps.map((step, i) => {
+          const barH = Math.max(MIN_H, Math.round((step.value / maxVal) * MAX_H))
+          return (
+            <div key={i} className="contents">
+              {i > 0 && (
+                <div className="shrink-0 flex flex-col items-center justify-center gap-0.5" style={{ width: 28 }}>
+                  <span className="text-[10px] font-semibold text-slate-400 leading-none">{step.rate}</span>
+                  <svg className="w-3 h-3 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
-                {step.rate && <p className="text-xs text-slate-400">{step.rate}</p>}
+              )}
+              <div className="flex-1 flex items-center justify-center" style={{ height: MAX_H }}>
+                <div
+                  className="w-full rounded-xl flex flex-col items-center justify-center gap-0.5"
+                  style={{ height: barH, backgroundColor: step.color }}
+                >
+                  <span className="text-white font-bold text-xl leading-none">{step.value}</span>
+                  <span className="text-white/70 text-[10px] font-medium">{step.label}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      {/* Liked / Disliked breakdown */}
+      {/* Liked / Disliked */}
       <div className="mt-4 pt-3 border-t border-slate-100 flex gap-5">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
@@ -451,7 +447,7 @@ function MatchFunnel({ matches, feedback }) {
         </div>
       </div>
 
-      {/* Purple insight */}
+      {/* Insight */}
       <div className="mt-3 bg-violet-50 border border-violet-100 rounded-xl p-3">
         <p className="text-xs text-violet-700 leading-relaxed">
           Your matching algorithm is learning from your reactions and improving over time.
