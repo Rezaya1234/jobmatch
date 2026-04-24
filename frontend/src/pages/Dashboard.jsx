@@ -391,7 +391,7 @@ function MatchFunnel({ matches, feedback }) {
             <p className="text-xs font-medium text-slate-600 mt-0.5">{s.label}</p>
             {s.sub && <p className="text-[10px] text-slate-400 mt-0.5">{s.sub}</p>}
             {i === 2 && (
-              <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1 items-center">
+              <div className="mt-2 pt-2 border-t border-slate-100 flex flex-row gap-3 justify-center">
                 <div className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
                   <span className="text-xs text-slate-500">Liked: <strong className="text-slate-700">{liked}</strong></span>
