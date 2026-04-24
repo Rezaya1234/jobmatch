@@ -54,174 +54,97 @@ function useToasts() {
 }
 
 // ---------------------------------------------------------------------------
-// Score Ring (circular progress)
+// Score Badge (compact number + label)
 // ---------------------------------------------------------------------------
 
-function ScoreRing({ pct }) {
-  const r = 22
-  const circ = 2 * Math.PI * r
-  const offset = circ - (pct / 100) * circ
+function ScoreBadge({ pct }) {
+  const color = pct >= 85 ? 'text-violet-700' : pct >= 70 ? 'text-slate-700' : 'text-slate-500'
   return (
-    <div className="relative shrink-0" style={{ width: 73, height: 73 }}>
-      <svg viewBox="0 0 56 56" style={{ width: 73, height: 73, transform: 'rotate(-90deg)' }}>
-        <circle cx="28" cy="28" r={r} fill="none" stroke="#ede9fe" strokeWidth="5" />
-        <circle
-          cx="28" cy="28" r={r}
-          fill="none" stroke="#7c3aed" strokeWidth="5"
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-800">
-        {pct}%
-      </span>
+    <div className="flex flex-col items-center">
+      <span className={`text-lg font-bold leading-none ${color}`}>{pct}%</span>
+      <span className="text-[10px] text-slate-400 font-medium mt-0.5 tracking-wide uppercase">match</span>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Check Bullet (green checkmark)
+// Signal bullets — concrete, 5-7 word max, sorted by dimension score
 // ---------------------------------------------------------------------------
 
-function CheckBullet({ text }) {
-  return (
-    <div className="flex items-start gap-1.5">
-      <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-      </svg>
-      <span className="text-xs text-slate-600 leading-snug">{text}</span>
-    </div>
-  )
-}
+function buildSignals(match, profile) {
+  const k = n => Math.round(n / 1000)
+  const signals = []
+  const added = new Set()
 
-// ---------------------------------------------------------------------------
-// Why You Match — job+profile sentence builder, sorted by dimension weight
-// ---------------------------------------------------------------------------
-
-const DIMENSION_KEYWORDS = {
-  skills_match:       ['skill', 'proficien', 'expertise', 'knowledge', 'technical', 'certif', 'background', 'familiar', 'tool', 'stack'],
-  experience_level:   ['year', 'senior', 'junior', 'level', 'experienc', 'veteran', 'seasoned', 'proven'],
-  industry_alignment: ['industr', 'sector', 'domain', 'field', 'vertical', 'market'],
-  salary:             ['salary', 'compensation', 'pay', 'remuneration', 'package'],
-  function_type:      ['role', 'function', 'position', 'responsibilit', 'account', 'manage', 'lead'],
-  career_trajectory:  ['career', 'growth', 'trajectory', 'progression', 'advancement', 'leadership', 'strateg'],
-}
-
-function buildDimSentence(dim, match, profile) {
-  const k = (n) => Math.round(n / 1000)
-  switch (dim) {
-    case 'skills_match': {
-      const desc = profile?.role_description
-      if (desc) {
-        const snippet = desc.replace(/\s+/g, ' ').trim().slice(0, 60).replace(/\s\S*$/, '')
-        return `Your background in ${snippet}… aligns with this role's skill requirements`
-      }
-      return 'Your skill set closely matches what this role requires'
-    }
-    case 'experience_level': {
-      const years = profile?.years_experience
-      const level = profile?.seniority_level
-      if (years && level) return `The role targets ${level}-level candidates — your ${years} years of experience is a strong fit`
-      if (years) return `Your ${years} years of experience matches the seniority this role requires`
-      if (level) return `Your ${level}-level seniority aligns with what this role is looking for`
-      return 'Your experience level is well-suited to this position'
-    }
-    case 'industry_alignment': {
-      const sector = match.sector
-      const preferred = profile?.preferred_sectors || []
-      if (sector && preferred.some(s => s.toLowerCase().includes(sector.toLowerCase()) || sector.toLowerCase().includes(s.toLowerCase()))) {
-        return `${sector} is one of your preferred sectors — strong industry alignment`
-      }
-      if (sector) return `This role is in ${sector}, which fits your industry profile`
-      return 'Strong industry and domain alignment with your background'
-    }
-    case 'salary': {
-      const min = match.salary_min, max = match.salary_max, target = profile?.salary_min
-      if (min && max && target) return `Salary $${k(min)}k–$${k(max)}k meets your $${k(target)}k+ target`
-      if (min && max) return `Salary range $${k(min)}k–$${k(max)}k aligns with your expectations`
-      if (target) return `Compensation package meets your $${k(target)}k+ salary target`
-      return 'Compensation aligns with your salary expectations'
-    }
-    case 'function_type': {
-      const title = match.title || ''
-      if (title) return `${title} function matches your target role type`
-      return 'The role function aligns with your career focus'
-    }
-    case 'career_trajectory': {
-      const level = profile?.seniority_level
-      if (level) return `Career trajectory is aligned with your growth path as a ${level}`
-      return 'This role supports your long-term career trajectory'
-    }
-    default:
-      return `Strong alignment on ${dim.replace(/_/g, ' ')}`
+  function addSignal(s) {
+    if (s && !added.has(s) && signals.length < 3) { added.add(s); signals.push(s) }
   }
-}
 
-function WhyYouMatch({ match, profile }) {
   const scores = match.dimension_scores || {}
   const hasScores = Object.keys(scores).length > 0
+  const dims = hasScores
+    ? Object.entries(scores).filter(([, v]) => typeof v === 'number').sort(([, a], [, b]) => b - a).map(([d]) => d)
+    : ['experience_level', 'salary', 'industry_alignment', 'function_type']
 
-  // Best path: reasoning text from LLM — sort sentences by the dimension they relate to
-  if (match.reasoning) {
-    const sentences = match.reasoning
-      .replace(/\n+/g, ' ')
-      .split(/(?<=[.!?])\s+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 20 && s.length < 160)
+  for (const dim of dims) {
+    if (signals.length >= 3) break
+    const years = profile?.years_experience
+    const level = profile?.seniority_level
+    const sector = match.sector
+    const preferred = profile?.preferred_sectors || []
+    const sMin = match.salary_min, sMax = match.salary_max
 
-    if (sentences.length > 0) {
-      const ranked = sentences.map(text => {
-        let bestScore = 0
-        if (hasScores) {
-          const lower = text.toLowerCase()
-          for (const [dim, kws] of Object.entries(DIMENSION_KEYWORDS)) {
-            if (kws.some(k => lower.includes(k))) bestScore = Math.max(bestScore, scores[dim] ?? 0)
+    switch (dim) {
+      case 'experience_level':
+        if (years && level) addSignal(`${years}+ yrs · ${level}`)
+        else if (years) addSignal(`${years}+ yrs experience`)
+        else if (level) addSignal(`${level} level`)
+        break
+      case 'skills_match':
+        if (match.reasoning) {
+          const sents = match.reasoning.split(/(?<=[.!?])\s+/)
+          for (const s of sents.slice(0, 3)) {
+            const clean = s.trim()
+            if (clean.length >= 15 && clean.length <= 65) { addSignal(clean); break }
+            if (clean.length > 65) { addSignal(clean.slice(0, 60).replace(/\s\S*$/, '') + '…'); break }
           }
         }
-        return { text, weight: bestScore }
-      }).sort((a, b) => b.weight - a.weight).slice(0, 3)
-
-      return (
-        <div className="w-full">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Why you match</p>
-          <div className="space-y-1.5">
-            {ranked.map((item, i) => (
-              <div key={i} className="flex items-start gap-1.5">
-                <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                <span className="text-xs text-slate-600 leading-snug">{item.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )
+        break
+      case 'salary':
+        if (sMin && sMax) addSignal(`$${k(sMin)}k–$${k(sMax)}k`)
+        else if (sMin) addSignal(`From $${k(sMin)}k`)
+        break
+      case 'industry_alignment': {
+        if (sector) {
+          const pref = preferred.some(p =>
+            p.toLowerCase().includes(sector.toLowerCase()) || sector.toLowerCase().includes(p.toLowerCase())
+          )
+          addSignal(pref ? `${sector} · preferred` : sector)
+        }
+        break
+      }
+      case 'function_type': {
+        const stopWords = new Set(['and', 'or', 'of', 'the', 'a', 'for', 'in', 'at', '&', 'to', 'with'])
+        const words = (match.title || '').split(/\s+/).filter(w => !stopWords.has(w.toLowerCase())).slice(0, 5).join(' ')
+        if (words.length > 3) addSignal(words)
+        break
+      }
+      case 'career_trajectory':
+        if (level && sector) addSignal(`${level} ${sector} growth`)
+        else if (level) addSignal(`${level} growth path`)
+        break
     }
   }
 
-  // No LLM reasoning — construct sentences from job + profile data, sorted by dimension score
-  const dimOrder = hasScores
-    ? Object.entries(scores).filter(([, v]) => typeof v === 'number').sort(([, a], [, b]) => b - a).map(([k]) => k)
-    : ['skills_match', 'experience_level', 'industry_alignment']
+  // Concrete fallbacks — never generic
+  if (signals.length < 3 && match.work_mode) addSignal(match.work_mode)
+  if (signals.length < 3 && match.salary_min && match.salary_max && !signals.some(s => s.includes('k')))
+    addSignal(`$${k(match.salary_min)}k–$${k(match.salary_max)}k`)
+  if (signals.length < 3 && match.sector && !signals.some(s => s.toLowerCase().includes((match.sector || '').toLowerCase())))
+    addSignal(match.sector)
+  if (signals.length < 3 && match.location_raw) addSignal(match.location_raw)
 
-  const bullets = dimOrder.slice(0, 3).map(dim => buildDimSentence(dim, match, profile))
-
-  return (
-    <div className="w-full">
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">Why you match</p>
-      <div className="space-y-1.5">
-        {bullets.map((text, i) => (
-          <div key={i} className="flex items-start gap-1.5">
-            <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-            <span className="text-xs text-slate-600 leading-snug">{text}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+  return signals
 }
 
 // ---------------------------------------------------------------------------
@@ -244,18 +167,28 @@ function PurpleCheck() {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 animate-pulse flex items-center gap-3">
-      <div className="w-10 h-10 bg-slate-100 rounded-xl shrink-0" />
-      <div className="flex-1">
-        <div className="h-3 bg-slate-200 rounded w-20 mb-2" />
-        <div className="h-4 bg-slate-200 rounded w-3/4 mb-2" />
-        <div className="flex gap-2">
-          <div className="h-5 bg-slate-100 rounded-full w-16" />
-          <div className="h-5 bg-slate-100 rounded-full w-20" />
+    <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 animate-pulse flex items-center gap-3">
+      <div className="w-9 h-9 bg-slate-100 rounded-lg shrink-0" />
+      <div className="shrink-0" style={{ width: '220px' }}>
+        <div className="h-3.5 bg-slate-200 rounded w-3/4 mb-1.5" />
+        <div className="h-3 bg-slate-100 rounded w-1/2 mb-1.5" />
+        <div className="flex gap-1">
+          <div className="h-4 bg-slate-100 rounded w-12" />
+          <div className="h-4 bg-slate-100 rounded w-16" />
         </div>
       </div>
-      <div className="w-14 h-14 bg-slate-100 rounded-full shrink-0" />
-      <div className="w-8 h-20 bg-slate-100 rounded-xl shrink-0" />
+      <div className="hidden md:flex flex-1 flex-col gap-1.5 border-l border-slate-100 pl-3">
+        <div className="h-3 bg-slate-100 rounded w-4/5" />
+        <div className="h-3 bg-slate-100 rounded w-3/5" />
+        <div className="h-3 bg-slate-100 rounded w-2/5" />
+      </div>
+      <div className="shrink-0 flex flex-col items-center gap-2 pl-3 border-l border-slate-100">
+        <div className="h-5 w-10 bg-slate-200 rounded" />
+        <div className="flex gap-1">
+          <div className="w-9 h-9 bg-slate-100 rounded-lg" />
+          <div className="w-9 h-9 bg-slate-100 rounded-lg" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -267,6 +200,7 @@ function SkeletonCard() {
 function JobCard({ match, userId, profile, initialRating, removing, onReact, onOpenDrawer }) {
   const [saving, setSaving] = useState(false)
   const pct = Math.round((match.score || 0) * 100)
+  const signals = buildSignals(match, profile)
 
   async function handleFeedback(rating) {
     if (saving) return
@@ -282,89 +216,80 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
   return (
     <div
       className={`
-        bg-white rounded-2xl border border-slate-200 overflow-hidden
-        shadow-[0_1px_4px_rgba(0,0,0,0.06)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)]
-        hover:border-violet-200 transition-all duration-200 relative
-        ${removing ? 'opacity-0 -translate-y-2 pointer-events-none' : 'opacity-100 translate-y-0'}
+        bg-white rounded-xl border border-slate-200 overflow-hidden
+        shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.07)]
+        hover:border-slate-300 transition-all duration-150 relative
+        ${removing ? 'opacity-0 -translate-y-1 pointer-events-none' : 'opacity-100 translate-y-0'}
       `}
       style={{ transition: removing ? 'all 200ms ease-out' : 'box-shadow 150ms, border-color 150ms, opacity 200ms, transform 200ms' }}
     >
-      {isNew(match) && (
-        <div className="absolute top-3 left-14 z-10">
-          <span className="text-xs bg-violet-600 text-white px-2 py-0.5 rounded-full font-semibold">New</span>
-        </div>
-      )}
-
-      <div className="p-4 flex items-center gap-3">
-        {/* Company logo — offset down to align with job title line */}
-        <div className="self-start mt-5 shrink-0">
-          <CompanyLogo company={match.company} url={match.url} size="md" />
+      <div className="px-4 py-3 flex items-center gap-3">
+        {/* Logo */}
+        <div className="shrink-0 self-start mt-0.5">
+          <CompanyLogo company={match.company} url={match.url} size="sm" />
         </div>
 
-        {/* Center: title + why you match — share the remaining space */}
-        <div className="flex-1 min-w-0 flex items-stretch gap-0">
-          {/* Title + meta — fixed width so it doesn't stretch */}
-          <div className="min-w-0 pr-3" style={{ width: '260px', flexShrink: 0 }}>
-            <p className="text-xs font-medium text-slate-400 truncate">{match.company}</p>
-            <h3 className="text-sm font-semibold text-slate-900 leading-snug">{match.title}</h3>
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {match.work_mode && (
-                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{match.work_mode}</span>
-              )}
-              {match.location_raw && (
-                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{match.location_raw}</span>
-              )}
-              {(match.salary_min || match.salary_max) && (
-                <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-                  ${match.salary_min ? `${(match.salary_min / 1000).toFixed(0)}k` : '?'}
-                  {match.salary_max ? `–$${(match.salary_max / 1000).toFixed(0)}k` : '+'}
-                </span>
-              )}
-              {match.sector && (
-                <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{match.sector}</span>
-              )}
+        {/* LEFT: title + company + meta */}
+        <div className="min-w-0 shrink-0" style={{ width: '220px' }}>
+          <h3 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2">{match.title}</h3>
+          <p className="text-xs text-slate-400 mt-0.5 truncate">{match.company}</p>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {match.work_mode && (
+              <span className="text-[11px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{match.work_mode}</span>
+            )}
+            {match.location_raw && (
+              <span className="text-[11px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{match.location_raw}</span>
+            )}
+            {(match.salary_min || match.salary_max) && (
+              <span className="text-[11px] text-slate-500 px-1.5 py-0.5">
+                ${match.salary_min ? `${Math.round(match.salary_min / 1000)}k` : '?'}
+                {match.salary_max ? `–${Math.round(match.salary_max / 1000)}k` : '+'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* MIDDLE: 3 signal bullets */}
+        <div className="hidden md:flex flex-1 min-w-0 flex-col justify-center gap-1.5 border-l border-slate-100 pl-3">
+          {signals.length > 0 ? signals.map((s, i) => (
+            <div key={i} className="flex items-center gap-2 min-w-0">
+              <span className="w-1 h-1 rounded-full bg-violet-300 shrink-0" />
+              <span className="text-xs text-slate-600 leading-snug truncate">{s}</span>
             </div>
-          </div>
-
-          {/* Why you match — fills remaining space, hidden on mobile */}
-          <div className="hidden md:flex flex-1 min-w-0 border-l border-slate-100 pl-3 items-center">
-            <WhyYouMatch match={match} profile={profile} />
-          </div>
-        </div>
-
-        {/* Score ring */}
-        <div className="shrink-0 flex items-center justify-center px-3 border-l border-slate-100">
-          <ScoreRing pct={pct} />
-        </div>
-
-        {/* Actions */}
-        <div className="shrink-0 flex flex-col items-center gap-1 border-l border-slate-100 pl-2">
-          {initialRating ? (
-            <span className={`text-base ${initialRating === 'thumbs_up' ? 'text-green-600' : 'text-rose-500'}`}>
-              {initialRating === 'thumbs_up' ? '👍' : '👎'}
-            </span>
-          ) : (
-            <>
-              <button
-                onClick={() => handleFeedback('thumbs_up')}
-                disabled={saving}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-600 hover:bg-green-50 transition-all disabled:opacity-50 text-sm"
-                aria-label="Good fit"
-              >👍</button>
-              <button
-                onClick={() => handleFeedback('thumbs_down')}
-                disabled={saving}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50 transition-all disabled:opacity-50 text-sm"
-                aria-label="Not a fit"
-              >👎</button>
-            </>
+          )) : (
+            <span className="text-xs text-slate-300 italic">Signals loading…</span>
           )}
+        </div>
+
+        {/* RIGHT: score + thumbs + chevron */}
+        <div className="shrink-0 flex flex-col items-center gap-1.5 pl-3 border-l border-slate-100">
+          <ScoreBadge pct={pct} />
+          <div className="flex items-center gap-1">
+            {initialRating ? (
+              <span className="text-base">{initialRating === 'thumbs_up' ? '👍' : '👎'}</span>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleFeedback('thumbs_up')}
+                  disabled={saving}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 hover:border-green-300 hover:bg-green-50 transition-all disabled:opacity-50 text-base"
+                  aria-label="Good fit"
+                >👍</button>
+                <button
+                  onClick={() => handleFeedback('thumbs_down')}
+                  disabled={saving}
+                  className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 transition-all disabled:opacity-50 text-base"
+                  aria-label="Not a fit"
+                >👎</button>
+              </>
+            )}
+          </div>
           <button
             onClick={() => onOpenDrawer(match)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+            className="text-slate-300 hover:text-violet-500 transition-colors p-1"
             aria-label={`View details for ${match.title}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -876,7 +801,7 @@ export default function Dashboard() {
             <h2 className="text-base font-semibold text-slate-900">Today's Top Matches</h2>
             {!loading && allMatches.length > 0 && (
               <p className="text-xs text-slate-400 mt-0.5">
-                {displayed.length} shown · {allMatches.filter(m => !feedbackMap[m.job_id]).length} unreacted
+                {displayed.length} of {allMatches.filter(m => !feedbackMap[m.job_id]).length}
               </p>
             )}
           </div>
