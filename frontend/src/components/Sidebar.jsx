@@ -2,6 +2,15 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { getProfile } from '../api'
 
+function useSignOut() {
+  const navigate = useNavigate()
+  return () => {
+    localStorage.removeItem('userId')
+    localStorage.removeItem('userEmail')
+    navigate('/')
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Icons (inline SVG — no external dep)
 // ---------------------------------------------------------------------------
@@ -38,7 +47,7 @@ const PRIMARY_NAV = [
 
 const SECONDARY_NAV = [
   { to: '/profile',      label: 'Profile',           icon: 'profile' },
-  { to: '/settings',     label: 'Settings',          icon: 'settings',     soon: true },
+  { to: '/settings',     label: 'Settings',          icon: 'settings' },
 ]
 
 const ADMIN_NAV = [
@@ -99,7 +108,9 @@ function NavItem({ item, collapsed }) {
 // Sidebar
 // ---------------------------------------------------------------------------
 export default function Sidebar({ collapsed, onToggle }) {
-  const userId = localStorage.getItem('userId')
+  const userId   = localStorage.getItem('userId')
+  const email    = localStorage.getItem('userEmail') || ''
+  const signOut  = useSignOut()
   const [profile, setProfile] = useState(null)
 
   useEffect(() => {
@@ -107,6 +118,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   }, [userId])
 
   const pct = completionPct(profile)
+  const initial = email ? email[0].toUpperCase() : '?'
 
   return (
     <>
@@ -171,6 +183,37 @@ export default function Sidebar({ collapsed, onToggle }) {
             </div>
           </div>
         )}
+
+        {/* User row + sign out */}
+        <div className={`border-t border-slate-100 shrink-0 ${collapsed ? 'px-2 py-2' : 'px-3 py-2'}`}>
+          {collapsed ? (
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="w-full flex items-center justify-center h-9 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center shrink-0">
+                {initial}
+              </div>
+              <span className="flex-1 text-xs text-slate-500 truncate min-w-0">{email || 'Account'}</span>
+              <button
+                onClick={signOut}
+                title="Sign out"
+                className="shrink-0 p-1 rounded text-slate-300 hover:text-rose-500 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Collapse toggle */}
         <button
