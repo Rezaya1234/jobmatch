@@ -120,20 +120,27 @@ class CompanyInsightAgent:
             messages=[Message(role='user', content=prompt)],
             system=_SYSTEM,
             tier=ModelTier.STANDARD,
-            max_tokens=1000,
+            max_tokens=1500,
         )
         insight = self._parse(raw)
         await self._upsert(_slugify(data['company_name']), data, insight)
 
     def _parse(self, raw: str) -> dict:
         text = raw.strip()
-        if text.startswith('```'):
-            text = re.sub(r'^```[a-z]*\n?', '', text)
-            text = re.sub(r'\n?```$', '', text)
+        # Try extracting from code fences first (even if preceded by prose)
+        fence = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+        if fence:
+            text = fence.group(1)
+        else:
+            # Fall back: grab from first { to last }
+            start = text.find('{')
+            end = text.rfind('}')
+            if start != -1 and end > start:
+                text = text[start:end + 1]
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            logger.warning("CompanyInsightAgent: JSON parse failed — using empty insight")
+            logger.warning("CompanyInsightAgent: JSON parse failed. Raw response: %.300s", raw)
             return {}
 
     async def _upsert(self, slug: str, data: dict, insight: dict) -> None:
