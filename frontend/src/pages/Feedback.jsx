@@ -188,13 +188,35 @@ function InsightRow({ text }) {
 // What to do next
 // ---------------------------------------------------------------------------
 
-function NextStepCard({ index, text }) {
+const CATEGORY_STYLE = {
+  'Filter optimization': { badge: 'bg-blue-100 text-blue-700',   bar: 'bg-blue-500'   },
+  'Skill improvement':   { badge: 'bg-violet-100 text-violet-700', bar: 'bg-violet-500' },
+  'Focus strategy':      { badge: 'bg-amber-100 text-amber-700',  bar: 'bg-amber-500'  },
+}
+
+function NextStepCard({ index, step }) {
+  // Accept both old string format and new object format
+  const text     = typeof step === 'string' ? step : step.text
+  const category = typeof step === 'string' ? null  : step.category
+  const styles   = CATEGORY_STYLE[category] || { badge: 'bg-slate-100 text-slate-500', bar: 'bg-slate-400' }
+
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
-      <div className="w-5 h-5 rounded-full bg-violet-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+    <div className="flex items-start gap-3.5 p-4 rounded-xl border border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-150">
+      {/* Number */}
+      <div className={`w-7 h-7 rounded-full ${styles.bar} text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5`}>
         {index + 1}
       </div>
-      <span className="text-sm text-slate-700 leading-snug">{text}</span>
+
+      <div className="flex-1 min-w-0">
+        {/* Category badge */}
+        {category && (
+          <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-1.5 ${styles.badge}`}>
+            {category}
+          </span>
+        )}
+        {/* Action text */}
+        <p className="text-sm text-slate-800 leading-snug font-medium">{text}</p>
+      </div>
     </div>
   )
 }
@@ -439,7 +461,7 @@ export default function Feedback() {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {data.next_steps.map((step, i) => <NextStepCard key={i} index={i} text={step} />)}
+                  {data.next_steps.map((step, i) => <NextStepCard key={i} index={i} step={step} />)}
                 </div>
               )}
             </SectionCard>

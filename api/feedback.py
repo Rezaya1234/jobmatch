@@ -221,6 +221,11 @@ class ActivityItem(BaseModel):
     created_at: datetime
 
 
+class NextStep(BaseModel):
+    text: str
+    category: str   # "Filter optimization" | "Skill improvement" | "Focus strategy"
+
+
 class FeedbackSummaryResponse(BaseModel):
     liked_count: int
     disliked_count: int
@@ -231,7 +236,7 @@ class FeedbackSummaryResponse(BaseModel):
     learning_message: str
     impact_message: str
     insights: list[str]
-    next_steps: list[str]
+    next_steps: list[NextStep]
     preferences: dict[str, Any]
     courses: list[CourseItem]
     all_courses: list[CourseItem]
@@ -465,40 +470,115 @@ def _generate_insights(liked: list, disliked: list, total: int, liked_count: int
     return insights[:5]
 
 
-def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) -> list[str]:
+def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) -> list[NextStep]:
     from collections import Counter
-    from courses.recommender import gap_reason
-    steps: list[str] = []
+    from courses.recommender import gap_reason, skill_counts_in_texts
 
-    # Step from work mode gap
-    liked_modes = Counter(j.work_mode for j in liked if j.work_mode)
+    candidates: list[NextStep] = []
+
+    liked_modes    = Counter(j.work_mode    for j in liked    if j.work_mode)
+    disliked_modes = Counter(j.work_mode    for j in disliked if j.work_mode)
+    liked_sectors  = Counter(j.sector       for j in liked    if j.sector)
+    liked_texts    = [f"{j.title} {j.description[:300]}" for j in liked] if liked else []
+    skill_counts   = skill_counts_in_texts(liked_texts) if liked_texts else Counter()
+    total_liked    = max(len(liked), 1)
+
+    MODE_LABEL = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}
+
+    # 1. Filter: liked work mode not yet set in profile
     if liked_modes and liked:
-        top_mode = liked_modes.most_common(1)[0][0]
-        top_pct = round(liked_modes[top_mode] / len(liked) * 100)
+        top_mode, top_count = liked_modes.most_common(1)[0]
+        top_pct = round(top_count / total_liked * 100)
         current_modes = (profile.work_modes if profile else None) or []
-        label = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}.get(top_mode, top_mode.title())
+        ml = MODE_LABEL.get(top_mode, top_mode.title())
         if top_pct >= 60 and top_mode not in current_modes:
-            steps.append(f"Set {label} as your required work mode — {top_pct}% of your liked roles are {label}")
+            candidates.append(NextStep(
+                text=f"Filter to {ml} roles only — {top_pct}% of your liked jobs are {ml}",
+                category="Filter optimization",
+            ))
 
-    # Step from sector gap
-    liked_sectors = Counter(j.sector for j in liked if j.sector)
+    # 2. Filter: disliked work mode (if no liked-mode step was added)
+    if len(candidates) == 0 and disliked_modes and disliked:
+        top_dis, dis_count = disliked_modes.most_common(1)[0]
+        dis_pct = round(dis_count / max(len(disliked), 1) * 100)
+        if dis_pct >= 50 and dis_count >= 2:
+            dl = MODE_LABEL.get(top_dis, top_dis.title())
+            candidates.append(NextStep(
+                text=f"Filter out {dl} roles — they make up {dis_pct}% of jobs you skip",
+                category="Filter optimization",
+            ))
+
+    # 3. Focus: dominant sector not yet in profile
     if liked_sectors and liked_sectors.most_common(1)[0][1] >= 2:
-        top_sector = liked_sectors.most_common(1)[0][0]
+        top_sector, sec_count = liked_sectors.most_common(1)[0]
+        sec_pct = round(sec_count / total_liked * 100)
         current_sectors = (profile.preferred_sectors if profile else None) or []
         if top_sector not in current_sectors:
-            steps.append(f"Add '{top_sector}' to your preferred sectors to surface more of these roles")
+            candidates.append(NextStep(
+                text=f"Focus on {top_sector} roles — {sec_pct}% of your liked jobs are in this sector",
+                category="Focus strategy",
+            ))
 
-    # Step from skill gap
+    # 4. Focus: seniority pattern
+    if liked:
+        senior_liked = sum(
+            1 for j in liked
+            if any(kw in (j.title or "").lower() for kw in ["senior", "lead", "principal", "staff", "vp", "director"])
+        )
+        if senior_liked >= 2:
+            sen_pct = round(senior_liked / total_liked * 100)
+            current_seniority = (profile.seniority_level if profile else None) or ""
+            if not current_seniority or current_seniority in ("junior", "mid", "unknown"):
+                candidates.append(NextStep(
+                    text=f"Focus on Senior / Lead roles — {sen_pct}% of your liked jobs are at this level",
+                    category="Focus strategy",
+                ))
+
+    # 5. Skill improvement: top gap
     if gaps:
-        label = gap_reason(gaps[0])
-        steps.append(f"Strengthen your {label} skills — they appear in most of the roles you like")
+        g = gaps[0]
+        label = gap_reason(g)
+        pct = round(skill_counts.get(g, 0) / total_liked * 100) if liked else 0
+        text = (
+            f"Add {label} skills — required in ~{pct}% of roles you engage with"
+            if pct >= 10 else
+            f"Add {label} skills — a gap in roles you consistently like"
+        )
+        candidates.append(NextStep(text=text, category="Skill improvement"))
 
-    # Step from low approval rate
-    total = len(liked) + len(disliked)
-    if total >= 5 and len(liked) / total < 0.35:
-        steps.append("Run 'Reset Filters' in Pipeline to re-score all jobs with your current profile")
+    # 6. Skill improvement: second gap (fills slot if we have room)
+    if len(gaps) > 1 and len(candidates) < 3:
+        g2 = gaps[1]
+        label2 = gap_reason(g2)
+        pct2 = round(skill_counts.get(g2, 0) / total_liked * 100) if liked else 0
+        text2 = (
+            f"Add {label2} skills — present in ~{pct2}% of roles you engage with"
+            if pct2 >= 10 else
+            f"Build {label2} skills — seen in roles you like but missing from your profile"
+        )
+        candidates.append(NextStep(text=text2, category="Skill improvement"))
 
-    return steps[:3]
+    # 7. Filter: low approval rate (last resort)
+    total_rated = len(liked) + len(disliked)
+    if total_rated >= 5 and len(liked) / total_rated < 0.35 and len(candidates) < 3:
+        candidates.append(NextStep(
+            text="Reset your filters — your low approval rate suggests your match criteria need updating",
+            category="Filter optimization",
+        ))
+
+    # Prefer variety: deduplicate same category if we have 3+ candidates
+    if len(candidates) >= 3:
+        seen: set[str] = set()
+        result: list[NextStep] = []
+        for c in candidates:
+            if c.category not in seen or len(result) < 2:
+                result.append(c)
+                seen.add(c.category)
+            if len(result) == 3:
+                break
+        return result
+
+    return candidates[:3]
 
 
 def _build_preferences(profile) -> dict:
