@@ -34,13 +34,18 @@ function getDomain(url) {
 }
 
 function CompanyLogo({ name, website, slug, cls = 'w-12 h-12' }) {
-  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const domain = getDomain(website) || SLUG_DOMAINS[slug] || null
   const initials = name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
   const colors = ['bg-violet-100 text-violet-700','bg-blue-100 text-blue-700','bg-emerald-100 text-emerald-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700','bg-cyan-100 text-cyan-700']
 
-  if (domain && !failed) {
-    return <img src={`https://logo.clearbit.com/${domain}`} alt={name} className={`${cls} rounded-xl object-contain border border-slate-100 bg-white p-1 shrink-0`} onError={() => setFailed(true)} />
+  const sources = domain ? [
+    `https://logo.clearbit.com/${domain}`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+  ] : []
+
+  if (attempt < sources.length) {
+    return <img src={sources[attempt]} alt={name} className={`${cls} rounded-xl object-contain border border-slate-100 bg-white p-1 shrink-0`} onError={() => setAttempt(a => a + 1)} />
   }
   return (
     <div className={`${cls} rounded-xl flex items-center justify-center text-lg font-bold shrink-0 ${colors[name.charCodeAt(0) % colors.length]}`}>
