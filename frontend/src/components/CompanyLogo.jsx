@@ -1,10 +1,19 @@
 import { useState } from 'react'
 
+const ATS_DOMAINS = new Set([
+  'greenhouse.io', 'lever.co', 'workday.com', 'myworkdayjobs.com',
+  'icims.com', 'taleo.net', 'bamboohr.com', 'smartrecruiters.com',
+  'jobvite.com', 'ashbyhq.com', 'jobs.ashbyhq.com', 'linkedin.com',
+  'indeed.com', 'glassdoor.com', 'ziprecruiter.com', 'wellfound.com',
+  'angel.co', 'rippling.com', 'workable.com', 'recruitee.com',
+])
+
 function getDomainFromUrl(url) {
   if (!url) return null
   try {
     const hostname = new URL(url).hostname.toLowerCase()
-    return hostname.replace(/^(jobs|careers|apply|work|talent|recruiting|hire|www)\./i, '')
+    const domain = hostname.replace(/^(jobs|careers|apply|work|talent|recruiting|hire|boards|www)\./i, '')
+    return ATS_DOMAINS.has(domain) ? null : domain
   } catch {
     return null
   }
