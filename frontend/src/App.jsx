@@ -207,6 +207,24 @@ function AppShell() {
               <Route path="*" element={<Navigate to="/dashboard" />} />
             </Routes>
           </div>
+
+          {/* App footer */}
+          <footer className="hidden md:flex items-center justify-between px-6 py-3 border-t border-slate-100 bg-white shrink-0">
+            <span className="text-xs text-slate-400">© {new Date().getFullYear()} StellaPath</span>
+            <nav className="flex gap-4">
+              {[
+                { to: '/about',   label: 'About' },
+                { to: '/help',    label: 'Help' },
+                { to: '/contact', label: 'Contact' },
+                { to: '/privacy', label: 'Privacy' },
+                { to: '/terms',   label: 'Terms' },
+              ].map(({ to, label }) => (
+                <a key={to} href={to} className="text-xs text-slate-400 hover:text-slate-700 transition-colors">
+                  {label}
+                </a>
+              ))}
+            </nav>
+          </footer>
         </main>
       </div>
     </div>
