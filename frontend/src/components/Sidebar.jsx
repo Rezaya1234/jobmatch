@@ -78,7 +78,7 @@ function NavItem({ item, collapsed }) {
     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative',
     isActive
       ? 'bg-violet-50 text-violet-700'
-      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+      : 'text-slate-900 hover:text-slate-900 hover:bg-slate-100',
     item.soon ? 'opacity-50 pointer-events-none' : '',
   ].join(' ')
 
@@ -86,7 +86,7 @@ function NavItem({ item, collapsed }) {
     <NavLink to={item.to} className={cls} title={collapsed ? item.label : undefined}>
       {({ isActive }) => (
         <>
-          <span className={`shrink-0 ${isActive ? 'text-violet-600' : 'text-slate-500 group-hover:text-slate-700'}`}>
+          <span className={`shrink-0 ${isActive ? 'text-violet-600' : 'text-slate-700 group-hover:text-slate-900'}`}>
             <Icon path={ICONS[item.icon]} />
           </span>
           {!collapsed && (
