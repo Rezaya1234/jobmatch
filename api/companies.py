@@ -155,7 +155,7 @@ async def get_company_jobs(
     jobs_result = await session.execute(
         select(Job)
         .where(Job.company == insight.company_name, Job.is_active == True)
-        .order_by(Job.posted_at.desc().nullslast())
+        .order_by(Job.scraped_at.desc())
         .limit(limit)
     )
     return [

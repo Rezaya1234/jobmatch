@@ -126,10 +126,10 @@ export default function CompanyDetail() {
     )
   }
 
-  if (error) {
+  if (error || !company) {
     return (
       <div className="text-center py-16">
-        <p className="text-slate-500 text-sm mb-4">{error}</p>
+        <p className="text-slate-500 text-sm mb-4">{error || 'Company data could not be loaded.'}</p>
         <button onClick={() => navigate('/insights')} className="text-sm text-violet-600 hover:underline">
           ← Back to Company Insights
         </button>
@@ -187,6 +187,11 @@ export default function CompanyDetail() {
           <p className="mt-3 text-xs text-slate-400">
             Last updated {new Date(company.generated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
+        )}
+        {!company.summary && !company.hiring_outlook && (
+          <div className="mt-4 bg-amber-50 border border-amber-100 rounded-lg px-4 py-3">
+            <p className="text-xs text-amber-700">Insights for this company haven't been generated yet. Go to <a href="/pipeline" className="underline font-medium">Pipeline → Refresh Insights</a> to generate them.</p>
+          </div>
         )}
       </div>
 
