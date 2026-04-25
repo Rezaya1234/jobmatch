@@ -155,7 +155,7 @@ export default function CompanyDetail() {
       {/* Header card */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-start gap-4">
-          <CompanyLogo name={company.company_name} website={company.website} />
+          <CompanyLogo name={company.company_name} website={company.website} slug={company.slug} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-1">
               <h1 className="text-xl font-bold text-slate-900">{company.company_name}</h1>
@@ -391,18 +391,18 @@ function CompanyInitials({ name }) {
   )
 }
 
-function CompanyLogo({ name, website }) {
-  const [failed, setFailed] = useState(false)
-  const domain = getDomain(website)
-  if (domain && !failed) {
-    return (
-      <img
-        src={`https://logo.clearbit.com/${domain}`}
-        alt={name}
-        className="w-14 h-14 rounded-xl object-contain border border-slate-100 bg-white p-1.5 shrink-0"
-        onError={() => setFailed(true)}
-      />
-    )
+function CompanyLogo({ name, website, slug }) {
+  const [failedWebsite, setFailedWebsite] = useState(false)
+  const [failedSlug, setFailedSlug] = useState(false)
+  const domain1 = getDomain(website)
+  const domain2 = slug ? `${slug}.com` : null
+  const imgCls = 'w-14 h-14 rounded-xl object-contain border border-slate-100 bg-white p-1.5 shrink-0'
+
+  if (domain1 && !failedWebsite) {
+    return <img src={`https://logo.clearbit.com/${domain1}`} alt={name} className={imgCls} onError={() => setFailedWebsite(true)} />
+  }
+  if (domain2 && domain2 !== domain1 && !failedSlug) {
+    return <img src={`https://logo.clearbit.com/${domain2}`} alt={name} className={imgCls} onError={() => setFailedSlug(true)} />
   }
   return <CompanyInitials name={name} />
 }
