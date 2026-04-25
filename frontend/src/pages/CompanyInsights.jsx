@@ -2,23 +2,32 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listCompanies } from '../api'
 
-function CompanyInitials({ name }) {
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(w => w[0]?.toUpperCase() || '')
-    .join('')
-  const colors = [
-    'bg-violet-100 text-violet-700',
-    'bg-blue-100 text-blue-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-amber-100 text-amber-700',
-    'bg-rose-100 text-rose-700',
-    'bg-cyan-100 text-cyan-700',
-  ]
-  const idx = name.charCodeAt(0) % colors.length
+function getDomain(url) {
+  if (!url) return null
+  try { return new URL(url).hostname.replace(/^www\./, '') }
+  catch { return url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] }
+}
+
+function CompanyLogo({ name, website, size = 12 }) {
+  const [failed, setFailed] = useState(false)
+  const domain = getDomain(website)
+  const initials = name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
+  const colors = ['bg-violet-100 text-violet-700','bg-blue-100 text-blue-700','bg-emerald-100 text-emerald-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700','bg-cyan-100 text-cyan-700']
+  const color = colors[name.charCodeAt(0) % colors.length]
+  const cls = `w-${size} h-${size} rounded-xl shrink-0`
+
+  if (domain && !failed) {
+    return (
+      <img
+        src={`https://logo.clearbit.com/${domain}`}
+        alt={name}
+        className={`${cls} object-contain border border-slate-100 bg-white p-1`}
+        onError={() => setFailed(true)}
+      />
+    )
+  }
   return (
-    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shrink-0 ${colors[idx]}`}>
+    <div className={`${cls} flex items-center justify-center font-bold ${color} ${size >= 14 ? 'text-xl' : 'text-lg'}`}>
       {initials}
     </div>
   )
@@ -51,7 +60,7 @@ function CompanyCard({ company, onClick }) {
       className="bg-white rounded-xl border border-slate-200 p-5 text-left hover:shadow-md hover:border-violet-200 transition-all duration-150 flex flex-col gap-3"
     >
       <div className="flex items-start gap-3">
-        <CompanyInitials name={company.company_name} />
+        <CompanyLogo name={company.company_name} website={company.website} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
             <h3 className="font-semibold text-slate-900 text-sm truncate">{company.company_name}</h3>

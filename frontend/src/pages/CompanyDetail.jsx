@@ -155,7 +155,7 @@ export default function CompanyDetail() {
       {/* Header card */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-start gap-4">
-          <CompanyInitials name={company.company_name} />
+          <CompanyLogo name={company.company_name} website={company.website} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-1">
               <h1 className="text-xl font-bold text-slate-900">{company.company_name}</h1>
@@ -375,24 +375,34 @@ export default function CompanyDetail() {
   )
 }
 
+function getDomain(url) {
+  if (!url) return null
+  try { return new URL(url).hostname.replace(/^www\./, '') }
+  catch { return url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0] }
+}
+
 function CompanyInitials({ name }) {
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(w => w[0]?.toUpperCase() || '')
-    .join('')
-  const colors = [
-    'bg-violet-100 text-violet-700',
-    'bg-blue-100 text-blue-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-amber-100 text-amber-700',
-    'bg-rose-100 text-rose-700',
-    'bg-cyan-100 text-cyan-700',
-  ]
-  const idx = name.charCodeAt(0) % colors.length
+  const initials = name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
+  const colors = ['bg-violet-100 text-violet-700','bg-blue-100 text-blue-700','bg-emerald-100 text-emerald-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700','bg-cyan-100 text-cyan-700']
   return (
-    <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold shrink-0 ${colors[idx]}`}>
+    <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold shrink-0 ${colors[name.charCodeAt(0) % colors.length]}`}>
       {initials}
     </div>
   )
+}
+
+function CompanyLogo({ name, website }) {
+  const [failed, setFailed] = useState(false)
+  const domain = getDomain(website)
+  if (domain && !failed) {
+    return (
+      <img
+        src={`https://logo.clearbit.com/${domain}`}
+        alt={name}
+        className="w-14 h-14 rounded-xl object-contain border border-slate-100 bg-white p-1.5 shrink-0"
+        onError={() => setFailed(true)}
+      />
+    )
+  }
+  return <CompanyInitials name={name} />
 }

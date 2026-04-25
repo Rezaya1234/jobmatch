@@ -52,7 +52,9 @@ Return a JSON object with exactly these fields:
 - cons: array of 2-4 strings (honest potential drawbacks)
 - signals: array of 1-3 objects with keys "title" (string), "date" (YYYY-MM), "type" (one of: "hiring_surge", "expansion", "tech_stack", "culture", "leadership")
 - hiring_areas: array of department strings inferred from titles (e.g. "Engineering", "Product")
-- risks: array of 2-3 strings (things job seekers should consider)"""
+- risks: array of 2-3 strings (things job seekers should consider)
+- website: string, the company's primary website URL (e.g. "https://openai.com") — null if unknown
+- hq_location: string, city/state or city/country of HQ (e.g. "San Francisco, CA") — null if unknown"""
 
 
 def _slugify(name: str) -> str:
@@ -171,6 +173,8 @@ class CompanyInsightAgent:
         row.signals = insight.get('signals')
         row.hiring_areas = insight.get('hiring_areas')
         row.risks = insight.get('risks')
+        row.website = insight.get('website')
+        row.hq_location = insight.get('hq_location')
         row.generated_at = datetime.now(timezone.utc)
 
         await self._session.commit()

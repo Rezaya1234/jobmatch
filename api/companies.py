@@ -24,6 +24,7 @@ class CompanySummary(BaseModel):
     overall_rating: float | None
     summary: str | None
     logo_url: str | None
+    website: str | None
     hiring_areas: list | None
 
 
@@ -94,6 +95,7 @@ async def list_companies(
             overall_rating=r.overall_rating,
             summary=r.summary,
             logo_url=r.logo_url,
+            website=r.website,
             hiring_areas=r.hiring_areas,
         )
         for r in rows
