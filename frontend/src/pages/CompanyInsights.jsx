@@ -88,14 +88,14 @@ function CompanyCard({ company, onClick }) {
             <TrendArrow trend={company.hiring_trend} />
           </div>
           {company.sector && (
-            <p className="text-xs text-slate-400 truncate">{company.sector}</p>
+            <p className="text-xs text-slate-500 truncate">{company.sector}</p>
           )}
         </div>
         <OutlookBadge outlook={company.hiring_outlook} />
       </div>
 
       {company.summary && (
-        <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{company.summary}</p>
+        <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{company.summary}</p>
       )}
 
       <div className="flex items-center justify-between pt-2 border-t border-slate-100">
@@ -155,7 +155,7 @@ export default function CompanyInsights() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-slate-900">Company Insights</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-slate-600 mt-1">
           Hiring intelligence for every company in our job pool — updated weekly.
         </p>
       </div>

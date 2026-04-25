@@ -78,7 +78,7 @@ function NavItem({ item, collapsed }) {
     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative',
     isActive
       ? 'bg-violet-50 text-violet-700'
-      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100',
+      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
     item.soon ? 'opacity-50 pointer-events-none' : '',
   ].join(' ')
 
@@ -86,7 +86,7 @@ function NavItem({ item, collapsed }) {
     <NavLink to={item.to} className={cls} title={collapsed ? item.label : undefined}>
       {({ isActive }) => (
         <>
-          <span className={`shrink-0 ${isActive ? 'text-violet-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+          <span className={`shrink-0 ${isActive ? 'text-violet-600' : 'text-slate-500 group-hover:text-slate-700'}`}>
             <Icon path={ICONS[item.icon]} />
           </span>
           {!collapsed && (
@@ -201,7 +201,7 @@ export default function Sidebar({ collapsed, onToggle }) {
               <div className="w-7 h-7 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center shrink-0">
                 {initial}
               </div>
-              <span className="flex-1 text-xs text-slate-500 truncate min-w-0">{email || 'Account'}</span>
+              <span className="flex-1 text-xs text-slate-600 truncate min-w-0">{email || 'Account'}</span>
               <button
                 onClick={signOut}
                 title="Sign out"

@@ -18,7 +18,7 @@ function ToggleRow({ label, description, checked, onChange }) {
     <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0 border-b border-slate-50 last:border-0">
       <div className="flex-1">
         <p className="text-sm font-medium text-slate-800">{label}</p>
-        {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
       </div>
       <button
         onClick={() => onChange(!checked)}
@@ -40,7 +40,7 @@ function Field({ label, description, children }) {
       <div className="flex items-start justify-between gap-4 mb-1.5">
         <div>
           <p className="text-sm font-medium text-slate-800">{label}</p>
-          {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+          {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
         </div>
       </div>
       {children}
@@ -115,7 +115,7 @@ export default function Settings() {
     <div className="max-w-2xl space-y-5">
       <div className="mb-2">
         <h1 className="text-xl font-bold text-slate-900">Settings</h1>
-        <p className="text-sm text-slate-400 mt-0.5">Manage your account and preferences.</p>
+        <p className="text-sm text-slate-600 mt-0.5">Manage your account and preferences.</p>
       </div>
 
       {/* Account */}
@@ -141,7 +141,7 @@ export default function Settings() {
 
       {/* Notifications */}
       <Section title="Notifications">
-        <p className="text-xs text-slate-400 mb-4">
+        <p className="text-xs text-slate-500 mb-4">
           Email preferences. Changes take effect on your next notification cycle.
         </p>
         <ToggleRow
@@ -166,7 +166,7 @@ export default function Settings() {
 
       {/* Connected sources */}
       <Section title="Connected sources">
-        <p className="text-xs text-slate-400 mb-4">
+        <p className="text-xs text-slate-500 mb-4">
           Connect your LinkedIn profile to help StellaPath surface warm introductions.
           StellaPath works without this — it's an optional enhancement.
         </p>

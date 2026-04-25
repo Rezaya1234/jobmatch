@@ -230,7 +230,7 @@ function RightPanel({ aiProfile, generating, onLooksGood }) {
           <span className="text-sm font-semibold text-slate-700">AI-Generated Profile</span>
           <span className="ml-auto text-[11px] bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full font-medium">Preview</span>
         </div>
-        <p className="text-xs text-slate-400 leading-relaxed">
+        <p className="text-xs text-slate-500 leading-relaxed">
           Upload your resume and describe what you're looking for to generate your profile.
         </p>
       </div>
@@ -287,7 +287,7 @@ function RightPanel({ aiProfile, generating, onLooksGood }) {
       <div className="px-5 pb-5 space-y-3 border-t border-slate-100 pt-4">
         <div>
           <p className="text-sm font-semibold text-slate-700">Does this look right?</p>
-          <p className="text-xs text-slate-400 mt-0.5">You can edit anything before we start matching.</p>
+          <p className="text-xs text-slate-500 mt-0.5">You can edit anything before we start matching.</p>
         </div>
         <div className="flex gap-2">
           <button type="button"

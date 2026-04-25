@@ -28,7 +28,7 @@ export function PublicNav() {
             <NavLink key={to} to={to}
               className={({ isActive }) =>
                 `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? 'text-violet-700 bg-violet-50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                  isActive ? 'text-violet-700 bg-violet-50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`
               }
             >
@@ -71,7 +71,7 @@ export function PublicFooter() {
       <div className="max-w-6xl mx-auto px-5 py-10">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <Logo />
-          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500">
+          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
             <Link to="/about"   className="hover:text-slate-800 transition-colors">About</Link>
             <Link to="/contact" className="hover:text-slate-800 transition-colors">Contact</Link>
             <Link to="/help"    className="hover:text-slate-800 transition-colors">Help</Link>

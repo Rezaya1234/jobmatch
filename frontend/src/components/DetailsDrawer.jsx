@@ -396,7 +396,7 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
             <CompanyLogo company={job.company} url={job.url} size="md" />
             <div>
               <h2 className="text-base font-semibold text-slate-900 leading-snug">{job.title}</h2>
-              <p className="text-sm text-slate-500">{job.company}</p>
+              <p className="text-sm text-slate-600">{job.company}</p>
             </div>
           </div>
           <button
@@ -494,7 +494,7 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
                 </div>
               ))}
               {suggestedCourses.length === 0 && (
-                <p className="text-sm text-slate-500">No specific courses detected for this role.</p>
+                <p className="text-sm text-slate-600">No specific courses detected for this role.</p>
               )}
               <p className="text-xs text-slate-400 pt-0.5">
                 <a href="/feedback" className="text-violet-600 hover:underline font-medium">See all learning recommendations →</a>
@@ -509,7 +509,7 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
               <svg className="w-8 h-8 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              <p className="text-sm text-slate-500 mb-2">Connect your LinkedIn in Profile to see who you know at {job.company}.</p>
+              <p className="text-sm text-slate-600 mb-2">Connect your LinkedIn in Profile to see who you know at {job.company}.</p>
               <a href="/profile" className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">Connect LinkedIn →</a>
             </div>
           </div>

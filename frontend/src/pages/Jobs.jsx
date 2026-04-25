@@ -131,7 +131,7 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{job.company}</p>
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{job.company}</p>
             {job.work_mode && (
               <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{job.work_mode}</span>
             )}
@@ -356,7 +356,7 @@ export default function Jobs() {
           <p className="text-base font-semibold text-slate-600 mb-1">No positions found</p>
           {hasFilters
             ? <button onClick={clearFilters} className="text-sm text-indigo-600 hover:underline">Clear filters</button>
-            : <p className="text-sm text-slate-400">Try adjusting your search.</p>
+            : <p className="text-sm text-slate-500">Try adjusting your search.</p>
           }
         </div>
       ) : (

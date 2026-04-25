@@ -92,7 +92,7 @@ function SectionCard({ title, subtitle, children, action }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
       <div className="flex items-start justify-between mb-1">
-        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
         {action}
       </div>
       {subtitle && <p className="text-xs text-slate-400 mb-4">{subtitle}</p>}
@@ -119,7 +119,7 @@ function LearningStatus({ status, progress, message, impact }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-base leading-none">🧠</span>
-          <h2 className="text-sm font-semibold text-slate-800">Your profile learning status</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Your profile learning status</h2>
         </div>
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${badgeCls}`}>
           {safeStatus}
@@ -164,7 +164,7 @@ function LearningStatus({ status, progress, message, impact }) {
         </p>
       )}
 
-      <p className="text-xs text-slate-400 mt-3">
+      <p className="text-xs text-slate-500 mt-3">
         We continuously update your recommendations as you provide feedback.
       </p>
     </div>
@@ -179,7 +179,7 @@ function InsightRow({ text }) {
   return (
     <div className="flex items-start gap-2 py-1.5">
       <span className="text-slate-300 mt-1 shrink-0 leading-none text-xs">•</span>
-      <span className="text-xs text-slate-500 leading-relaxed">{text}</span>
+      <span className="text-xs text-slate-600 leading-relaxed">{text}</span>
     </div>
   )
 }
@@ -441,8 +441,8 @@ function ActivityRow({ item, isRecent }) {
       <div className="flex-1 min-w-0 text-xs">
         {actionEl}
         {item.job_title && <span className="font-semibold text-slate-800"> · {item.job_title}</span>}
-        {item.company   && <span className="font-normal text-slate-400"> @ {item.company}</span>}
-        {!hasJob        && <span className="text-slate-400"> — no details</span>}
+        {item.company   && <span className="font-normal text-slate-500"> @ {item.company}</span>}
+        {!hasJob        && <span className="text-slate-500"> — no details</span>}
       </div>
       <span className="text-[11px] text-slate-300 shrink-0 whitespace-nowrap">{timeStr}</span>
     </div>
@@ -582,7 +582,7 @@ export default function Feedback() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Feedback</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Your activity is shaping better job recommendations</p>
+          <p className="text-sm text-slate-600 mt-0.5">Your activity is shaping better job recommendations</p>
         </div>
         <div className="flex items-center gap-3">
           <button

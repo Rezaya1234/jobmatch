@@ -296,7 +296,7 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
         {/* LEFT: title + company + meta — wider to push "why you match" ~2in right */}
         <div className="min-w-0 shrink-0" style={{ width: '396px' }}>
           <h3 className="text-sm font-semibold text-slate-900 leading-snug line-clamp-2">{match.title}</h3>
-          <p className="text-xs text-slate-400 mt-0.5 truncate">{match.company}</p>
+          <p className="text-xs text-slate-500 mt-0.5 truncate">{match.company}</p>
           <div className="flex flex-wrap gap-1 mt-1">
             {match.work_mode && (
               <span className="text-[11px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{match.work_mode}</span>
@@ -388,7 +388,7 @@ function MatchFunnel({ matches, feedback }) {
 
   if (shown === 0) {
     return (
-      <p className="text-sm text-slate-400 text-center py-4">
+      <p className="text-sm text-slate-500 text-center py-4">
         Your funnel will appear after you interact with your first few matches.
       </p>
     )
@@ -473,10 +473,10 @@ function MatchingInsights({ matches, feedback }) {
   if (feedback.length < MIN_INTERACTIONS) {
     return (
       <div className="text-center py-4">
-        <p className="text-sm text-slate-400 leading-relaxed">
+        <p className="text-sm text-slate-500 leading-relaxed">
           Interact with at least {MIN_INTERACTIONS} jobs to unlock personalized insights.
         </p>
-        <p className="text-xs text-slate-300 mt-1">{feedback.length}/{MIN_INTERACTIONS} interactions so far</p>
+        <p className="text-xs text-slate-400 mt-1">{feedback.length}/{MIN_INTERACTIONS} interactions so far</p>
       </div>
     )
   }
@@ -568,7 +568,7 @@ function MissedOpportunities({ matches, feedback }) {
                 <span className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">{pct}%</span>
               </div>
               <p className="text-sm font-semibold text-slate-800 mb-0.5 leading-snug">{m.title}</p>
-              <p className="text-xs text-slate-400 mb-3">{m.company}{m.location_raw ? ` · ${m.location_raw}` : ''}</p>
+              <p className="text-xs text-slate-500 mb-3">{m.company}{m.location_raw ? ` · ${m.location_raw}` : ''}</p>
               {m.url ? (
                 <a href={m.url} target="_blank" rel="noreferrer"
                   className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
@@ -853,7 +853,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-semibold text-slate-900">
             {getGreeting()}{name ? `, ${name}` : ''}.
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">Here are your top matches for today.</p>
+          <p className="text-sm text-slate-600 mt-0.5">Here are your top matches for today.</p>
         </div>
         <div className="flex flex-col items-end gap-1 text-right">
           {lastUpdated && (
@@ -866,7 +866,7 @@ export default function Dashboard() {
           >
             {loading ? 'Loading…' : 'Refresh'}
           </button>
-          <p className="text-xs text-slate-300">Matches refresh daily at 5:00 AM</p>
+          <p className="text-xs text-slate-400">Matches refresh daily at 5:00 AM</p>
         </div>
       </div>
 
@@ -923,13 +923,13 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-5 mb-6">
         <section className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-5">
           <h2 className="text-base font-semibold text-slate-900 mb-0.5">Match Funnel</h2>
-          <p className="text-xs text-slate-400 mb-4">Your engagement flow</p>
+          <p className="text-xs text-slate-500 mb-4">Your engagement flow</p>
           <MatchFunnel matches={allMatches} feedback={feedback} />
         </section>
 
         <section className="md:col-span-3 bg-white border border-slate-200 rounded-2xl p-5">
           <h2 className="text-base font-semibold text-slate-900 mb-0.5">Matching Insights</h2>
-          <p className="text-xs text-slate-400 mb-4">What we've learned about your preferences</p>
+          <p className="text-xs text-slate-500 mb-4">What we've learned about your preferences</p>
           <MatchingInsights matches={allMatches} feedback={feedback} />
         </section>
       </div>
@@ -942,7 +942,7 @@ export default function Dashboard() {
             View all →
           </Link>
         </div>
-        <p className="text-xs text-slate-400 mb-4">Strong matches you haven't reviewed yet</p>
+        <p className="text-xs text-slate-500 mb-4">Strong matches you haven't reviewed yet</p>
         <MissedOpportunities matches={allMatches} feedback={feedback} />
       </section>
 
@@ -951,7 +951,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-base font-semibold text-slate-900">Average Match Score</h2>
-            <p className="text-xs text-slate-400 mt-0.5">How your matches are trending</p>
+            <p className="text-xs text-slate-500 mt-0.5">How your matches are trending</p>
           </div>
           <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-full font-medium">Last 30 days</span>
         </div>
