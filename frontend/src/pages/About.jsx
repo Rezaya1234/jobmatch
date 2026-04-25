@@ -34,9 +34,9 @@ export default function About() {
           <ul className="space-y-3">
             {[
               'Job boards surface listings based on keywords, not fit.',
-              'Candidates apply to dozens of roles they're underqualified or overqualified for.',
-              'There's no signal about why applications fail or what to do differently.',
-              'Career path thinking is absent — it's just a list of open positions.',
+              "Candidates apply to dozens of roles they're underqualified or overqualified for.",
+              "There's no signal about why applications fail or what to do differently.",
+              "Career path thinking is absent — it's just a list of open positions.",
             ].map((item, i) => (
               <li key={i} className="flex items-start gap-3 text-slate-600">
                 <span className="mt-1 w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
