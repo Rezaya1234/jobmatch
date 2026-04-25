@@ -99,6 +99,12 @@ const KNOWN_DOMAINS = {
 
 function normaliseName(name) {
   if (!name) return ''
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function normaliseNameShort(name) {
+  // Strip common legal/type suffixes to get a shorter key
+  if (!name) return ''
   return name
     .toLowerCase()
     .replace(/\s+(inc|corp|ltd|llc|group|technologies|technology|solutions|services|company|co|ai|labs?|research)\.?\s*$/i, '')
@@ -119,13 +125,14 @@ function getDomainFromUrl(url) {
 
 function getDomainFromName(company) {
   if (!company) return null
-  const key = normaliseName(company)
-  if (KNOWN_DOMAINS[key]) return KNOWN_DOMAINS[key]
-  // Try with "ai" suffix stripped (catches "Acme AI" → "acme")
-  const keyNoAi = company.toLowerCase().replace(/\s+ai\s*$/i, '').replace(/[^a-z0-9]/g, '')
-  if (KNOWN_DOMAINS[keyNoAi]) return KNOWN_DOMAINS[keyNoAi]
-  // Fall back to guessing .com
-  return key ? `${key}.com` : null
+  // 1. Try full name (e.g. "scaleai" matches 'scaleai')
+  const full = normaliseName(company)
+  if (KNOWN_DOMAINS[full]) return KNOWN_DOMAINS[full]
+  // 2. Try with suffixes stripped (e.g. "Scale AI Labs" → "scale")
+  const short = normaliseNameShort(company)
+  if (short && KNOWN_DOMAINS[short]) return KNOWN_DOMAINS[short]
+  // 3. Guess .com
+  return (full || short) ? `${full || short}.com` : null
 }
 
 const COLORS = [
