@@ -108,45 +108,43 @@ function buildGapBullets(job, gaps, detectedSkills, requirements, profile) {
     switch (key) {
       case 'skills_match': {
         const named = detectedSkills.slice(0, 2).map(s => SKILL_DISPLAY_NAMES[s]).filter(Boolean)
-        if (reqText && named.length >= 1) return `This requires ${trim80(reqText).toLowerCase()} — specifically ${named[0]}. That's not a strong part of your current profile. Call out any relevant exposure or plan to build it.`
-        if (reqText)  return `This requires ${trim80(reqText).toLowerCase()}. That's not clearly represented on your current profile — address it before applying.`
-        if (named.length >= 2) return `This role requires ${named[0]} and ${named[1]}. These aren't a prominent part of your profile — call them out or build toward them.`
-        if (named.length === 1) return `This role requires solid ${named[0]}. That's not a current strength on your profile — worth addressing directly.`
-        return 'There are specific technical requirements here that aren\'t clearly visible on your profile. Review the posting and address the gap before applying.'
+        if (reqText && named.length >= 1) return `Requires ${trim80(reqText).toLowerCase()} — ${named[0]} isn't currently prominent on your profile.`
+        if (reqText)       return `Requires ${trim80(reqText).toLowerCase()} — not clearly represented on your current profile.`
+        if (named.length >= 2) return `Requires ${named[0]} and ${named[1]} — not a current strength on your profile.`
+        if (named.length === 1) return `Requires solid ${named[0]} — not currently a visible part of your profile.`
+        return 'Some specific technical requirements here aren\'t clearly visible on your profile.'
       }
 
       case 'experience_level': {
-        const expReq = reqText || null
-        const yearsReq = expReq?.match(/(\d+)\+?\s*(?:to\s*\d+\s*)?years?/i)?.[0]
-        if (expReq && yrs && yearsReq) return `This asks for ${yearsReq} of experience — you have ${yrs}. Lead with the scope and impact of your work to close that gap.`
-        if (expReq && yrs) return `This asks for ${trim80(expReq).toLowerCase()} — you have ${yrs} years. Emphasise scope and outcomes to make up the difference.`
-        if (expReq) return `This asks for ${trim80(expReq).toLowerCase()}. Lean into the impact and scope of your work, not just tenure.`
-        if (seniority && lvl) return `This is a ${seniority}-level role — you're currently at ${lvl}. Lead with scope and outcomes to make the case.`
-        return 'The seniority requirement here is a stretch. Lead with the scope and impact of your work, not just your title.'
+        const yearsReq = reqText?.match(/(\d+)\+?\s*(?:to\s*\d+\s*)?years?/i)?.[0]
+        if (yearsReq && yrs) return `Asks for ${yearsReq} — you have ${yrs}. Lead with scope and impact, not tenure.`
+        if (reqText && yrs)  return `Asks for ${trim80(reqText).toLowerCase()} — you have ${yrs} years. Emphasise outcomes over titles.`
+        if (reqText)         return `Asks for ${trim80(reqText).toLowerCase()} — lean into impact and scope in your application.`
+        if (seniority && lvl) return `${seniority}-level role — you're at ${lvl}. Lean into impact and scope.`
+        return 'Seniority bar is a stretch — lead with scope and impact, not job titles.'
       }
 
       case 'industry_alignment':
-        if (reqText && sector) return `They want ${trim80(reqText).toLowerCase()}. Your background isn't primarily in ${sector} — make the relevance explicit in your application, don't leave it to be inferred.`
-        if (sector) return `Your background isn't primarily in ${sector}. Make the relevance explicit upfront — don't leave it to the reader to figure out.`
-        return "Your industry background is a mismatch here. Make your relevance clear and explicit in your application."
+        if (sector) return `Your background isn't primarily in ${sector} — make the connection explicit in your application.`
+        return 'Industry background is a mismatch — make your relevance explicit, don\'t leave it to be inferred.'
 
       case 'salary':
-        if (job.salary_min && job.salary_max) return `The posted range is $${k(job.salary_min)}k–$${k(job.salary_max)}k. Check that against your target before investing time in the process.`
-        return "Check the compensation range against your target before investing time in this process."
+        if (job.salary_min && job.salary_max) return `Posted range is $${k(job.salary_min)}k–$${k(job.salary_max)}k — check that against your target.`
+        return 'Check the compensation range against your target before going further.'
 
       case 'function_type': {
-        if (reqText) return `This role requires ${trim80(reqText).toLowerCase()}. That's not a strong part of your current profile — address it before applying.`
+        if (reqText) return `Requires ${trim80(reqText).toLowerCase()} — not currently a strong part of your profile.`
         const fn = job.title.split(/\s+/).slice(0, 3).join(' ')
-        return `This is primarily a ${fn} role — a shift from your recent work. You'll need a clear narrative for why you're making that move.`
+        return `Primarily a ${fn} role — a shift from your recent work.`
       }
 
       case 'career_trajectory':
-        if (reqText && lvl) return `They're looking for ${trim80(reqText).toLowerCase()}. At ${lvl} level, this is a stretch — make sure your application tells a convincing story.`
-        if (reqText) return `They're looking for ${trim80(reqText).toLowerCase()}. This is a stretch from your current direction — build a clear narrative around the move.`
-        return "This is a pivot from your recent direction. Without a clear story for why, it's a harder sell — build that narrative before applying."
+        if (reqText && lvl) return `Wants ${trim80(reqText).toLowerCase()} — at ${lvl} level, that's a stretch.`
+        if (reqText)        return `Wants ${trim80(reqText).toLowerCase()} — a stretch from your current direction.`
+        return 'A pivot from your recent direction — you\'ll need a clear narrative for the move.'
 
       default:
-        return 'This is a gap worth addressing before you apply.'
+        return 'An area worth addressing before you apply.'
     }
   })
 }
@@ -264,17 +262,20 @@ function buildWhyWorthIt(job) {
   const numeric = Object.entries(scores)
     .filter(([, v]) => typeof v === 'number')
     .sort(([, a], [, b]) => b - a)
-  // Show top dims that are genuinely strong (>= 0.75), max 3
-  const topDims = numeric.filter(([, v]) => v >= 0.75).slice(0, 3)
+  // Always take top 3 dims as strengths — these are matched roles, show what's working
+  const topDims = numeric.slice(0, 3)
   return { reasoning: job.reasoning, topDims }
 }
 
 function buildGaps(job) {
   const scores = job.dimension_scores || {}
-  return Object.entries(scores)
-    .filter(([, v]) => typeof v === 'number' && v < 0.75)
+  const all = Object.entries(scores)
+    .filter(([, v]) => typeof v === 'number')
     .sort(([, a], [, b]) => a - b)
-    .slice(0, 3)
+  // Only flag genuine gaps (< 0.75), max 2 — fit section must always be longer
+  return all
+    .filter(([, v]) => v < 0.75)
+    .slice(0, 2)
     .map(([key, val]) => ({
       key,
       label: DIM_LABELS[key] || key.replace(/_/g, ' '),
