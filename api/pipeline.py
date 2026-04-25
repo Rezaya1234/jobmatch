@@ -177,6 +177,26 @@ async def trigger_company_insights(
     return PipelineResponse(status="accepted", detail="Company insights generation started.")
 
 
+@router.post("/backfill-logos", response_model=PipelineResponse, status_code=200)
+async def backfill_logos(
+    session: AsyncSession = Depends(get_session),
+) -> PipelineResponse:
+    """Set website on existing company_insights rows from the known domain list."""
+    from agents.company_sources import COMPANY_DOMAIN
+    from db.models import CompanyInsight
+    from sqlalchemy import select
+    result = await session.execute(select(CompanyInsight))
+    rows = result.scalars().all()
+    updated = 0
+    for row in rows:
+        domain = COMPANY_DOMAIN.get(row.company_name)
+        if domain and not row.website:
+            row.website = f'https://{domain}'
+            updated += 1
+    await session.commit()
+    return PipelineResponse(status="ok", detail=f"Backfilled {updated} company logo domains.")
+
+
 @router.post("/feedback/{user_id}", response_model=PipelineResponse, status_code=202)
 async def trigger_feedback_pipeline(
     user_id: str,

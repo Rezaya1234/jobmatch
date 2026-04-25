@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { triggerDailyPipeline, triggerCollect, triggerResetFilters, triggerTestEmail, triggerCompanyInsights, getJobCount, getMatchCount, getPipelineStatus } from '../api'
+import { triggerDailyPipeline, triggerCollect, triggerResetFilters, triggerTestEmail, triggerCompanyInsights, backfillLogos, getJobCount, getMatchCount, getPipelineStatus } from '../api'
 
 function StatusIcon({ status }) {
   if (status === 'complete') return <span className="text-green-500 text-xl">✓</span>
@@ -34,6 +34,7 @@ export default function Pipeline() {
   const [triggering, setTriggering] = useState(false)
   const [emailStatus, setEmailStatus] = useState('')
   const [insightsStatus, setInsightsStatus] = useState('')
+  const [logoStatus, setLogoStatus] = useState('')
   const pollRef = useRef(null)
 
   async function fetchTotals() {
@@ -113,6 +114,18 @@ export default function Pipeline() {
       setEmailStatus('error')
     } finally {
       setTimeout(() => setEmailStatus(''), 5000)
+    }
+  }
+
+  async function handleBackfillLogos() {
+    setLogoStatus('running')
+    try {
+      const res = await backfillLogos()
+      setLogoStatus(res.detail || 'done')
+    } catch {
+      setLogoStatus('error')
+    } finally {
+      setTimeout(() => setLogoStatus(''), 6000)
     }
   }
 
@@ -225,6 +238,10 @@ export default function Pipeline() {
             <button onClick={handleCompanyInsights} disabled={insightsStatus === 'running'}
               className="bg-violet-600 text-white py-2 rounded-lg font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
               {insightsStatus === 'running' ? 'Starting...' : insightsStatus === 'accepted' ? '✓ Started' : insightsStatus === 'error' ? 'Failed' : 'Refresh Insights'}
+            </button>
+            <button onClick={handleBackfillLogos} disabled={logoStatus === 'running'}
+              className="bg-slate-600 text-white py-2 rounded-lg font-medium hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
+              {logoStatus === 'running' ? 'Updating...' : logoStatus && logoStatus !== 'error' ? '✓ ' + logoStatus : logoStatus === 'error' ? 'Failed' : 'Backfill Logos'}
             </button>
           </div>
         </div>

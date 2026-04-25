@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agents.company_sources import COMPANY_DOMAIN
 from db.models import CompanyInsight, Job
 from llm.client import LLMClient, Message, ModelTier
 
@@ -173,7 +174,9 @@ class CompanyInsightAgent:
         row.signals = insight.get('signals')
         row.hiring_areas = insight.get('hiring_areas')
         row.risks = insight.get('risks')
-        row.website = insight.get('website')
+        # Prefer LLM-returned website; fall back to known domain from company_sources
+        known_domain = COMPANY_DOMAIN.get(data['company_name'])
+        row.website = insight.get('website') or (f'https://{known_domain}' if known_domain else None)
         row.hq_location = insight.get('hq_location')
         row.generated_at = datetime.now(timezone.utc)
 

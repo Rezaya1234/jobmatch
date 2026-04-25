@@ -31,6 +31,7 @@ export const listCompanies = (params = {}) => http.get('/companies', { params })
 export const getCompany = (slug) => http.get(`/companies/${slug}`).then(r => r.data)
 export const getCompanyJobs = (slug, params = {}) => http.get(`/companies/${slug}/jobs`, { params }).then(r => r.data)
 export const triggerCompanyInsights = () => http.post('/pipeline/company-insights').then(r => r.data)
+export const backfillLogos = () => http.post('/pipeline/backfill-logos').then(r => r.data)
 export const parseProfile = (id, text, resumeFile) => {
   const form = new FormData()
   if (text) form.append('text', text)
