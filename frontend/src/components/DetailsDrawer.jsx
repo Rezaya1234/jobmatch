@@ -262,40 +262,7 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
             )}
           </div>
 
-          {/* 3. Company snapshot */}
-          {(job.sector || job.company_size || job.work_mode || job.location_raw) && (
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Company snapshot</p>
-              <div className="grid grid-cols-2 gap-2">
-                {job.sector && (
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Sector</p>
-                    <p className="text-sm font-medium text-slate-700">{job.sector}</p>
-                  </div>
-                )}
-                {job.company_size && (
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Company size</p>
-                    <p className="text-sm font-medium text-slate-700">{job.company_size}</p>
-                  </div>
-                )}
-                {job.work_mode && (
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Work mode</p>
-                    <p className="text-sm font-medium text-slate-700">{job.work_mode}</p>
-                  </div>
-                )}
-                {job.location_raw && (
-                  <div className="bg-slate-50 rounded-xl p-3">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Location</p>
-                    <p className="text-sm font-medium text-slate-700">{job.location_raw}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 4. How to improve your chances */}
+          {/* 3. How to improve your chances */}
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">How to improve your chances</p>
             {suggestedCourses.length > 0 ? (
