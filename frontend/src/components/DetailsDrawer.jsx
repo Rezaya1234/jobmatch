@@ -12,22 +12,116 @@ const DIMENSIONS = [
 ]
 const DIM_LABELS = Object.fromEntries(DIMENSIONS.map(d => [d.key, d.label]))
 
-const DIM_FIT_PHRASES = {
-  skills_match:       'Your technical background lines up well with what this role needs.',
-  experience_level:   'The seniority level here matches where you are in your career.',
-  industry_alignment: "This is in the kind of space you've been targeting.",
-  salary:             "The compensation looks aligned with what you're looking for.",
-  function_type:      "The type of work here fits the direction you've been moving.",
-  career_trajectory:  'This could be a natural next step from where you are now.',
+const SKILL_DISPLAY_NAMES = {
+  python:           'Python',
+  machine_learning: 'machine learning',
+  deep_learning:    'deep learning',
+  llm:              'LLM / generative AI',
+  nlp:              'NLP',
+  mlops:            'MLOps',
+  data_engineering: 'data engineering',
+  sql:              'SQL',
+  aws:              'cloud (AWS)',
+  kubernetes:       'Kubernetes',
+  docker:           'Docker / containerisation',
+  react:            'React',
+  typescript:       'TypeScript',
+  system_design:    'system design',
+  analytics:        'data analytics',
 }
 
-const GAP_ADVISOR = {
-  skills_match:       "You'd likely need to show stronger technical depth for this role.",
-  experience_level:   "The seniority bar here might be a stretch — worth addressing directly in your application.",
-  industry_alignment: "This leans into a space that's a bit outside your recent focus.",
-  salary:             "The compensation range here might be different from what you're targeting.",
-  function_type:      "This leans more toward a different function than your recent work.",
-  career_trajectory:  "The career direction here is a bit of a pivot from your current path.",
+function extractSeniority(title) {
+  const t = (title || '').toLowerCase()
+  if (t.includes('principal') || t.includes('staff')) return 'principal / staff'
+  if (t.includes('senior') || t.includes('sr.') || / sr /.test(t)) return 'senior'
+  if (t.includes('lead')) return 'lead'
+  if (t.includes('director')) return 'director'
+  if (t.includes('manager')) return 'manager'
+  if (t.includes('junior') || t.includes('jr.')) return 'junior'
+  return null
+}
+
+function buildFitBullets(job, topDims, detectedSkills) {
+  const sector    = job.sector
+  const seniority = extractSeniority(job.title)
+  const skill0    = SKILL_DISPLAY_NAMES[detectedSkills[0]] || null
+  const skill1    = SKILL_DISPLAY_NAMES[detectedSkills[1]] || null
+  const k         = n => Math.round(n / 1000)
+
+  return topDims.slice(0, 3).map(([key]) => {
+    switch (key) {
+      case 'skills_match':
+        if (skill0 && skill1) return `This role centres on ${skill0} and ${skill1} — both a strong match with your technical profile.`
+        if (skill0)           return `The ${skill0} focus here lines up well with your technical background.`
+        return 'Your technical skills line up with what this role requires.'
+
+      case 'experience_level':
+        if (seniority && sector) return `This is a ${seniority}-level role in ${sector} — the right level for where you are right now.`
+        if (seniority)           return `This is pitched at ${seniority} level, which fits your current experience.`
+        return 'The seniority level here is a good match for where you are in your career.'
+
+      case 'industry_alignment':
+        if (sector) return `This is in ${sector} — consistent with the space you've been targeting.`
+        return 'The industry here aligns with your recent focus.'
+
+      case 'salary':
+        if (job.salary_min && job.salary_max) return `The range ($${k(job.salary_min)}k–$${k(job.salary_max)}k) looks aligned with your target.`
+        return 'The compensation looks aligned with your target range.'
+
+      case 'function_type': {
+        const fn = job.title.split(/\s+/).slice(0, 4).join(' ')
+        return `The core work — ${fn} — fits the direction you've been moving toward.`
+      }
+
+      case 'career_trajectory':
+        if (seniority && sector) return `A ${seniority} role in ${sector} is a logical next step from where you are.`
+        if (seniority)           return `Moving into a ${seniority} role like this builds well on your current path.`
+        return 'This role builds on your current trajectory rather than pulling you sideways.'
+
+      default:
+        return 'This area aligns well with your background.'
+    }
+  })
+}
+
+function buildGapBullets(job, gaps, detectedSkills) {
+  const sector    = job.sector
+  const seniority = extractSeniority(job.title)
+  const k         = n => Math.round(n / 1000)
+
+  return gaps.map(({ key }) => {
+    switch (key) {
+      case 'skills_match': {
+        const named = detectedSkills.slice(0, 2).map(s => SKILL_DISPLAY_NAMES[s]).filter(Boolean)
+        if (named.length >= 2) return `This role requires ${named[0]} and ${named[1]} experience. If those aren't clearly on your profile, it's worth calling them out or building them up before applying.`
+        if (named.length === 1) return `This role requires solid ${named[0]} experience. If that's not front and centre on your profile, it's worth addressing.`
+        return 'There are specific technical requirements here that may not be visible on your current profile — worth reviewing before you apply.'
+      }
+
+      case 'experience_level':
+        if (seniority) return `This is pitched at ${seniority} level. If you're not quite there yet, lean into impact and outcomes rather than job titles.`
+        return 'The seniority bar here is worth being honest about — come in with strong examples of scope and ownership.'
+
+      case 'industry_alignment':
+        if (sector) return `Your background isn't primarily in ${sector}. That's not disqualifying, but you'd want to connect the dots clearly in your application.`
+        return "Your industry background is a bit of a mismatch here — worth making your relevance explicit in the cover note."
+
+      case 'salary':
+        if (job.salary_min && job.salary_max) return `The posted range ($${k(job.salary_min)}k–$${k(job.salary_max)}k) may be different from your target — worth checking before investing time.`
+        return "The compensation range here might differ from your target — worth checking the details first."
+
+      case 'function_type': {
+        const fn = job.title.split(/\s+/).slice(0, 3).join(' ')
+        return `This is primarily a ${fn} role. If that's a shift from your recent work, think through how you'd frame the transition.`
+      }
+
+      case 'career_trajectory':
+        return "This is a bit of a pivot from your recent direction. It can work, but you'd need a clear story for why you're making the move."
+
+      default:
+        return 'This is worth addressing before you apply.'
+    }
+  })
 }
 
 const COURSE_OUTCOMES = {
@@ -160,6 +254,8 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
   const gaps = buildGaps(job)
   const detectedSkills = detectSkillsFromText(job.description)
   const suggestedCourses = detectedSkills.map(s => SKILL_COURSES[s]).filter(Boolean).slice(0, 2)
+  const fitBullets = buildFitBullets(job, topDims, detectedSkills)
+  const gapBullets = buildGapBullets(job, gaps, detectedSkills)
 
   async function applyRating(newRating) {
     if (saving) return
@@ -262,19 +358,19 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
             {reasoning && (
               <p className="text-sm text-slate-700 leading-relaxed mb-3">{reasoning}</p>
             )}
-            {topDims.length > 0 && (
+            {fitBullets.length > 0 && (
               <div className="space-y-2">
-                {topDims.map(([key]) => (
-                  <div key={key} className="flex items-start gap-2">
+                {fitBullets.map((text, i) => (
+                  <div key={i} className="flex items-start gap-2">
                     <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-sm text-slate-700">{DIM_FIT_PHRASES[key] || 'This area aligns well with your background.'}</span>
+                    <span className="text-sm text-slate-700">{text}</span>
                   </div>
                 ))}
               </div>
             )}
-            {!reasoning && topDims.length === 0 && (
+            {!reasoning && fitBullets.length === 0 && (
               <p className="text-sm text-slate-400">Analysis in progress.</p>
             )}
           </div>
@@ -282,22 +378,21 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
           {/* 2. Where you might need to stretch */}
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Where you might need to stretch</p>
-            {gaps.length === 0 ? (
+            {gapBullets.length === 0 ? (
               Object.keys(job.dimension_scores || {}).length === 0
                 ? <p className="text-sm text-slate-400">Detailed breakdown not available for this role yet.</p>
-                : <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
-                    <svg className="w-4 h-4 text-green-600 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                : <div className="flex items-start gap-2">
+                    <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <p className="text-sm text-green-700">Nothing stands out as a major gap. You look well-positioned for this one.</p>
+                    <p className="text-sm text-slate-700">Nothing stands out as a major gap. You look well-positioned for this one.</p>
                   </div>
             ) : (
-              <div className="space-y-2.5">
-                {gaps.map(({ key, severe }) => (
-                  <div key={key} className={`rounded-xl p-3 border ${severe ? 'bg-rose-50 border-rose-100' : 'bg-amber-50 border-amber-100'}`}>
-                    <p className={`text-sm leading-relaxed ${severe ? 'text-rose-700' : 'text-amber-700'}`}>
-                      {GAP_ADVISOR[key] || 'This is an area worth addressing before you apply.'}
-                    </p>
+              <div className="space-y-2">
+                {gapBullets.map((text, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 mt-2" />
+                    <span className="text-sm text-slate-700 leading-relaxed">{text}</span>
                   </div>
                 ))}
               </div>
@@ -307,32 +402,25 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
           {/* 3. How to get closer to roles like this */}
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">How to get closer to roles like this</p>
-            {suggestedCourses.length > 0 ? (
-              <div className="space-y-2">
-                {suggestedCourses.map((course, i) => (
-                  <div key={i} className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
-                    <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-blue-700 truncate">{course.name}</p>
-                      <p className="text-xs text-blue-600 mt-0.5 leading-snug">{COURSE_OUTCOMES[course.skill] || ''}</p>
-                    </div>
+            <div className="space-y-2">
+              {suggestedCourses.map((course, i) => (
+                <div key={i} className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+                  <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-blue-700 truncate">{course.name}</p>
+                    <p className="text-xs text-blue-600 mt-0.5 leading-snug">{COURSE_OUTCOMES[course.skill] || ''}</p>
                   </div>
-                ))}
-                <p className="text-xs text-slate-400 pt-0.5">
-                  <a href="/feedback" className="text-violet-600 hover:underline font-medium">See all recommendations →</a>
-                </p>
-              </div>
-            ) : (
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                <p className="text-sm text-slate-500">
-                  Head to{' '}
-                  <a href="/feedback" className="text-violet-600 font-medium hover:underline">Feedback & Insights</a>
-                  {' '}to see learning recommendations based on your activity across all roles.
-                </p>
-              </div>
-            )}
+                </div>
+              ))}
+              {suggestedCourses.length === 0 && (
+                <p className="text-sm text-slate-500">No specific courses detected for this role.</p>
+              )}
+              <p className="text-xs text-slate-400 pt-0.5">
+                <a href="/feedback" className="text-violet-600 hover:underline font-medium">See all learning recommendations →</a>
+              </p>
+            </div>
           </div>
 
           {/* 5. People in your network */}
