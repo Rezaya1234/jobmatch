@@ -14,7 +14,7 @@ export default function About() {
         </p>
       </div>
 
-      <div className="prose prose-slate max-w-none space-y-10">
+      <div className="space-y-10">
         <section>
           <h2 className="text-xl font-bold text-slate-900 mb-3">Our mission</h2>
           <p className="text-slate-600 leading-relaxed">

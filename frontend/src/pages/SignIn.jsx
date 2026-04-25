@@ -27,8 +27,8 @@ export default function SignIn() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-5 py-16">
-      <div className="w-full max-w-sm">
+    <div className="px-5 py-16 max-w-sm mx-auto">
+      <div className="w-full">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Welcome back</h1>
           <p className="text-slate-500 text-sm">
