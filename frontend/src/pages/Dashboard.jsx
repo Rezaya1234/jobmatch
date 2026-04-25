@@ -405,9 +405,9 @@ function MatchFunnel({ matches, feedback }) {
   const i3 = Math.min(47, i2 + 4)                                       // right edge of stage 3
 
   const stages = [
-    { value: shown,            label: 'Jobs shown',   sub: null,                color: '#7c3aed', l: i0, r: i1 },
+    { value: shown,            label: 'Jobs shown',   sub: null,                color: '#c4b5fd', l: i0, r: i1 },
     { value: reacted,          label: 'Jobs opened',  sub: `${clickRate}% of shown`, color: '#8b5cf6', l: i1, r: i2 },
-    { value: liked + disliked, label: 'Reactions',    sub: `${likeRate}% of opened`, color: '#a78bfa', l: i2, r: i3 },
+    { value: liked + disliked, label: 'Reactions',    sub: `${likeRate}% of opened`, color: '#5b21b6', l: i2, r: i3 },
   ]
 
   return (
