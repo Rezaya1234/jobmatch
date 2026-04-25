@@ -212,13 +212,20 @@ const SKILL_COURSES = {
 // Parse job description into responsibilities + requirements sections
 // ---------------------------------------------------------------------------
 
+function stripHtml(html) {
+  if (!html) return ''
+  const withBreaks = html.replace(/<\/?(li|p|div|br|h[1-6]|tr)[^>]*>/gi, '\n')
+  const doc = new DOMParser().parseFromString(withBreaks, 'text/html')
+  return doc.body.textContent || ''
+}
+
 const _RESP_RE = /^(?:what you['']ll do|responsibilities|key responsibilities|your role|in this role|what you['']ll be doing|the role|day.to.day|what you['']ll own|what you['']ll build|role overview)/i
 const _REQ_RE  = /^(?:what you['']ll bring|requirements|qualifications|what we['']re looking for|you have|you bring|must.have|required|who you are|what you need|minimum qualifications|basic qualifications|about you|ideal candidate|your background|you offer)/i
 const _STOP_RE = /^(?:benefits|compensation|what we offer|perks|about us|about the company|our company|why join)/i
 
 function parseJobSections(description) {
   if (!description) return { responsibilities: [], requirements: [] }
-  const lines = description.split(/\n/).map(l => l.trim()).filter(Boolean)
+  const lines = stripHtml(description).split(/\n/).map(l => l.trim()).filter(Boolean)
   const resp = [], reqs = []
   let mode = null
   for (const line of lines) {
@@ -251,7 +258,7 @@ function findReqFor(requirements, dimension) {
 
 function detectSkillsFromText(text) {
   if (!text) return []
-  const lower = text.toLowerCase()
+  const lower = stripHtml(text).toLowerCase()
   return Object.entries(SKILL_KEYWORDS_JS)
     .filter(([, patterns]) => patterns.some(p => lower.includes(p)))
     .map(([skill]) => skill)

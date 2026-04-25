@@ -71,12 +71,21 @@ function ScoreBadge({ pct }) {
 // Extract a 1-2 line "What you'll do" snippet from the job description
 // ---------------------------------------------------------------------------
 
+function stripHtml(html) {
+  if (!html) return ''
+  // Convert block/list elements to newlines so structure is preserved
+  const withBreaks = html
+    .replace(/<\/?(li|p|div|br|h[1-6]|tr)[^>]*>/gi, '\n')
+  const doc = new DOMParser().parseFromString(withBreaks, 'text/html')
+  return doc.body.textContent || ''
+}
+
 const RESP_HEADER_RE = /^(?:what you['']ll do|responsibilities|key responsibilities|your role|in this role|what you['']ll be doing|the role|day.to.day|what you['']ll own|what you['']ll build|what you['']ll lead|role overview)/i
 const NEXT_SECTION_RE = /^(?:what you['']ll bring|requirements|qualifications|about us|benefits|who you are|you bring|you have|compensation|what we offer)/i
 
 function parseResponsibilities(description) {
   if (!description) return []
-  const lines = description.split(/\n/).map(l => l.trim()).filter(Boolean)
+  const lines = stripHtml(description).split(/\n/).map(l => l.trim()).filter(Boolean)
   let start = -1
   for (let i = 0; i < lines.length; i++) {
     const bare = lines[i].replace(/^[#*•\-:]+\s*/, '').trim()
@@ -104,8 +113,9 @@ function extractWhatYouDo(description) {
   }
   // Fallback: first substantive non-intro sentence
   if (!description) return null
+  const plain = stripHtml(description)
   const skipRe = /^(?:about us|about the company|who we are|we are|we['']re|our company|join us)/i
-  for (const sent of description.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/)) {
+  for (const sent of plain.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/)) {
     const clean = sent.trim()
     if (clean.length >= 40 && !skipRe.test(clean)) return clean.length > 150 ? clean.slice(0, 147) + '…' : clean
   }
