@@ -9,19 +9,33 @@ const DAYS_OPTIONS = [
   { value: 365, label: 'All time' },
 ]
 
-const LEARNING_STATUS_COLOR = {
-  'Early stage':          'bg-slate-100 text-slate-600',
-  'Building understanding': 'bg-amber-100 text-amber-700',
-  'Good understanding':   'bg-blue-100 text-blue-700',
-  'Strong understanding': 'bg-green-100 text-green-700',
+const LEARNING_STAGE_INDEX = {
+  'Early stage':            0,
+  'Building understanding': 1,
+  'Good understanding':     2,
+  'Strong understanding':   3,
 }
 
-const LEARNING_BAR_COLOR = {
-  'Early stage':          'bg-slate-400',
-  'Building understanding': 'bg-amber-400',
-  'Good understanding':   'bg-blue-500',
-  'Strong understanding': 'bg-green-500',
+const LEARNING_BADGE = {
+  'Early stage':            'bg-slate-100 text-slate-600',
+  'Building understanding': 'bg-amber-100 text-amber-700',
+  'Good understanding':     'bg-blue-100 text-blue-700',
+  'Strong understanding':   'bg-green-100 text-green-700',
 }
+
+const LEARNING_BAR_GRADIENT = {
+  'Early stage':            'from-slate-300 to-slate-400',
+  'Building understanding': 'from-amber-300 to-amber-500',
+  'Good understanding':     'from-blue-400 to-blue-600',
+  'Strong understanding':   'from-green-400 to-green-600',
+}
+
+const LEARNING_STAGES = [
+  { label: 'Early',    sub: '0 signals' },
+  { label: 'Building', sub: '5+ signals' },
+  { label: 'Good',     sub: '10+' },
+  { label: 'Strong',   sub: '20+' },
+]
 
 const EVENT_META = {
   thumbs_up:         { icon: '👍', label: 'Liked',            color: 'text-green-600 font-semibold' },
@@ -82,35 +96,68 @@ function SectionCard({ title, subtitle, children, action }) {
 // ---------------------------------------------------------------------------
 
 function LearningStatus({ status, progress, message, impact }) {
-  const statusCls = LEARNING_STATUS_COLOR[status] || 'bg-slate-100 text-slate-600'
-  const barCls = LEARNING_BAR_COLOR[status] || 'bg-slate-400'
+  const safeStatus = status || 'Early stage'
+  const safeProgress = progress || 0
+  const activeIndex = LEARNING_STAGE_INDEX[safeStatus] ?? 0
+  const badgeCls = LEARNING_BADGE[safeStatus] || 'bg-slate-100 text-slate-600'
+  const barGradient = LEARNING_BAR_GRADIENT[safeStatus] || 'from-slate-300 to-slate-400'
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5">
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-lg">🧠</span>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-sm font-semibold text-slate-800">Profile learning status</h2>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusCls}`}>{status}</span>
-          </div>
-          {impact && (
-            <p className="text-xs text-green-600 font-medium mt-0.5">{impact}</p>
-          )}
+
+      {/* Title row */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-base leading-none">🧠</span>
+          <h2 className="text-sm font-semibold text-slate-800">Your profile learning status</h2>
         </div>
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${badgeCls}`}>
+          {safeStatus}
+        </span>
       </div>
 
-      {/* Progress bar */}
-      <div className="mb-3">
-        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+      {/* Bar + stage markers */}
+      <div className="mb-4">
+        {/* Bar */}
+        <div className="h-3.5 bg-slate-100 rounded-full overflow-hidden mb-2">
           <div
-            className={`h-2 rounded-full transition-all duration-500 ${barCls}`}
-            style={{ width: `${progress}%` }}
+            className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-700`}
+            style={{ width: `${Math.max(safeProgress, 4)}%` }}
           />
         </div>
+
+        {/* Stage milestones */}
+        <div className="flex justify-between">
+          {LEARNING_STAGES.map((stage, i) => {
+            const isActive = i === activeIndex
+            const isPast   = i < activeIndex
+            return (
+              <div
+                key={i}
+                className={`flex flex-col gap-0.5 ${i === 0 ? 'items-start' : i === LEARNING_STAGES.length - 1 ? 'items-end' : 'items-center'}`}
+              >
+                <span className={`text-xs font-semibold ${isActive ? 'text-slate-800' : isPast ? 'text-slate-400' : 'text-slate-300'}`}>
+                  {stage.label}
+                </span>
+                <span className={`text-xs ${isActive ? 'text-slate-500' : isPast ? 'text-slate-300' : 'text-slate-200'}`}>
+                  {stage.sub}
+                </span>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      <p className="text-sm text-slate-600">{message}</p>
+      {/* Actionable message */}
+      <p className="text-sm font-medium text-slate-700">{message}</p>
+
+      {/* Impact message */}
+      {impact && (
+        <p className="flex items-center gap-1.5 text-xs text-green-600 font-medium mt-2">
+          <span className="text-green-500">↑</span>
+          {impact}
+        </p>
+      )}
     </div>
   )
 }
