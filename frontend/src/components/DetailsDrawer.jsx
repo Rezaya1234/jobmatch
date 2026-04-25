@@ -77,17 +77,16 @@ function buildWhyWorthIt(job) {
 
 function buildGaps(job) {
   const scores = job.dimension_scores || {}
-  const numeric = Object.entries(scores)
-    .filter(([, v]) => typeof v === 'number')
-    .sort(([, a], [, b]) => a - b)  // weakest first
-  if (numeric.length === 0) return []
-  // Always show up to 3 weakest dims; flag severity so the UI can style accordingly
-  return numeric.slice(0, 3).map(([key, val]) => ({
-    key,
-    label: DIM_LABELS[key] || key.replace(/_/g, ' '),
-    val,
-    severe: val < 0.65,
-  }))
+  return Object.entries(scores)
+    .filter(([, v]) => typeof v === 'number' && v < 0.75)
+    .sort(([, a], [, b]) => a - b)
+    .slice(0, 3)
+    .map(([key, val]) => ({
+      key,
+      label: DIM_LABELS[key] || key.replace(/_/g, ' '),
+      val,
+      severe: val < 0.60,
+    }))
 }
 
 export default function DetailsDrawer({ job, userId, currentRating, onClose, onFeedback }) {
@@ -238,7 +237,14 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">What might hold you back</p>
             {gaps.length === 0 ? (
-              <p className="text-sm text-slate-400">Score breakdown not available for this role yet.</p>
+              Object.keys(job.dimension_scores || {}).length === 0
+                ? <p className="text-sm text-slate-400">Score breakdown not available for this role yet.</p>
+                : <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
+                    <svg className="w-4 h-4 text-green-600 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-sm text-green-700 font-medium">No significant gaps — you're a strong candidate for this role.</p>
+                  </div>
             ) : (
               <div className="space-y-2.5">
                 {gaps.map(({ key, label, val, severe }) => (
