@@ -167,19 +167,10 @@ function LearningStatus({ status, progress, message, impact }) {
 // ---------------------------------------------------------------------------
 
 function InsightRow({ text }) {
-  const [main, action] = text.includes(' → ') ? text.split(' → ') : [text, null]
   return (
-    <div className="flex items-start gap-2 py-2 border-b border-slate-50 last:border-0">
-      <span className="text-violet-400 mt-0.5 shrink-0 text-sm">›</span>
-      <span className="text-sm text-slate-700 leading-snug">
-        {main}
-        {action && (
-          <>
-            <span className="text-slate-400"> → </span>
-            <span className="text-violet-700 font-medium">{action}</span>
-          </>
-        )}
-      </span>
+    <div className="flex items-start gap-2 py-1.5">
+      <span className="text-slate-300 mt-1 shrink-0 leading-none text-xs">•</span>
+      <span className="text-xs text-slate-500 leading-relaxed">{text}</span>
     </div>
   )
 }
@@ -434,14 +425,6 @@ export default function Feedback() {
             <SectionCard
               title="What we learned"
               subtitle="Patterns from your activity"
-              action={
-                <button
-                  onClick={() => navigate('/profile')}
-                  className="text-xs text-violet-600 hover:text-violet-700 font-medium whitespace-nowrap"
-                >
-                  Update filters →
-                </button>
-              }
             >
               {!(data.insights?.length) ? (
                 <p className="text-xs text-slate-400">Rate a few jobs to unlock personalized insights.</p>

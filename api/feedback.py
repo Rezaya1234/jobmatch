@@ -428,46 +428,51 @@ def _generate_insights(liked: list, disliked: list, total: int, liked_count: int
     if total == 0:
         return []
 
-    # Work mode — liked pattern
-    liked_modes = Counter(j.work_mode for j in liked if j.work_mode)
-    if liked_modes and liked:
-        top_mode, top_count = liked_modes.most_common(1)[0]
-        mode_pct = round(top_count / len(liked) * 100)
-        mode_label = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}.get(top_mode, top_mode.title())
-        if mode_pct >= 60:
-            insights.append(f"{mode_pct}% of your liked roles are {mode_label} → set {mode_label} as your required work mode to cut noise")
+    MODE_LABEL = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}
 
-    # Work mode — disliked pattern
+    # Strongest skipped-mode signal first (most striking data point)
     disliked_modes = Counter(j.work_mode for j in disliked if j.work_mode)
     if disliked_modes and disliked:
         top_dis, dis_count = disliked_modes.most_common(1)[0]
-        dis_pct = round(dis_count / len(disliked) * 100)
-        dis_label = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}.get(top_dis, top_dis.title())
+        dis_pct = round(dis_count / max(len(disliked), 1) * 100)
+        dl = MODE_LABEL.get(top_dis, top_dis.title())
         if dis_pct >= 50 and dis_count >= 2:
-            insights.append(f"You consistently skip {dis_label} roles → filter them out in Profile to reduce noise")
+            insights.append(f"{dis_pct}% of roles you skipped were {dl}")
 
-    # Sector — liked pattern
+    # Liked work mode
+    liked_modes = Counter(j.work_mode for j in liked if j.work_mode)
+    if liked_modes and liked:
+        top_mode, top_count = liked_modes.most_common(1)[0]
+        mode_pct = round(top_count / max(len(liked), 1) * 100)
+        ml = MODE_LABEL.get(top_mode, top_mode.title())
+        if mode_pct >= 60:
+            insights.append(f"{mode_pct}% of roles you liked were {ml}")
+
+    # Sector concentration
     liked_sectors = Counter(j.sector for j in liked if j.sector)
     if liked_sectors and liked_sectors.most_common(1)[0][1] >= 2:
-        top_sector, sector_count = liked_sectors.most_common(1)[0]
-        sector_pct = round(sector_count / max(len(liked), 1) * 100)
-        insights.append(f"You engage most with {top_sector} roles ({sector_pct}% of likes) → add it to your preferred sectors")
+        top_sector, sec_count = liked_sectors.most_common(1)[0]
+        sec_pct = round(sec_count / max(len(liked), 1) * 100)
+        insights.append(f"{sec_pct}% of your liked roles are in {top_sector}")
 
-    # Company size — liked pattern
+    # Company size concentration
     liked_sizes = Counter(j.company_size for j in liked if j.company_size)
     if liked_sizes and liked_sizes.most_common(1)[0][1] >= 2:
-        top_size = liked_sizes.most_common(1)[0][0]
-        size_labels = {"startup": "startups", "small": "small companies", "medium": "mid-size companies", "large": "large companies"}
-        insights.append(f"Most of your liked roles are at {size_labels.get(top_size, top_size)} → update company size preference")
+        top_size, size_count = liked_sizes.most_common(1)[0]
+        size_pct = round(size_count / max(len(liked), 1) * 100)
+        size_label = {"startup": "startups", "small": "small companies",
+                      "medium": "mid-size companies", "large": "large companies"}.get(top_size, top_size)
+        insights.append(f"{size_pct}% of your liked roles are at {size_label}")
 
-    # Approval rate framing
+    # Approval rate — only when notably high or low
     rate = round(liked_count / total * 100) if total else 0
-    if rate >= 70:
-        insights.append(f"{rate}% approval rate — your filters are well-calibrated")
-    elif rate <= 25 and total >= 5:
-        insights.append(f"Only {rate}% approval — try widening your search criteria or updating your profile")
+    if total >= 5:
+        if rate >= 70:
+            insights.append(f"You've approved {rate}% of rated roles")
+        elif rate <= 25:
+            insights.append(f"You've approved only {rate}% of rated roles")
 
-    return insights[:5]
+    return insights[:3]
 
 
 def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) -> list[NextStep]:
