@@ -64,6 +64,14 @@ function Skeleton({ className }) {
   return <div className={`animate-pulse bg-slate-100 rounded-lg ${className}`} />
 }
 
+function SectionLabel({ children }) {
+  return (
+    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
+      {children}
+    </p>
+  )
+}
+
 function MetricCard({ icon, label, value, color }) {
   const styles = {
     green:  'bg-green-50 border-green-200',
@@ -72,7 +80,7 @@ function MetricCard({ icon, label, value, color }) {
     violet: 'bg-violet-50 border-violet-200',
   }
   return (
-    <div className={`rounded-xl border p-4 flex flex-col gap-2 ${styles[color]}`}>
+    <div className={`rounded-xl border shadow-sm p-4 flex flex-col gap-2 ${styles[color]}`}>
       <span className="text-xl leading-none">{icon}</span>
       <span className="text-2xl font-bold text-slate-900">{value}</span>
       <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</span>
@@ -82,7 +90,7 @@ function MetricCard({ icon, label, value, color }) {
 
 function SectionCard({ title, subtitle, children, action }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
       <div className="flex items-start justify-between mb-1">
         <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
         {action}
@@ -99,16 +107,15 @@ function SectionCard({ title, subtitle, children, action }) {
 // ---------------------------------------------------------------------------
 
 function LearningStatus({ status, progress, message, impact }) {
-  const safeStatus = status || 'Early stage'
+  const safeStatus   = status || 'Early stage'
   const safeProgress = progress || 0
-  const activeIndex = LEARNING_STAGE_INDEX[safeStatus] ?? 0
-  const badgeCls = LEARNING_BADGE[safeStatus] || 'bg-slate-100 text-slate-600'
-  const barGradient = LEARNING_BAR_GRADIENT[safeStatus] || 'from-slate-300 to-slate-400'
+  const activeIndex  = LEARNING_STAGE_INDEX[safeStatus] ?? 0
+  const badgeCls     = LEARNING_BADGE[safeStatus] || 'bg-slate-100 text-slate-600'
+  const barGradient  = LEARNING_BAR_GRADIENT[safeStatus] || 'from-slate-300 to-slate-400'
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
 
-      {/* Title row */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-base leading-none">🧠</span>
@@ -119,7 +126,6 @@ function LearningStatus({ status, progress, message, impact }) {
         </span>
       </div>
 
-      {/* Bar + stage markers */}
       <div className="mb-4">
         <div className="h-3.5 bg-slate-100 rounded-full overflow-hidden mb-2">
           <div
@@ -157,6 +163,10 @@ function LearningStatus({ status, progress, message, impact }) {
           {impact}
         </p>
       )}
+
+      <p className="text-xs text-slate-400 mt-3">
+        We continuously update your recommendations as you provide feedback.
+      </p>
     </div>
   )
 }
@@ -186,6 +196,7 @@ const CATEGORY_STYLE = {
 
 function NextStepCard({ index, step }) {
   const text     = typeof step === 'string' ? step : step.text
+  const subtext  = typeof step === 'string' ? null  : (step.subtext || null)
   const category = typeof step === 'string' ? null  : step.category
   const styles   = CATEGORY_STYLE[category] || { badge: 'bg-slate-100 text-slate-500', bar: 'bg-slate-400' }
 
@@ -201,6 +212,9 @@ function NextStepCard({ index, step }) {
           </span>
         )}
         <p className="text-sm text-slate-800 leading-snug font-medium">{text}</p>
+        {subtext && (
+          <p className="text-xs text-slate-400 mt-0.5 leading-snug">{subtext}</p>
+        )}
       </div>
     </div>
   )
@@ -216,21 +230,20 @@ function CourseCard({ course }) {
       href={course.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block rounded-xl border border-slate-200 p-4 hover:shadow-md hover:border-violet-200 transition-all duration-150 bg-white"
+      className="block rounded-xl border border-slate-200 p-4 hover:shadow-md hover:border-blue-200 transition-all duration-150 bg-white"
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
+      <div className="flex items-start justify-between gap-2 mb-2">
         <h4 className="text-sm font-semibold text-slate-900 leading-snug">{course.title}</h4>
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${LEVEL_STYLE[course.level] || 'bg-slate-100 text-slate-500'}`}>
           {course.level}
         </span>
       </div>
-      <p className="text-xs text-slate-500 mb-2 line-clamp-2">{course.description}</p>
       {course.gap_reason && (
-        <p className="text-xs text-violet-600 mb-2 font-medium">{course.gap_reason}</p>
+        <p className="text-xs text-blue-600 mb-3 font-medium leading-snug">{course.gap_reason}</p>
       )}
       <div className="flex items-center justify-between">
         <span className="text-xs text-slate-400">{course.provider}</span>
-        <span className="text-xs text-violet-600 font-medium">View →</span>
+        <span className="text-xs text-blue-600 font-semibold">View →</span>
       </div>
     </a>
   )
@@ -271,27 +284,27 @@ function PreferencesPanel({ prefs, navigate }) {
 
   const modeLabels = { remote: 'Remote', hybrid: 'Hybrid', onsite: 'On-site' }
   const sizeLabels = { startup: 'Startup', small: 'Small', medium: 'Mid-size', large: 'Large' }
-  const workModes = (prefs.work_modes || []).map(m => modeLabels[m] || m)
-  const seniority = prefs.seniority_level ? [prefs.seniority_level] : []
-  const sectors = prefs.preferred_sectors || []
-  const sizes = (prefs.preferred_company_sizes || []).map(s => sizeLabels[s] || s)
-  const locations = prefs.locations || []
-  const titleInclude = (prefs.title_include || []).map(t => `+${t}`)
-  const titleExclude = prefs.title_exclude || []
-  const salaryChips = prefs.salary_min
+  const workModes     = (prefs.work_modes || []).map(m => modeLabels[m] || m)
+  const seniority     = prefs.seniority_level ? [prefs.seniority_level] : []
+  const sectors       = prefs.preferred_sectors || []
+  const sizes         = (prefs.preferred_company_sizes || []).map(s => sizeLabels[s] || s)
+  const locations     = prefs.locations || []
+  const titleInclude  = (prefs.title_include || []).map(t => `+${t}`)
+  const titleExclude  = prefs.title_exclude || []
+  const salaryChips   = prefs.salary_min
     ? [`${prefs.salary_currency || 'USD'} ${Math.round(prefs.salary_min / 1000)}k+`]
     : []
 
   return (
     <div>
-      <PrefGroup label="Work mode" chips={workModes} />
-      <PrefGroup label="Seniority" chips={seniority} />
-      <PrefGroup label="Industries" chips={sectors} />
-      <PrefGroup label="Company size" chips={sizes} />
-      <PrefGroup label="Locations" chips={locations} />
-      <PrefGroup label="Title must include" chips={titleInclude} />
-      <PrefGroup label="Title must exclude" chips={titleExclude} muted />
-      <PrefGroup label="Salary" chips={salaryChips} />
+      <PrefGroup label="Work mode"          chips={workModes} />
+      <PrefGroup label="Seniority"           chips={seniority} />
+      <PrefGroup label="Industries"          chips={sectors} />
+      <PrefGroup label="Company size"        chips={sizes} />
+      <PrefGroup label="Locations"           chips={locations} />
+      <PrefGroup label="Title must include"  chips={titleInclude} />
+      <PrefGroup label="Title must exclude"  chips={titleExclude} muted />
+      <PrefGroup label="Salary"              chips={salaryChips} />
       <button
         onClick={() => navigate('/profile')}
         className="mt-1 text-xs text-violet-600 hover:text-violet-700 font-medium"
@@ -307,8 +320,8 @@ function PreferencesPanel({ prefs, navigate }) {
 // ---------------------------------------------------------------------------
 
 function toDayLabel(dateStr) {
-  const now = new Date()
-  const d   = new Date(dateStr)
+  const now       = new Date()
+  const d         = new Date(dateStr)
   const yesterday = new Date(now)
   yesterday.setDate(yesterday.getDate() - 1)
   const weekAgo = new Date(now)
@@ -320,8 +333,7 @@ function toDayLabel(dateStr) {
   return 'Older'
 }
 
-// Merge multiple events for the same job into one row.
-// Input is newest-first; the first occurrence is kept as the anchor.
+// Merge multiple events for the same job into one row (newest-first input).
 function collapseActivity(items) {
   const seenKeys = new Map()
   const result   = []
@@ -348,11 +360,8 @@ function collapseActivity(items) {
     if (hasLiked && hasDisliked) {
       const firstDislikedIdx = evts.findIndex(e => DISLIKED_TYPES.has(e))
       const firstLikedIdx    = evts.findIndex(e => LIKED_TYPES.has(e))
-      // newer-first list: smaller index = more recent
-      // if dislike is more recent than like → user liked first then disliked
-      const combinedLabel = firstDislikedIdx < firstLikedIdx
-        ? 'Liked, then Disliked'
-        : 'Disliked, then Liked'
+      // newer-first: smaller index = more recent → if dislike is more recent, user liked first
+      const combinedLabel = firstDislikedIdx < firstLikedIdx ? 'Liked, then Disliked' : 'Disliked, then Liked'
       return { ...entry, _combined: true, _combinedLabel: combinedLabel }
     }
     return entry
@@ -409,10 +418,10 @@ function generatePatternHint(allActivity) {
 // Activity row
 // ---------------------------------------------------------------------------
 
-function ActivityRow({ item }) {
-  const meta       = EVENT_META[item.event_type] || { icon: '•', label: item.event_type, color: 'text-slate-400' }
-  const timeStr    = new Date(item.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-  const hasJob     = item.job_title || item.company
+function ActivityRow({ item, isRecent }) {
+  const meta    = EVENT_META[item.event_type] || { icon: '•', label: item.event_type, color: 'text-slate-400' }
+  const timeStr = new Date(item.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const hasJob  = item.job_title || item.company
 
   let actionEl
   if (item._combined) {
@@ -423,21 +432,19 @@ function ActivityRow({ item }) {
       </span>
     )
   } else {
-    actionEl = (
-      <span className={`font-semibold ${meta.color}`}>{meta.label}</span>
-    )
+    actionEl = <span className={`font-semibold ${meta.color}`}>{meta.label}</span>
   }
 
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-slate-50 last:border-0">
-      <span className="text-base leading-none mt-0.5 shrink-0">{meta.icon}</span>
-      <div className="flex-1 min-w-0 text-sm">
+    <div className={`flex items-start gap-3 py-2 border-b border-slate-50 last:border-0 rounded-lg transition-colors ${isRecent ? 'bg-slate-50 px-2 -mx-2' : ''}`}>
+      <span className="text-sm leading-none mt-0.5 shrink-0">{meta.icon}</span>
+      <div className="flex-1 min-w-0 text-xs">
         {actionEl}
         {item.job_title && <span className="font-semibold text-slate-800"> · {item.job_title}</span>}
         {item.company   && <span className="font-normal text-slate-400"> @ {item.company}</span>}
         {!hasJob        && <span className="text-slate-400"> — no details</span>}
       </div>
-      <span className="text-xs text-slate-400 shrink-0 whitespace-nowrap">{timeStr}</span>
+      <span className="text-[11px] text-slate-300 shrink-0 whitespace-nowrap">{timeStr}</span>
     </div>
   )
 }
@@ -459,11 +466,11 @@ function ActivitySection({ allActivity }) {
     ? raw.filter(a => DISLIKED_TYPES.has(a.event_type))
     : raw
 
-  const collapsed    = collapseActivity(filtered)
-  const visible      = showAll ? collapsed : collapsed.slice(0, ACTIVITY_LIMIT)
-  const grouped      = groupByDay(visible)
-  const patternHint  = generatePatternHint(raw)
-  const hasMore      = collapsed.length > ACTIVITY_LIMIT
+  const collapsed   = collapseActivity(filtered)
+  const visible     = showAll ? collapsed : collapsed.slice(0, ACTIVITY_LIMIT)
+  const grouped     = groupByDay(visible)
+  const patternHint = generatePatternHint(raw)
+  const hasMore     = collapsed.length > ACTIVITY_LIMIT
 
   const FilterBtn = ({ val, label }) => (
     <button
@@ -477,6 +484,8 @@ function ActivitySection({ allActivity }) {
       {label}
     </button>
   )
+
+  let recentCount = 0
 
   return (
     <SectionCard
@@ -501,12 +510,13 @@ function ActivitySection({ allActivity }) {
           <div>
             {grouped.map(group => (
               <div key={group.label}>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide pt-3 pb-1 first:pt-0">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest pt-3 pb-1 first:pt-0">
                   {group.label}
                 </p>
-                {group.items.map((item, i) => (
-                  <ActivityRow key={`${item.created_at}-${i}`} item={item} />
-                ))}
+                {group.items.map((item, i) => {
+                  const isRecent = recentCount++ < 2
+                  return <ActivityRow key={`${item.created_at}-${i}`} item={item} isRecent={isRecent} />
+                })}
               </div>
             ))}
           </div>
@@ -566,7 +576,7 @@ export default function Feedback() {
   const extraCourses     = (data?.all_courses?.length || 0) - (data?.courses?.length || 0)
 
   return (
-    <div className="space-y-5 max-w-5xl">
+    <div className="space-y-6 max-w-5xl">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -574,13 +584,21 @@ export default function Feedback() {
           <h1 className="text-xl font-bold text-slate-900">Feedback</h1>
           <p className="text-sm text-slate-500 mt-0.5">Your activity is shaping better job recommendations</p>
         </div>
-        <select
-          value={days}
-          onChange={e => setDays(Number(e.target.value))}
-          className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400"
-        >
-          {DAYS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/positions')}
+            className="text-sm font-semibold bg-violet-600 text-white px-4 py-2 rounded-lg hover:bg-violet-700 active:bg-violet-800 transition-colors shadow-sm"
+          >
+            Explore better matches
+          </button>
+          <select
+            value={days}
+            onChange={e => setDays(Number(e.target.value))}
+            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+          >
+            {DAYS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -588,7 +606,7 @@ export default function Feedback() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}
           </div>
-          <Skeleton className="h-28" />
+          <Skeleton className="h-36" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Skeleton className="h-48" />
             <Skeleton className="h-48" />
@@ -616,70 +634,87 @@ export default function Feedback() {
             impact={data.impact_message}
           />
 
-          {/* ── What we learned + What to do next ── */}
+          {/* ── Insights + Actions ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SectionCard title="What we learned" subtitle="Patterns from your activity">
-              {!(data.insights?.length) ? (
-                <p className="text-xs text-slate-400">Rate a few jobs to unlock personalized insights.</p>
-              ) : (
-                <div>
-                  {data.insights.map((text, i) => <InsightRow key={i} text={text} />)}
-                </div>
-              )}
-            </SectionCard>
+            <div>
+              <SectionLabel>Insights</SectionLabel>
+              <SectionCard title="What we learned" subtitle="Patterns from your activity">
+                {!(data.insights?.length) ? (
+                  <p className="text-xs text-slate-400">Rate a few jobs to unlock personalized insights.</p>
+                ) : (
+                  <div>
+                    {data.insights.map((text, i) => <InsightRow key={i} text={text} />)}
+                  </div>
+                )}
+              </SectionCard>
+            </div>
 
-            <SectionCard title="🎯 What to do next" subtitle="Your highest-impact next actions">
-              {!(data.next_steps?.length) ? (
-                <p className="text-xs text-slate-400">
-                  {data.feedback_count === 0
-                    ? 'Rate jobs from the Open Positions tab to get personalised next steps.'
-                    : 'Keep rating jobs — next steps will appear once patterns emerge.'}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {data.next_steps.map((step, i) => <NextStepCard key={i} index={i} step={step} />)}
-                </div>
-              )}
-            </SectionCard>
+            <div>
+              <SectionLabel>Actions</SectionLabel>
+              <SectionCard title="🎯 What to do next" subtitle="Your highest-impact next actions">
+                {!(data.next_steps?.length) ? (
+                  <p className="text-xs text-slate-400">
+                    {data.feedback_count === 0
+                      ? 'Rate jobs from the Open Positions tab to get personalised next steps.'
+                      : 'Keep rating jobs — next steps will appear once patterns emerge.'}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.next_steps.map((step, i) => <NextStepCard key={i} index={i} step={step} />)}
+                  </div>
+                )}
+              </SectionCard>
+            </div>
           </div>
 
           {/* ── Course recommendations + Preferences ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SectionCard title="Ways to improve your matches" subtitle="Skill gaps in roles you engage with">
-              {!displayedCourses || displayedCourses.length === 0 ? (
-                <p className="text-xs text-slate-400">Like a few jobs to get personalised course recommendations.</p>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {displayedCourses.map(c => <CourseCard key={c.id} course={c} />)}
-                  </div>
-                  {!showAllCourses && extraCourses > 0 && (
-                    <button
-                      onClick={() => setShowAllCourses(true)}
-                      className="mt-3 text-xs text-violet-600 hover:text-violet-700 font-medium"
-                    >
-                      View {extraCourses} more course{extraCourses !== 1 ? 's' : ''} →
-                    </button>
-                  )}
-                  {showAllCourses && (
-                    <button
-                      onClick={() => setShowAllCourses(false)}
-                      className="mt-3 text-xs text-slate-400 hover:text-slate-600 font-medium"
-                    >
-                      Show less
-                    </button>
-                  )}
-                </>
-              )}
-            </SectionCard>
+            <div>
+              <SectionLabel>Improvement</SectionLabel>
+              <SectionCard title="Ways to improve your matches" subtitle="Skill gaps in roles you engage with">
+                {!displayedCourses || displayedCourses.length === 0 ? (
+                  <p className="text-xs text-slate-400">Like a few jobs to get personalised course recommendations.</p>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      {displayedCourses.map(c => <CourseCard key={c.id} course={c} />)}
+                    </div>
+                    {!showAllCourses && extraCourses > 0 && (
+                      <button
+                        onClick={() => setShowAllCourses(true)}
+                        className="mt-3 text-xs text-violet-600 hover:text-violet-700 font-medium"
+                      >
+                        View {extraCourses} more course{extraCourses !== 1 ? 's' : ''} →
+                      </button>
+                    )}
+                    {showAllCourses && (
+                      <button
+                        onClick={() => setShowAllCourses(false)}
+                        className="mt-3 text-xs text-slate-400 hover:text-slate-600 font-medium"
+                      >
+                        Show less
+                      </button>
+                    )}
+                  </>
+                )}
+              </SectionCard>
+            </div>
 
-            <SectionCard title="Your preferences (inferred)" subtitle="Based on your profile and activity">
-              <PreferencesPanel prefs={data.preferences} navigate={navigate} />
-            </SectionCard>
+            <div>
+              <SectionLabel>&nbsp;</SectionLabel>
+              <SectionCard title="Your preferences (inferred)" subtitle="Based on your behavior and profile">
+                <PreferencesPanel prefs={data.preferences} navigate={navigate} />
+              </SectionCard>
+            </div>
           </div>
 
           {/* ── Recent activity ── */}
           <ActivitySection key={days} allActivity={data?.all_activity} />
+
+          {/* ── Motivational footer ── */}
+          <p className="text-center text-xs text-slate-400 pb-2">
+            You're focusing on the right opportunities — keep going.
+          </p>
         </>
       )}
     </div>

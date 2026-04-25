@@ -143,7 +143,7 @@ def course_gap_reason(course: Course, gaps: list[str], skill_counts: Counter[str
         count = skill_counts.get(top_gap, 0)
         pct = round(count / total_liked * 100)
         if pct > 0:
-            return f"Covers {label} — present in ~{pct}% of roles you liked"
+            return f"Adding {label} skills can unlock ~{pct}% more relevant roles"
     return f"Covers {label} — a skill gap in roles you engage with"
 
 

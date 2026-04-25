@@ -223,6 +223,7 @@ class ActivityItem(BaseModel):
 
 class NextStep(BaseModel):
     text: str
+    subtext: str = ""
     category: str   # "Filter optimization" | "Skill improvement" | "Focus strategy"
 
 
@@ -435,30 +436,25 @@ def _generate_insights(liked: list, disliked: list, total: int, liked_count: int
     liked_sizes    = Counter(j.company_size for j in liked    if j.company_size)
 
     # --- Contrast: same work mode dominates both liked and disliked ---
-    # e.g. "You prefer On-site roles but also skip many On-site opportunities"
     contrast: str | None = None
     if liked_modes and disliked_modes and liked and disliked:
-        top_lk_mode = liked_modes.most_common(1)[0][0]
+        top_lk_mode  = liked_modes.most_common(1)[0][0]
         top_dis_mode = disliked_modes.most_common(1)[0][0]
         lk_pct  = round(liked_modes[top_lk_mode]    / max(len(liked),    1) * 100)
         dis_pct = round(disliked_modes[top_dis_mode] / max(len(disliked), 1) * 100)
         if top_lk_mode == top_dis_mode and lk_pct >= 50 and dis_pct >= 40:
-            ml = MODE_LABEL.get(top_lk_mode, top_lk_mode.title())
-            contrast = (
-                f"You prefer {ml} roles but also skip many {ml} opportunities — "
-                f"this suggests inconsistency in filtering or role quality"
-            )
+            contrast = "Your preferences vary across roles — refining your filters can improve match quality"
 
     # --- Individual observations ---
     obs: list[str] = []
 
-    # Skipped work mode (most striking negative signal)
+    # Skipped work mode
     if disliked_modes and disliked:
         top_dis, dis_count = disliked_modes.most_common(1)[0]
         dis_pct = round(dis_count / max(len(disliked), 1) * 100)
         dl = MODE_LABEL.get(top_dis, top_dis.title())
         if dis_pct >= 50 and dis_count >= 2:
-            obs.append(f"{dis_pct}% of roles you skipped were {dl} roles")
+            obs.append(f"You skip most {dl} roles ({dis_pct}%)")
 
     # Liked work mode
     if liked_modes and liked:
@@ -466,13 +462,13 @@ def _generate_insights(liked: list, disliked: list, total: int, liked_count: int
         mode_pct = round(top_count / max(len(liked), 1) * 100)
         ml = MODE_LABEL.get(top_mode, top_mode.title())
         if mode_pct >= 60:
-            obs.append(f"{mode_pct}% of roles you liked were {ml} roles")
+            obs.append(f"You tend to like {ml} roles ({mode_pct}%)")
 
     # Sector concentration
     if liked_sectors and liked_sectors.most_common(1)[0][1] >= 2:
         top_sector, sec_count = liked_sectors.most_common(1)[0]
         sec_pct = round(sec_count / max(len(liked), 1) * 100)
-        obs.append(f"{sec_pct}% of your liked roles are in {top_sector}")
+        obs.append(f"Most liked roles are in {top_sector} ({sec_pct}%)")
 
     # Company size concentration
     if liked_sizes and liked_sizes.most_common(1)[0][1] >= 2:
@@ -480,7 +476,7 @@ def _generate_insights(liked: list, disliked: list, total: int, liked_count: int
         size_pct = round(size_count / max(len(liked), 1) * 100)
         size_label = {"startup": "startups", "small": "small companies",
                       "medium": "mid-size companies", "large": "large companies"}.get(top_size, top_size)
-        obs.append(f"{size_pct}% of your liked roles are at {size_label}")
+        obs.append(f"You lean toward {size_label} ({size_pct}%)")
 
     # Approval rate — only when notably high or low
     rate = round(liked_count / total * 100) if total else 0
@@ -488,9 +484,8 @@ def _generate_insights(liked: list, disliked: list, total: int, liked_count: int
         if rate >= 70:
             obs.append(f"You've approved {rate}% of rated roles")
         elif rate <= 25:
-            obs.append(f"You've approved only {rate}% of rated roles")
+            obs.append(f"Only {rate}% of rated roles approved — your filters may need adjusting")
 
-    # If contrast fires: show max 2 individual obs + contrast = 3 total
     if contrast:
         return obs[:2] + [contrast]
     return obs[:3]
@@ -519,7 +514,8 @@ def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) 
         ml = MODE_LABEL.get(top_mode, top_mode.title())
         if top_pct >= 60 and top_mode not in current_modes:
             candidates.append(NextStep(
-                text=f"Filter to {ml} roles only — {top_pct}% of your liked jobs are {ml}",
+                text=f"Focus on {ml} roles to see better matches",
+                subtext=f"{top_pct}% of your liked jobs are {ml}",
                 category="Filter optimization",
             ))
 
@@ -530,7 +526,8 @@ def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) 
         if dis_pct >= 50 and dis_count >= 2:
             dl = MODE_LABEL.get(top_dis, top_dis.title())
             candidates.append(NextStep(
-                text=f"Filter out {dl} roles — they make up {dis_pct}% of jobs you skip",
+                text=f"Filter out {dl} roles to reduce noise",
+                subtext=f"{dis_pct}% of jobs you skip are {dl}",
                 category="Filter optimization",
             ))
 
@@ -541,7 +538,8 @@ def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) 
         current_sectors = (profile.preferred_sectors if profile else None) or []
         if top_sector not in current_sectors:
             candidates.append(NextStep(
-                text=f"Focus on {top_sector} roles — {sec_pct}% of your liked jobs are in this sector",
+                text=f"Focus your search on {top_sector}",
+                subtext=f"{sec_pct}% of your liked jobs are in this sector",
                 category="Focus strategy",
             ))
 
@@ -556,7 +554,8 @@ def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) 
             current_seniority = (profile.seniority_level if profile else None) or ""
             if not current_seniority or current_seniority in ("junior", "mid", "unknown"):
                 candidates.append(NextStep(
-                    text=f"Focus on Senior / Lead roles — {sen_pct}% of your liked jobs are at this level",
+                    text="Target Senior / Lead roles",
+                    subtext=f"{sen_pct}% of your liked jobs are at this level",
                     category="Focus strategy",
                 ))
 
@@ -565,30 +564,31 @@ def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) 
         g = gaps[0]
         label = gap_reason(g)
         pct = round(skill_counts.get(g, 0) / total_liked * 100) if liked else 0
-        text = (
-            f"Add {label} skills — required in ~{pct}% of roles you engage with"
-            if pct >= 10 else
-            f"Add {label} skills — a gap in roles you consistently like"
-        )
-        candidates.append(NextStep(text=text, category="Skill improvement"))
+        subtext = f"Required in ~{pct}% of roles you engage with" if pct >= 10 else "A gap in roles you consistently like"
+        candidates.append(NextStep(
+            text=f"Add {label} skills to unlock more relevant roles",
+            subtext=subtext,
+            category="Skill improvement",
+        ))
 
     # 6. Skill improvement: second gap (fills slot if we have room)
     if len(gaps) > 1 and len(candidates) < 3:
         g2 = gaps[1]
         label2 = gap_reason(g2)
         pct2 = round(skill_counts.get(g2, 0) / total_liked * 100) if liked else 0
-        text2 = (
-            f"Add {label2} skills — present in ~{pct2}% of roles you engage with"
-            if pct2 >= 10 else
-            f"Build {label2} skills — seen in roles you like but missing from your profile"
-        )
-        candidates.append(NextStep(text=text2, category="Skill improvement"))
+        subtext2 = f"Present in ~{pct2}% of roles you engage with" if pct2 >= 10 else "Seen in roles you like but missing from your profile"
+        candidates.append(NextStep(
+            text=f"Build {label2} skills",
+            subtext=subtext2,
+            category="Skill improvement",
+        ))
 
     # 7. Filter: low approval rate (last resort)
     total_rated = len(liked) + len(disliked)
     if total_rated >= 5 and len(liked) / total_rated < 0.35 and len(candidates) < 3:
         candidates.append(NextStep(
-            text="Reset your filters — your low approval rate suggests your match criteria need updating",
+            text="Revisit your match filters",
+            subtext="Your approval rate suggests your criteria need updating",
             category="Filter optimization",
         ))
 
