@@ -41,99 +41,112 @@ function extractSeniority(title) {
   return null
 }
 
-function buildFitBullets(job, topDims, detectedSkills, requirements) {
+function buildFitBullets(job, topDims, detectedSkills, requirements, profile) {
   const sector    = job.sector
   const seniority = extractSeniority(job.title)
   const skill0    = SKILL_DISPLAY_NAMES[detectedSkills[0]] || null
   const skill1    = SKILL_DISPLAY_NAMES[detectedSkills[1]] || null
   const k         = n => Math.round(n / 1000)
+  const yrs       = profile?.years_experience
+  const lvl       = profile?.seniority_level
 
   return topDims.slice(0, 3).map(([key]) => {
     const reqText = findReqFor(requirements, key)
 
     switch (key) {
       case 'skills_match':
-        if (reqText) return `They're looking for ${trim80(reqText)} — that lines up well with your technical background.`
-        if (skill0 && skill1) return `This role centres on ${skill0} and ${skill1} — both a strong match with your technical profile.`
-        if (skill0)           return `The ${skill0} focus here lines up well with your technical background.`
-        return 'Your technical skills line up with what this role requires.'
+        if (reqText && skill0) return `They need ${trim80(reqText).toLowerCase()} — your ${skill0} background covers this.`
+        if (reqText)           return `They need ${trim80(reqText).toLowerCase()} — your background covers this.`
+        if (skill0 && skill1)  return `This role centres on ${skill0} and ${skill1} — your profile covers both.`
+        if (skill0)            return `The ${skill0} focus here is a direct match with your background.`
+        return 'Your technical skills are a solid match for what this role requires.'
 
       case 'experience_level':
-        if (reqText) return `${trim80(reqText)} — that fits where you are right now.`
-        if (seniority && sector) return `This is a ${seniority}-level role in ${sector} — the right level for where you are right now.`
-        if (seniority)           return `This is pitched at ${seniority} level, which fits your current experience.`
-        return 'The seniority level here is a good match for where you are in your career.'
+        if (reqText && yrs) return `They ask for ${trim80(reqText).toLowerCase()} — you have ${yrs} years, which covers that.`
+        if (reqText)        return `${trim80(reqText)} — your experience is a match here.`
+        if (yrs && seniority) return `You have ${yrs} years at ${seniority} level — that's exactly what this role is looking for.`
+        if (seniority)        return `You're at ${seniority} level, which is what this role requires.`
+        return 'Your experience level is a strong match for this role.'
 
       case 'industry_alignment':
-        if (reqText) return `${trim80(reqText)} — that matches your background.`
-        if (sector) return `This is in ${sector} — consistent with the space you've been targeting.`
-        return 'The industry here aligns with your recent focus.'
+        if (reqText && sector) return `They want ${trim80(reqText).toLowerCase()} — your ${sector} background is a direct fit.`
+        if (sector)            return `Your background in ${sector} is exactly the domain this role operates in.`
+        return 'Your industry background aligns with what this role needs.'
 
       case 'salary':
-        if (job.salary_min && job.salary_max) return `The range ($${k(job.salary_min)}k–$${k(job.salary_max)}k) looks aligned with your target.`
-        return 'The compensation looks aligned with your target range.'
+        if (job.salary_min && job.salary_max) return `The range ($${k(job.salary_min)}k–$${k(job.salary_max)}k) is in line with your target.`
+        return 'The compensation is in line with your target range.'
 
       case 'function_type': {
-        if (reqText) return `${trim80(reqText)} — that's covered.`
+        if (reqText) return `They require ${trim80(reqText).toLowerCase()} — that's a clear match with your qualifications.`
         const fn = job.title.split(/\s+/).slice(0, 4).join(' ')
-        return `The core work — ${fn} — fits the direction you've been moving toward.`
+        return `The type of work — ${fn} — is consistent with your recent experience.`
       }
 
       case 'career_trajectory':
-        if (reqText) return `They want ${trim80(reqText).toLowerCase()} — that aligns with where you're heading.`
-        if (seniority && sector) return `A ${seniority} role in ${sector} is a logical next step from where you are.`
-        if (seniority)           return `Moving into a ${seniority} role like this builds well on your current path.`
-        return 'This role builds on your current trajectory rather than pulling you sideways.'
+        if (reqText && lvl) return `They want ${trim80(reqText).toLowerCase()} — at ${lvl} level, this is a natural next move for you.`
+        if (reqText)        return `They want ${trim80(reqText).toLowerCase()} — that aligns with where you're heading.`
+        if (seniority)      return `A ${seniority} role here is a natural progression from where you are now.`
+        return 'This role is a logical step forward from your current position.'
 
       default:
-        return 'This area aligns well with your background.'
+        return 'This area is a strong match with your background.'
     }
   })
 }
 
-function buildGapBullets(job, gaps, detectedSkills, requirements) {
-  const sector    = job.sector
+function buildGapBullets(job, gaps, detectedSkills, requirements, profile) {
+  const sector = job.sector
   const seniority = extractSeniority(job.title)
-  const k         = n => Math.round(n / 1000)
+  const k = n => Math.round(n / 1000)
+  const yrs = profile?.years_experience
+  const lvl = profile?.seniority_level
 
   return gaps.map(({ key }) => {
     const reqText = findReqFor(requirements, key)
 
     switch (key) {
       case 'skills_match': {
-        if (reqText) return `This requires ${trim80(reqText).toLowerCase().replace(/^they need |^you need |^you should have |^you must have /, '')}. If that's not clearly on your profile, call it out or build toward it.`
         const named = detectedSkills.slice(0, 2).map(s => SKILL_DISPLAY_NAMES[s]).filter(Boolean)
-        if (named.length >= 2) return `This role requires ${named[0]} and ${named[1]} experience. If those aren't clearly on your profile, it's worth calling them out before applying.`
-        if (named.length === 1) return `This role requires solid ${named[0]} experience. If that's not front and centre on your profile, it's worth addressing.`
-        return 'There are specific technical requirements here that may not be visible on your current profile — worth reviewing before you apply.'
+        if (reqText && named.length >= 1) return `This requires ${trim80(reqText).toLowerCase()} — specifically ${named[0]}. That's not a strong part of your current profile. Call out any relevant exposure or plan to build it.`
+        if (reqText)  return `This requires ${trim80(reqText).toLowerCase()}. That's not clearly represented on your current profile — address it before applying.`
+        if (named.length >= 2) return `This role requires ${named[0]} and ${named[1]}. These aren't a prominent part of your profile — call them out or build toward them.`
+        if (named.length === 1) return `This role requires solid ${named[0]}. That's not a current strength on your profile — worth addressing directly.`
+        return 'There are specific technical requirements here that aren\'t clearly visible on your profile. Review the posting and address the gap before applying.'
       }
 
-      case 'experience_level':
-        if (reqText) return `This asks for ${trim80(reqText).toLowerCase().replace(/^they need |^you need |^you should have |^you must have /, '')}. If you're not quite there, lean into scope and impact over titles.`
-        if (seniority) return `This is pitched at ${seniority} level. If you're not quite there yet, lean into impact and outcomes rather than job titles.`
-        return 'The seniority bar here is worth being honest about — come in with strong examples of scope and ownership.'
+      case 'experience_level': {
+        const expReq = reqText || null
+        const yearsReq = expReq?.match(/(\d+)\+?\s*(?:to\s*\d+\s*)?years?/i)?.[0]
+        if (expReq && yrs && yearsReq) return `This asks for ${yearsReq} of experience — you have ${yrs}. Lead with the scope and impact of your work to close that gap.`
+        if (expReq && yrs) return `This asks for ${trim80(expReq).toLowerCase()} — you have ${yrs} years. Emphasise scope and outcomes to make up the difference.`
+        if (expReq) return `This asks for ${trim80(expReq).toLowerCase()}. Lean into the impact and scope of your work, not just tenure.`
+        if (seniority && lvl) return `This is a ${seniority}-level role — you're currently at ${lvl}. Lead with scope and outcomes to make the case.`
+        return 'The seniority requirement here is a stretch. Lead with the scope and impact of your work, not just your title.'
+      }
 
       case 'industry_alignment':
-        if (reqText) return `${trim80(reqText)}. If that's not your primary background, connect the dots clearly in your application.`
-        if (sector) return `Your background isn't primarily in ${sector}. That's not disqualifying, but you'd want to connect the dots clearly in your application.`
-        return "Your industry background is a bit of a mismatch here — worth making your relevance explicit in the cover note."
+        if (reqText && sector) return `They want ${trim80(reqText).toLowerCase()}. Your background isn't primarily in ${sector} — make the relevance explicit in your application, don't leave it to be inferred.`
+        if (sector) return `Your background isn't primarily in ${sector}. Make the relevance explicit upfront — don't leave it to the reader to figure out.`
+        return "Your industry background is a mismatch here. Make your relevance clear and explicit in your application."
 
       case 'salary':
-        if (job.salary_min && job.salary_max) return `The posted range ($${k(job.salary_min)}k–$${k(job.salary_max)}k) may be different from your target — worth checking before investing time.`
-        return "The compensation range here might differ from your target — worth checking the details first."
+        if (job.salary_min && job.salary_max) return `The posted range is $${k(job.salary_min)}k–$${k(job.salary_max)}k. Check that against your target before investing time in the process.`
+        return "Check the compensation range against your target before investing time in this process."
 
       case 'function_type': {
-        if (reqText) return `This role asks for ${trim80(reqText).toLowerCase()}. If that's not on your CV, it's worth addressing before applying.`
+        if (reqText) return `This role requires ${trim80(reqText).toLowerCase()}. That's not a strong part of your current profile — address it before applying.`
         const fn = job.title.split(/\s+/).slice(0, 3).join(' ')
-        return `This is primarily a ${fn} role. If that's a shift from your recent work, think through how you'd frame the transition.`
+        return `This is primarily a ${fn} role — a shift from your recent work. You'll need a clear narrative for why you're making that move.`
       }
 
       case 'career_trajectory':
-        if (reqText) return `They're looking for ${trim80(reqText).toLowerCase()}. If that's a stretch, make sure your application tells a clear story.`
-        return "This is a bit of a pivot from your recent direction. It can work, but you'd need a clear story for why you're making the move."
+        if (reqText && lvl) return `They're looking for ${trim80(reqText).toLowerCase()}. At ${lvl} level, this is a stretch — make sure your application tells a convincing story.`
+        if (reqText) return `They're looking for ${trim80(reqText).toLowerCase()}. This is a stretch from your current direction — build a clear narrative around the move.`
+        return "This is a pivot from your recent direction. Without a clear story for why, it's a harder sell — build that narrative before applying."
 
       default:
-        return 'This is worth addressing before you apply.'
+        return 'This is a gap worth addressing before you apply.'
     }
   })
 }
@@ -286,7 +299,7 @@ function scoreLabel(pct) {
   return 'Partial fit'
 }
 
-export default function DetailsDrawer({ job, userId, currentRating, onClose, onFeedback }) {
+export default function DetailsDrawer({ job, userId, profile, currentRating, onClose, onFeedback }) {
   const [localRating, setLocalRating] = useState(currentRating || null)
   const [saving, setSaving] = useState(false)
 
@@ -315,8 +328,8 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
   const detectedSkills = detectSkillsFromText(job.description)
   const { requirements } = parseJobSections(job.description)
   const suggestedCourses = detectedSkills.map(s => SKILL_COURSES[s]).filter(Boolean).slice(0, 2)
-  const fitBullets = buildFitBullets(job, topDims, detectedSkills, requirements)
-  const gapBullets = buildGapBullets(job, gaps, detectedSkills, requirements)
+  const fitBullets = buildFitBullets(job, topDims, detectedSkills, requirements, profile)
+  const gapBullets = buildGapBullets(job, gaps, detectedSkills, requirements, profile)
 
   async function applyRating(newRating) {
     if (saving) return

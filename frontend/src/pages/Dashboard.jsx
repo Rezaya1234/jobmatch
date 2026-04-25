@@ -953,6 +953,7 @@ export default function Dashboard() {
         <DetailsDrawer
           job={drawerJob}
           userId={userId}
+          profile={profile}
           currentRating={feedbackMap[drawerJob.job_id]?.rating || null}
           onClose={() => setDrawerJob(null)}
           onFeedback={(rating, jobId) => handleReact(rating, jobId)}
