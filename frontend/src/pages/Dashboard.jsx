@@ -68,6 +68,31 @@ function ScoreBadge({ pct }) {
 }
 
 // ---------------------------------------------------------------------------
+// Extract a 1-2 line "What you'll do" snippet from the job description
+// ---------------------------------------------------------------------------
+
+function extractWhatYouDo(description) {
+  if (!description) return null
+  const respMarkers = /(?:what you['']ll do|responsibilities|what you will do|your role|key responsibilities|in this role|you will|you['']ll)/i
+  const lines = description.split(/\n+/)
+  for (let i = 0; i < lines.length; i++) {
+    if (respMarkers.test(lines[i])) {
+      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+        const next = lines[j].trim().replace(/^[-•*]\s*/, '')
+        if (next.length >= 20) return next.length > 130 ? next.slice(0, 127) + '…' : next
+      }
+    }
+  }
+  const aboutUs = /^(?:about us|about the company|who we are|overview|we are|we['']re)/i
+  const sentences = description.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/)
+  for (const sent of sentences) {
+    const clean = sent.trim()
+    if (clean.length >= 30 && !aboutUs.test(clean)) return clean.length > 130 ? clean.slice(0, 127) + '…' : clean
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Signal bullets — concrete, 5-7 word max, sorted by dimension score
 // ---------------------------------------------------------------------------
 
@@ -259,16 +284,18 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
           </div>
         </div>
 
-        {/* MIDDLE: why you match label + 3 signal bullets */}
+        {/* MIDDLE: what you'll do */}
         <div className="hidden md:flex flex-1 min-w-0 flex-col justify-center gap-1.5 border-l border-slate-100 pl-3">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5">Why you match</p>
-          {signals.length > 0 ? signals.map((s, i) => (
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5">What you'll do</p>
+          {extractWhatYouDo(match.description) ? (
+            <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{extractWhatYouDo(match.description)}</p>
+          ) : signals.length > 0 ? signals.map((s, i) => (
             <div key={i} className="flex items-center gap-2 min-w-0">
               <span className="w-1 h-1 rounded-full bg-violet-300 shrink-0" />
               <span className="text-xs text-slate-600 leading-snug truncate">{s}</span>
             </div>
           )) : (
-            <span className="text-xs text-slate-300 italic">Signals loading…</span>
+            <span className="text-xs text-slate-300 italic">Details loading…</span>
           )}
         </div>
 
@@ -906,6 +933,7 @@ export default function Dashboard() {
         <DetailsDrawer
           job={drawerJob}
           userId={userId}
+          currentRating={feedbackMap[drawerJob.job_id]?.rating || null}
           onClose={() => setDrawerJob(null)}
           onFeedback={(rating, jobId) => handleReact(rating, jobId)}
         />

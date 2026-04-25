@@ -32,6 +32,8 @@ class MatchResponse(BaseModel):
     salary_max: int | None
     salary_currency: str | None
     sector: str | None
+    company_size: str | None
+    description: str | None
     emailed_at: datetime | None
     created_at: datetime
 
@@ -142,6 +144,8 @@ def _to_response(match: JobMatch, job: Job) -> MatchResponse:
         salary_max=job.salary_max,
         salary_currency=job.salary_currency,
         sector=job.sector,
+        company_size=job.company_size,
+        description=job.description[:1500] if job.description else None,
         emailed_at=match.emailed_at,
         created_at=match.created_at,
     )
