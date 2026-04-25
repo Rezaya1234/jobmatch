@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getMatches, submitFeedback, getFeedback } from '../api'
+import { getMatches, submitFeedback, deleteFeedback, getFeedback } from '../api'
 
 function ScoreBadge({ score }) {
   const pct = Math.round((score || 0) * 100)
@@ -7,21 +7,40 @@ function ScoreBadge({ score }) {
   return <span className={`text-xs font-bold px-2 py-1 rounded-full ${color}`}>{pct}% match</span>
 }
 
-function JobCard({ match, userId, onFeedback, initialRating = null }) {
-  const [comment, setComment] = useState('')
-  const [submitted, setSubmitted] = useState(initialRating)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+function ThumbUpIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+    </svg>
+  )
+}
 
-  async function handleFeedback(rating) {
+function ThumbDownIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+    </svg>
+  )
+}
+
+function JobCard({ match, userId, onFeedback, initialRating = null }) {
+  const [rating, setRating] = useState(initialRating)
+  const [saving, setSaving] = useState(false)
+
+  async function handleVote(r) {
+    if (saving) return
+    const next = rating === r ? null : r
+    setRating(next)
     setSaving(true)
-    setError('')
     try {
-      await submitFeedback(userId, match.job_id, rating, comment)
-      setSubmitted(rating)
+      if (next === null) {
+        await deleteFeedback(userId, match.job_id)
+      } else {
+        await submitFeedback(userId, match.job_id, next, '')
+      }
       onFeedback()
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save feedback')
+    } catch {
+      setRating(rating)
     } finally {
       setSaving(false)
     }
@@ -53,35 +72,37 @@ function JobCard({ match, userId, onFeedback, initialRating = null }) {
       )}
 
       <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-        <div className="flex items-center gap-2 flex-wrap">
-          {submitted ? (
-            <span className={`text-sm font-medium ${submitted === 'thumbs_up' ? 'text-green-600' : 'text-red-500'}`}>
-              {submitted === 'thumbs_up' ? '👍 Good fit' : '👎 Not a fit'}
-            </span>
-          ) : saving ? (
-            <span className="text-sm text-slate-400">Saving...</span>
-          ) : (
-            <>
-              <button onClick={() => handleFeedback('thumbs_up')} className="text-lg hover:scale-110 transition-transform" title="Good fit">👍</button>
-              <button onClick={() => handleFeedback('thumbs_down')} className="text-lg hover:scale-110 transition-transform" title="Not a fit">👎</button>
-              <input
-                type="text"
-                placeholder="Optional comment..."
-                value={comment}
-                onChange={e => setComment(e.target.value)}
-                className="text-xs border border-slate-200 rounded px-2 py-1 w-36 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-              />
-            </>
-          )}
-          {error && <span className="text-xs text-red-500">{error}</span>}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => handleVote('thumbs_up')}
+            disabled={saving}
+            aria-label="Good fit"
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${
+              rating === 'thumbs_up'
+                ? 'border-green-300 text-green-600 bg-green-50'
+                : 'border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-600 hover:bg-green-50'
+            }`}
+          >
+            <ThumbUpIcon />
+          </button>
+          <button
+            onClick={() => handleVote('thumbs_down')}
+            disabled={saving}
+            aria-label="Not a fit"
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all disabled:opacity-50 ${
+              rating === 'thumbs_down'
+                ? 'border-rose-300 text-rose-500 bg-rose-50'
+                : 'border-slate-200 text-slate-400 hover:border-rose-300 hover:text-rose-500 hover:bg-rose-50'
+            }`}
+          >
+            <ThumbDownIcon />
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          {match.url && (
-            <a href={match.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline font-medium">
-              View job →
-            </a>
-          )}
-        </div>
+        {match.url && (
+          <a href={match.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline font-medium">
+            View job →
+          </a>
+        )}
       </div>
     </div>
   )
