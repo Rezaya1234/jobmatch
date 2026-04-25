@@ -51,7 +51,7 @@ export default function About() {
           <ul className="space-y-3">
             {[
               'Every recommendation is scored against your actual background — not just title keywords.',
-              'Fit and gap analysis tells you exactly where you match and where you'd need to grow.',
+              "Fit and gap analysis tells you exactly where you match and where you'd need to grow.",
               'Feedback signals teach the system your taste, so results improve over time.',
               'Company insights give you real context before you invest time in an application.',
             ].map((item, i) => (
