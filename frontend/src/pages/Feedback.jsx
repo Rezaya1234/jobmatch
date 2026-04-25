@@ -38,14 +38,17 @@ const LEARNING_STAGES = [
 ]
 
 const EVENT_META = {
-  thumbs_up:         { icon: '👍', label: 'Liked',            color: 'text-green-600 font-semibold' },
-  thumbs_down:       { icon: '👎', label: 'Disliked',         color: 'text-red-500 font-semibold' },
-  link_click:        { icon: '🔗', label: 'Clicked',          color: 'text-blue-500' },
-  email_thumbs_up:   { icon: '📧', label: 'Liked via email',  color: 'text-green-600' },
+  thumbs_up:         { icon: '👍', label: 'Liked',              color: 'text-green-600' },
+  thumbs_down:       { icon: '👎', label: 'Disliked',           color: 'text-red-500' },
+  link_click:        { icon: '🔗', label: 'Clicked',            color: 'text-blue-500' },
+  email_thumbs_up:   { icon: '📧', label: 'Liked via email',    color: 'text-green-600' },
   email_thumbs_down: { icon: '📧', label: 'Disliked via email', color: 'text-red-500' },
-  applied:           { icon: '✅', label: 'Applied',          color: 'text-violet-600 font-semibold' },
-  interview:         { icon: '🎯', label: 'Interview',        color: 'text-amber-600 font-semibold' },
+  applied:           { icon: '✅', label: 'Applied',            color: 'text-violet-600' },
+  interview:         { icon: '🎯', label: 'Interview',          color: 'text-amber-600' },
 }
+
+const LIKED_TYPES    = new Set(['thumbs_up', 'email_thumbs_up'])
+const DISLIKED_TYPES = new Set(['thumbs_down', 'email_thumbs_down'])
 
 const LEVEL_STYLE = {
   beginner:     'bg-green-100 text-green-700',
@@ -118,7 +121,6 @@ function LearningStatus({ status, progress, message, impact }) {
 
       {/* Bar + stage markers */}
       <div className="mb-4">
-        {/* Bar */}
         <div className="h-3.5 bg-slate-100 rounded-full overflow-hidden mb-2">
           <div
             className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-700`}
@@ -126,7 +128,6 @@ function LearningStatus({ status, progress, message, impact }) {
           />
         </div>
 
-        {/* Stage milestones */}
         <div className="flex justify-between">
           {LEARNING_STAGES.map((stage, i) => {
             const isActive = i === activeIndex
@@ -148,10 +149,8 @@ function LearningStatus({ status, progress, message, impact }) {
         </div>
       </div>
 
-      {/* Actionable message */}
       <p className="text-sm font-medium text-slate-700">{message}</p>
 
-      {/* Impact message */}
       {impact && (
         <p className="flex items-center gap-1.5 text-xs text-green-600 font-medium mt-2">
           <span className="text-green-500">↑</span>
@@ -180,32 +179,27 @@ function InsightRow({ text }) {
 // ---------------------------------------------------------------------------
 
 const CATEGORY_STYLE = {
-  'Filter optimization': { badge: 'bg-blue-100 text-blue-700',   bar: 'bg-blue-500'   },
+  'Filter optimization': { badge: 'bg-blue-100 text-blue-700',    bar: 'bg-blue-500'   },
   'Skill improvement':   { badge: 'bg-violet-100 text-violet-700', bar: 'bg-violet-500' },
-  'Focus strategy':      { badge: 'bg-amber-100 text-amber-700',  bar: 'bg-amber-500'  },
+  'Focus strategy':      { badge: 'bg-amber-100 text-amber-700',   bar: 'bg-amber-500'  },
 }
 
 function NextStepCard({ index, step }) {
-  // Accept both old string format and new object format
   const text     = typeof step === 'string' ? step : step.text
   const category = typeof step === 'string' ? null  : step.category
   const styles   = CATEGORY_STYLE[category] || { badge: 'bg-slate-100 text-slate-500', bar: 'bg-slate-400' }
 
   return (
     <div className="flex items-start gap-3.5 p-4 rounded-xl border border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-150">
-      {/* Number */}
       <div className={`w-7 h-7 rounded-full ${styles.bar} text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5`}>
         {index + 1}
       </div>
-
       <div className="flex-1 min-w-0">
-        {/* Category badge */}
         {category && (
           <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-1.5 ${styles.badge}`}>
             {category}
           </span>
         )}
-        {/* Action text */}
         <p className="text-sm text-slate-800 leading-snug font-medium">{text}</p>
       </div>
     </div>
@@ -309,28 +303,233 @@ function PreferencesPanel({ prefs, navigate }) {
 }
 
 // ---------------------------------------------------------------------------
+// Activity helpers
+// ---------------------------------------------------------------------------
+
+function toDayLabel(dateStr) {
+  const now = new Date()
+  const d   = new Date(dateStr)
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const weekAgo = new Date(now)
+  weekAgo.setDate(weekAgo.getDate() - 7)
+
+  if (d.toDateString() === now.toDateString())       return 'Today'
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  if (d >= weekAgo)                                  return 'Earlier this week'
+  return 'Older'
+}
+
+// Merge multiple events for the same job into one row.
+// Input is newest-first; the first occurrence is kept as the anchor.
+function collapseActivity(items) {
+  const seenKeys = new Map()
+  const result   = []
+
+  for (const item of items) {
+    const key = item.job_title && item.company
+      ? `${item.job_title}|||${item.company}`
+      : null
+
+    if (key && seenKeys.has(key)) {
+      result[seenKeys.get(key)]._allEvents.push(item.event_type)
+    } else {
+      const entry = { ...item, _allEvents: [item.event_type] }
+      if (key) seenKeys.set(key, result.length)
+      result.push(entry)
+    }
+  }
+
+  return result.map(entry => {
+    const evts        = entry._allEvents
+    const hasLiked    = evts.some(e => LIKED_TYPES.has(e))
+    const hasDisliked = evts.some(e => DISLIKED_TYPES.has(e))
+
+    if (hasLiked && hasDisliked) {
+      const firstDislikedIdx = evts.findIndex(e => DISLIKED_TYPES.has(e))
+      const firstLikedIdx    = evts.findIndex(e => LIKED_TYPES.has(e))
+      // newer-first list: smaller index = more recent
+      // if dislike is more recent than like → user liked first then disliked
+      const combinedLabel = firstDislikedIdx < firstLikedIdx
+        ? 'Liked, then Disliked'
+        : 'Disliked, then Liked'
+      return { ...entry, _combined: true, _combinedLabel: combinedLabel }
+    }
+    return entry
+  })
+}
+
+function groupByDay(items) {
+  const ORDER  = ['Today', 'Yesterday', 'Earlier this week', 'Older']
+  const groups = new Map(ORDER.map(l => [l, []]))
+  for (const item of items) groups.get(toDayLabel(item.created_at))?.push(item)
+  return ORDER.map(l => ({ label: l, items: groups.get(l) })).filter(g => g.items.length > 0)
+}
+
+function generatePatternHint(allActivity) {
+  if (!allActivity?.length) return null
+  const liked    = allActivity.filter(a => LIKED_TYPES.has(a.event_type))
+  const disliked = allActivity.filter(a => DISLIKED_TYPES.has(a.event_type))
+  const total    = liked.length + disliked.length
+  if (total < 3) return null
+
+  const PATTERNS = [
+    { keywords: ['operations', 'ops', 'supply chain', 'logistics', 'warehouse', 'area manager'], label: 'operations' },
+    { keywords: ['software engineer', 'backend', 'frontend', 'developer', 'swe', 'fullstack', 'full stack'], label: 'engineering' },
+    { keywords: ['data', 'analyst', 'analytics', ' bi '], label: 'data/analytics' },
+    { keywords: [' ai ', ' ml ', 'machine learning', 'llm', 'deep learning'], label: 'AI/ML' },
+    { keywords: ['product manager', 'product owner', 'strategy', 'growth', 'program manager'], label: 'product/strategy' },
+  ]
+
+  const likedText    = liked.map(a => ` ${(a.job_title || '').toLowerCase()} `).join(' ')
+  const dislikedText = disliked.map(a => ` ${(a.job_title || '').toLowerCase()} `).join(' ')
+
+  let topLiked = null, topDisliked = null, maxL = 0, maxD = 0
+  for (const p of PATTERNS) {
+    const lScore = p.keywords.filter(k => likedText.includes(k)).length
+    const dScore = p.keywords.filter(k => dislikedText.includes(k)).length
+    if (lScore > maxL) { maxL = lScore; topLiked = p.label }
+    if (dScore > maxD) { maxD = dScore; topDisliked = p.label }
+  }
+
+  if (topLiked && topDisliked && topLiked !== topDisliked && maxL >= 1 && maxD >= 1) {
+    return `You tend to skip ${topDisliked} roles and prefer ${topLiked} roles`
+  }
+  if (topLiked && maxL >= 1) {
+    return `You consistently engage with ${topLiked} roles`
+  }
+
+  const likedPct = Math.round(liked.length / total * 100)
+  if (likedPct >= 70) return 'You approve most roles you see — try narrowing your match filters'
+  if (likedPct <= 30) return 'You skip most roles — your match criteria may need recalibration'
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Activity row
 // ---------------------------------------------------------------------------
 
 function ActivityRow({ item }) {
-  const meta = EVENT_META[item.event_type] || { icon: '•', label: item.event_type, color: 'text-slate-400' }
-  const ts = new Date(item.created_at)
-  const dateStr = ts.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  const timeStr = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const meta       = EVENT_META[item.event_type] || { icon: '•', label: item.event_type, color: 'text-slate-400' }
+  const timeStr    = new Date(item.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const hasJob     = item.job_title || item.company
 
-  const hasJob = item.job_title || item.company
+  let actionEl
+  if (item._combined) {
+    const positive = item._combinedLabel === 'Disliked, then Liked'
+    actionEl = (
+      <span className={`font-semibold ${positive ? 'text-green-600' : 'text-amber-600'}`}>
+        {item._combinedLabel}
+      </span>
+    )
+  } else {
+    actionEl = (
+      <span className={`font-semibold ${meta.color}`}>{meta.label}</span>
+    )
+  }
 
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-slate-50 last:border-0">
       <span className="text-base leading-none mt-0.5 shrink-0">{meta.icon}</span>
       <div className="flex-1 min-w-0 text-sm">
-        <span className={meta.color}>{meta.label}</span>
-        {item.job_title && <span className="text-slate-700">: {item.job_title}</span>}
-        {item.company && <span className="text-slate-400"> @ {item.company}</span>}
-        {!hasJob && <span className="text-slate-400"> — no details</span>}
+        {actionEl}
+        {item.job_title && <span className="font-semibold text-slate-800"> · {item.job_title}</span>}
+        {item.company   && <span className="font-normal text-slate-400"> @ {item.company}</span>}
+        {!hasJob        && <span className="text-slate-400"> — no details</span>}
       </div>
-      <span className="text-xs text-slate-400 shrink-0 whitespace-nowrap">{dateStr} {timeStr}</span>
+      <span className="text-xs text-slate-400 shrink-0 whitespace-nowrap">{timeStr}</span>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Activity section (self-contained state)
+// ---------------------------------------------------------------------------
+
+const ACTIVITY_LIMIT = 8
+
+function ActivitySection({ allActivity }) {
+  const [showAll, setShowAll] = useState(false)
+  const [filter,  setFilter]  = useState('all')
+
+  const raw = allActivity || []
+  const filtered = filter === 'liked'
+    ? raw.filter(a => LIKED_TYPES.has(a.event_type))
+    : filter === 'disliked'
+    ? raw.filter(a => DISLIKED_TYPES.has(a.event_type))
+    : raw
+
+  const collapsed    = collapseActivity(filtered)
+  const visible      = showAll ? collapsed : collapsed.slice(0, ACTIVITY_LIMIT)
+  const grouped      = groupByDay(visible)
+  const patternHint  = generatePatternHint(raw)
+  const hasMore      = collapsed.length > ACTIVITY_LIMIT
+
+  const FilterBtn = ({ val, label }) => (
+    <button
+      onClick={() => { setFilter(val); setShowAll(false) }}
+      className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+        filter === val
+          ? 'bg-slate-800 text-white'
+          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+      }`}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <SectionCard
+      title="Recent activity"
+      subtitle={patternHint || undefined}
+      action={
+        <div className="flex gap-1 shrink-0">
+          <FilterBtn val="all"      label="All"      />
+          <FilterBtn val="liked"    label="Liked"    />
+          <FilterBtn val="disliked" label="Disliked" />
+        </div>
+      }
+    >
+      {grouped.length === 0 ? (
+        <p className="text-xs text-slate-400">
+          {filter === 'all'
+            ? 'No activity yet. Browse jobs to get started.'
+            : `No ${filter} activity in this period.`}
+        </p>
+      ) : (
+        <>
+          <div>
+            {grouped.map(group => (
+              <div key={group.label}>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide pt-3 pb-1 first:pt-0">
+                  {group.label}
+                </p>
+                {group.items.map((item, i) => (
+                  <ActivityRow key={`${item.created_at}-${i}`} item={item} />
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {!showAll && hasMore && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="mt-3 text-xs text-violet-600 hover:text-violet-700 font-medium"
+            >
+              👉 View all {collapsed.length} activities
+            </button>
+          )}
+          {showAll && (
+            <button
+              onClick={() => setShowAll(false)}
+              className="mt-3 text-xs text-slate-400 hover:text-slate-600 font-medium"
+            >
+              Show less
+            </button>
+          )}
+        </>
+      )}
+    </SectionCard>
   )
 }
 
@@ -340,12 +539,11 @@ function ActivityRow({ item }) {
 
 export default function Feedback() {
   const navigate = useNavigate()
-  const userId = localStorage.getItem('userId')
-  const [days, setDays] = useState(30)
-  const [data, setData] = useState(null)
+  const userId   = localStorage.getItem('userId')
+  const [days, setDays]       = useState(30)
+  const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAllCourses, setShowAllCourses] = useState(false)
-  const [showAllActivity, setShowAllActivity] = useState(false)
 
   useEffect(() => {
     if (!userId) return
@@ -365,9 +563,7 @@ export default function Feedback() {
   }
 
   const displayedCourses = showAllCourses ? data?.all_courses : data?.courses
-  const displayedActivity = showAllActivity ? data?.all_activity : data?.recent_activity
-  const extraCourses = (data?.all_courses?.length || 0) - (data?.courses?.length || 0)
-  const extraActivity = (data?.all_activity?.length || 0) - (data?.recent_activity?.length || 0)
+  const extraCourses     = (data?.all_courses?.length || 0) - (data?.courses?.length || 0)
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -406,10 +602,10 @@ export default function Feedback() {
         <>
           {/* ── Metric cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <MetricCard icon="👍" label="Liked" value={data.liked_count} color="green" />
-            <MetricCard icon="👎" label="Disliked" value={data.disliked_count} color="red" />
-            <MetricCard icon="🔗" label="Clicked" value={data.viewed_count} color="blue" />
-            <MetricCard icon="💬" label="Feedback given" value={data.feedback_count} color="violet" />
+            <MetricCard icon="👍" label="Liked"          value={data.liked_count}    color="green"  />
+            <MetricCard icon="👎" label="Disliked"        value={data.disliked_count} color="red"    />
+            <MetricCard icon="🔗" label="Clicked"         value={data.viewed_count}   color="blue"   />
+            <MetricCard icon="💬" label="Feedback given"  value={data.feedback_count} color="violet" />
           </div>
 
           {/* ── Learning status ── */}
@@ -422,10 +618,7 @@ export default function Feedback() {
 
           {/* ── What we learned + What to do next ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SectionCard
-              title="What we learned"
-              subtitle="Patterns from your activity"
-            >
+            <SectionCard title="What we learned" subtitle="Patterns from your activity">
               {!(data.insights?.length) ? (
                 <p className="text-xs text-slate-400">Rate a few jobs to unlock personalized insights.</p>
               ) : (
@@ -486,33 +679,7 @@ export default function Feedback() {
           </div>
 
           {/* ── Recent activity ── */}
-          <SectionCard title="Recent activity" subtitle="Your last interactions with the system">
-            {!displayedActivity || displayedActivity.length === 0 ? (
-              <p className="text-xs text-slate-400">No activity yet. Browse jobs to get started.</p>
-            ) : (
-              <>
-                <div>
-                  {displayedActivity.map((item, i) => <ActivityRow key={i} item={item} />)}
-                </div>
-                {!showAllActivity && extraActivity > 0 && (
-                  <button
-                    onClick={() => setShowAllActivity(true)}
-                    className="mt-2 text-xs text-violet-600 hover:text-violet-700 font-medium"
-                  >
-                    See all {data.all_activity.length} events →
-                  </button>
-                )}
-                {showAllActivity && (
-                  <button
-                    onClick={() => setShowAllActivity(false)}
-                    className="mt-2 text-xs text-slate-400 hover:text-slate-600 font-medium"
-                  >
-                    Show less
-                  </button>
-                )}
-              </>
-            )}
-          </SectionCard>
+          <ActivitySection key={days} allActivity={data?.all_activity} />
         </>
       )}
     </div>
