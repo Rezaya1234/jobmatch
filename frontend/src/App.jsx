@@ -9,6 +9,7 @@ import QA from './pages/QA'
 import Matches from './pages/Matches'
 import CompanyInsights from './pages/CompanyInsights'
 import CompanyDetail from './pages/CompanyDetail'
+import Feedback from './pages/Feedback'
 import Sidebar from './components/Sidebar'
 import './index.css'
 
@@ -96,7 +97,7 @@ export default function App() {
                 <Route path="/resources" element={<ComingSoon title="Resources" />} />
                 <Route path="/settings" element={<ComingSoon title="Settings" />} />
                 <Route path="/applications" element={<ComingSoon title="Applications" />} />
-                <Route path="/feedback" element={<ComingSoon title="Feedback" />} />
+                <Route path="/feedback" element={<Feedback />} />
                 {/* Legacy redirects */}
                 <Route path="/setup" element={<Navigate to="/profile" />} />
               </Routes>

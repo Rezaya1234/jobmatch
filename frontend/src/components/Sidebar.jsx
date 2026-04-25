@@ -32,7 +32,7 @@ const PRIMARY_NAV = [
   { to: '/positions',    label: 'Open Positions',    icon: 'positions' },
   { to: '/matches',      label: 'Saved Jobs',        icon: 'saved' },
   { to: '/applications', label: 'Applications',      icon: 'applications', soon: true },
-  { to: '/feedback',     label: 'Feedback',          icon: 'feedback',     soon: true },
+  { to: '/feedback',     label: 'Feedback',          icon: 'feedback' },
   { to: '/insights',     label: 'Company Insights',  icon: 'insights' },
 ]
 

@@ -1,6 +1,7 @@
 import logging
 import uuid as _uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse
@@ -11,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_llm, get_session
 from db.activity import log_event
 from db.database import AsyncSessionLocal
-from db.models import Feedback, FeedbackSignal, Job, JobMatch
+from db.models import ActivityLog, Feedback, FeedbackSignal, Job, JobMatch, UserProfile
 from llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -192,6 +193,232 @@ async def list_feedback(
         )
         for fb, job in result.all()
     ]
+
+
+# ------------------------------------------------------------------
+# Feedback summary endpoint
+# ------------------------------------------------------------------
+
+class CourseItem(BaseModel):
+    id: str
+    title: str
+    provider: str
+    url: str
+    tags: list[str]
+    level: str
+    description: str
+    quality_score: float
+
+
+class ActivityItem(BaseModel):
+    event_type: str
+    job_title: str | None
+    company: str | None
+    created_at: datetime
+
+
+class FeedbackSummaryResponse(BaseModel):
+    liked_count: int
+    disliked_count: int
+    viewed_count: int
+    feedback_count: int
+    insights: list[str]
+    preferences: dict[str, Any]
+    courses: list[CourseItem]
+    all_courses: list[CourseItem]
+    recent_activity: list[ActivityItem]
+    all_activity: list[ActivityItem]
+
+
+@router.get("/summary", response_model=FeedbackSummaryResponse)
+async def get_feedback_summary(
+    user_id: str,
+    days: int = Query(default=30, ge=1, le=365),
+    session: AsyncSession = Depends(get_session),
+) -> FeedbackSummaryResponse:
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid user_id")
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # --- Counts ---
+    liked_result = await session.execute(
+        select(func.count()).select_from(Feedback).where(
+            Feedback.user_id == uid,
+            Feedback.rating == "thumbs_up",
+            Feedback.created_at >= since,
+        )
+    )
+    liked_count = liked_result.scalar() or 0
+
+    disliked_result = await session.execute(
+        select(func.count()).select_from(Feedback).where(
+            Feedback.user_id == uid,
+            Feedback.rating == "thumbs_down",
+            Feedback.created_at >= since,
+        )
+    )
+    disliked_count = disliked_result.scalar() or 0
+
+    viewed_result = await session.execute(
+        select(func.count()).select_from(ActivityLog).where(
+            ActivityLog.user_id == uid,
+            ActivityLog.event_type == "link_click",
+            ActivityLog.created_at >= since,
+        )
+    )
+    viewed_count = viewed_result.scalar() or 0
+
+    feedback_count = liked_count + disliked_count
+
+    # --- Liked jobs for gap detection ---
+    liked_jobs_result = await session.execute(
+        select(Job).join(Feedback, Feedback.job_id == Job.id).where(
+            Feedback.user_id == uid,
+            Feedback.rating == "thumbs_up",
+        ).order_by(Feedback.created_at.desc()).limit(50)
+    )
+    liked_jobs = liked_jobs_result.scalars().all()
+
+    disliked_jobs_result = await session.execute(
+        select(Job).join(Feedback, Feedback.job_id == Job.id).where(
+            Feedback.user_id == uid,
+            Feedback.rating == "thumbs_down",
+        ).order_by(Feedback.created_at.desc()).limit(50)
+    )
+    disliked_jobs = disliked_jobs_result.scalars().all()
+
+    # --- User profile ---
+    profile_result = await session.execute(
+        select(UserProfile).where(UserProfile.user_id == uid)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    # --- Rule-based insights ---
+    insights = _generate_insights(liked_jobs, disliked_jobs, feedback_count, liked_count, disliked_count)
+
+    # --- Preferences ---
+    preferences = _build_preferences(profile)
+
+    # --- Course recommendations ---
+    from courses.recommender import detect_gaps, recommend_courses, recommend_all_courses
+    liked_texts = [f"{j.title} {j.description[:500]}" for j in liked_jobs]
+    profile_text = profile.role_description or "" if profile else ""
+    gaps = detect_gaps(liked_texts, profile_text)
+    courses_raw = recommend_courses(gaps, limit=3)
+    all_courses_raw = recommend_all_courses(gaps, limit=15)
+
+    courses = [CourseItem(id=c.id, title=c.title, provider=c.provider, url=c.url,
+                          tags=c.tags, level=c.level, description=c.description,
+                          quality_score=c.quality_score) for c in courses_raw]
+    all_courses = [CourseItem(id=c.id, title=c.title, provider=c.provider, url=c.url,
+                              tags=c.tags, level=c.level, description=c.description,
+                              quality_score=c.quality_score) for c in all_courses_raw]
+
+    # --- Activity log ---
+    all_activity_result = await session.execute(
+        select(ActivityLog).where(ActivityLog.user_id == uid)
+        .order_by(ActivityLog.created_at.desc()).limit(50)
+    )
+    all_activity_rows = all_activity_result.scalars().all()
+    all_activity = [
+        ActivityItem(
+            event_type=row.event_type,
+            job_title=(row.meta or {}).get("job_title"),
+            company=(row.meta or {}).get("company"),
+            created_at=row.created_at,
+        )
+        for row in all_activity_rows
+    ]
+    recent_activity = all_activity[:15]
+
+    return FeedbackSummaryResponse(
+        liked_count=liked_count,
+        disliked_count=disliked_count,
+        viewed_count=viewed_count,
+        feedback_count=feedback_count,
+        insights=insights,
+        preferences=preferences,
+        courses=courses,
+        all_courses=all_courses,
+        recent_activity=recent_activity,
+        all_activity=all_activity,
+    )
+
+
+def _generate_insights(
+    liked: list, disliked: list, total: int, liked_count: int, disliked_count: int
+) -> list[str]:
+    insights: list[str] = []
+    if total == 0:
+        return ["Rate a few jobs to unlock personalized insights."]
+
+    # Approval rate
+    rate = round(liked_count / total * 100)
+    if rate >= 70:
+        insights.append(f"You approve of {rate}% of rated jobs — your filters are working well.")
+    elif rate <= 30:
+        insights.append(f"Only {rate}% approval rate — your criteria may be too broad or the pool needs tuning.")
+    else:
+        insights.append(f"{rate}% of rated jobs earned a thumbs-up so far.")
+
+    # Work mode preference from liked jobs
+    from collections import Counter
+    liked_modes = Counter(j.work_mode for j in liked if j.work_mode)
+    if liked_modes:
+        top_mode = liked_modes.most_common(1)[0]
+        mode_pct = round(top_mode[1] / len(liked) * 100)
+        if mode_pct >= 60:
+            label = {"remote": "remote", "hybrid": "hybrid", "onsite": "on-site"}.get(top_mode[0], top_mode[0])
+            insights.append(f"{mode_pct}% of your liked roles are {label} — you have a clear work-mode preference.")
+
+    # Sector preference
+    liked_sectors = Counter(j.sector for j in liked if j.sector)
+    if liked_sectors and liked_sectors.most_common(1)[0][1] >= 2:
+        top_sector = liked_sectors.most_common(1)[0][0]
+        insights.append(f"You're drawn to {top_sector} roles — consider adding it to your profile sectors.")
+
+    # Disliked patterns
+    disliked_modes = Counter(j.work_mode for j in disliked if j.work_mode)
+    if disliked_modes:
+        top_dis = disliked_modes.most_common(1)[0]
+        if top_dis[1] >= 2 and top_dis[1] / max(len(disliked), 1) >= 0.5:
+            label = {"remote": "remote", "hybrid": "hybrid", "onsite": "on-site"}.get(top_dis[0], top_dis[0])
+            insights.append(f"You frequently dislike {label} roles — you can filter these out in Profile.")
+
+    # Company size preference
+    liked_sizes = Counter(j.company_size for j in liked if j.company_size)
+    if liked_sizes and liked_sizes.most_common(1)[0][1] >= 2:
+        top_size = liked_sizes.most_common(1)[0][0]
+        size_labels = {"startup": "startups (1–50)", "small": "small companies (51–200)",
+                       "medium": "mid-size companies (200–1000)", "large": "large companies (1000+)"}
+        label = size_labels.get(top_size, top_size)
+        insights.append(f"Most liked roles are at {label}.")
+
+    return insights[:5]
+
+
+def _build_preferences(profile) -> dict:
+    if profile is None:
+        return {}
+    return {
+        "work_modes":        profile.work_modes or [],
+        "seniority_level":   profile.seniority_level,
+        "salary_min":        profile.salary_min,
+        "salary_max":        profile.salary_max,
+        "salary_currency":   profile.salary_currency,
+        "preferred_sectors": profile.preferred_sectors or [],
+        "company_type":      profile.company_type,
+        "preferred_company_sizes": profile.preferred_company_sizes or [],
+        "preferred_companies": profile.preferred_companies or [],
+        "locations":         profile.locations or [],
+        "title_include":     profile.title_include or [],
+        "title_exclude":     profile.title_exclude or [],
+        "visa_sponsorship_required": profile.visa_sponsorship_required,
+        "excluded_companies": profile.excluded_companies or [],
+    }
 
 
 _VALID_SIGNALS = {"click", "applied", "interview"}
