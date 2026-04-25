@@ -424,9 +424,6 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
             )}
           </div>
 
-          {/* Summary sentence */}
-          <p className="text-sm text-slate-600 leading-relaxed">{buildSummary(pct, gaps)}</p>
-
           {/* 1. Why this could be a good fit */}
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Why this could be a good fit</p>
