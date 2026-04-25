@@ -374,7 +374,7 @@ export default function Feedback() {
                 </button>
               }
             >
-              {data.insights.length === 0 ? (
+              {!(data.insights?.length) ? (
                 <p className="text-xs text-slate-400">Rate a few jobs to unlock personalized insights.</p>
               ) : (
                 <div>
@@ -384,7 +384,7 @@ export default function Feedback() {
             </SectionCard>
 
             <SectionCard title="🎯 What to do next" subtitle="Your highest-impact next actions">
-              {data.next_steps.length === 0 ? (
+              {!(data.next_steps?.length) ? (
                 <p className="text-xs text-slate-400">
                   {data.feedback_count === 0
                     ? 'Rate jobs from the Open Positions tab to get personalised next steps.'
