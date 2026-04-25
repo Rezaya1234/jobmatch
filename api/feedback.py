@@ -199,6 +199,9 @@ async def list_feedback(
 # Feedback summary endpoint
 # ------------------------------------------------------------------
 
+_SHOWN_EVENT_TYPES = {"thumbs_up", "thumbs_down", "link_click", "email_thumbs_up", "email_thumbs_down", "applied", "interview"}
+
+
 class CourseItem(BaseModel):
     id: str
     title: str
@@ -208,6 +211,7 @@ class CourseItem(BaseModel):
     level: str
     description: str
     quality_score: float
+    gap_reason: str = ""
 
 
 class ActivityItem(BaseModel):
@@ -222,7 +226,12 @@ class FeedbackSummaryResponse(BaseModel):
     disliked_count: int
     viewed_count: int
     feedback_count: int
+    learning_status: str
+    learning_progress: int
+    learning_message: str
+    impact_message: str
     insights: list[str]
+    next_steps: list[str]
     preferences: dict[str, Any]
     courses: list[CourseItem]
     all_courses: list[CourseItem]
@@ -243,84 +252,106 @@ async def get_feedback_summary(
 
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # --- Counts ---
-    liked_result = await session.execute(
+    # --- Windowed counts (for the selected date range) ---
+    liked_count = (await session.scalar(
         select(func.count()).select_from(Feedback).where(
-            Feedback.user_id == uid,
-            Feedback.rating == "thumbs_up",
-            Feedback.created_at >= since,
+            Feedback.user_id == uid, Feedback.rating == "thumbs_up", Feedback.created_at >= since,
         )
-    )
-    liked_count = liked_result.scalar() or 0
+    )) or 0
 
-    disliked_result = await session.execute(
+    disliked_count = (await session.scalar(
         select(func.count()).select_from(Feedback).where(
-            Feedback.user_id == uid,
-            Feedback.rating == "thumbs_down",
-            Feedback.created_at >= since,
+            Feedback.user_id == uid, Feedback.rating == "thumbs_down", Feedback.created_at >= since,
         )
-    )
-    disliked_count = disliked_result.scalar() or 0
+    )) or 0
 
-    viewed_result = await session.execute(
+    viewed_count = (await session.scalar(
         select(func.count()).select_from(ActivityLog).where(
-            ActivityLog.user_id == uid,
-            ActivityLog.event_type == "link_click",
-            ActivityLog.created_at >= since,
+            ActivityLog.user_id == uid, ActivityLog.event_type == "link_click", ActivityLog.created_at >= since,
         )
-    )
-    viewed_count = viewed_result.scalar() or 0
+    )) or 0
 
     feedback_count = liked_count + disliked_count
 
-    # --- Liked jobs for gap detection ---
+    # --- All-time signal count for learning status (not date-windowed) ---
+    alltime_feedback = (await session.scalar(
+        select(func.count()).select_from(Feedback).where(Feedback.user_id == uid)
+    )) or 0
+    alltime_clicks = (await session.scalar(
+        select(func.count()).select_from(ActivityLog).where(
+            ActivityLog.user_id == uid, ActivityLog.event_type == "link_click",
+        )
+    )) or 0
+    total_signals = alltime_feedback + alltime_clicks
+
+    # --- Liked / disliked jobs (all-time, for pattern detection) ---
     liked_jobs_result = await session.execute(
         select(Job).join(Feedback, Feedback.job_id == Job.id).where(
-            Feedback.user_id == uid,
-            Feedback.rating == "thumbs_up",
+            Feedback.user_id == uid, Feedback.rating == "thumbs_up",
         ).order_by(Feedback.created_at.desc()).limit(50)
     )
     liked_jobs = liked_jobs_result.scalars().all()
 
     disliked_jobs_result = await session.execute(
         select(Job).join(Feedback, Feedback.job_id == Job.id).where(
-            Feedback.user_id == uid,
-            Feedback.rating == "thumbs_down",
+            Feedback.user_id == uid, Feedback.rating == "thumbs_down",
         ).order_by(Feedback.created_at.desc()).limit(50)
     )
     disliked_jobs = disliked_jobs_result.scalars().all()
 
     # --- User profile ---
-    profile_result = await session.execute(
+    profile = (await session.execute(
         select(UserProfile).where(UserProfile.user_id == uid)
-    )
-    profile = profile_result.scalar_one_or_none()
+    )).scalar_one_or_none()
 
-    # --- Rule-based insights ---
-    insights = _generate_insights(liked_jobs, disliked_jobs, feedback_count, liked_count, disliked_count)
+    # --- Learning status ---
+    learning_status, learning_progress, learning_message = _compute_learning_status(total_signals)
+    impact_message = _compute_impact_message(total_signals)
+
+    # --- Actionable insights ---
+    insights = _generate_insights(liked_jobs, disliked_jobs, alltime_feedback, len(liked_jobs), len(disliked_jobs))
+
+    # --- Next steps ---
+    from courses.recommender import (
+        detect_gaps, recommend_courses, recommend_all_courses,
+        skill_counts_in_texts, course_gap_reason,
+    )
+    liked_texts = [f"{j.title} {j.description[:500]}" for j in liked_jobs]
+    profile_text = (profile.role_description or "") if profile else ""
+    gaps = detect_gaps(liked_texts, profile_text)
+    skill_counts = skill_counts_in_texts(liked_texts)
+    total_liked = len(liked_texts)
+
+    next_steps = _generate_next_steps(liked_jobs, disliked_jobs, gaps, profile)
 
     # --- Preferences ---
     preferences = _build_preferences(profile)
 
-    # --- Course recommendations ---
-    from courses.recommender import detect_gaps, recommend_courses, recommend_all_courses
-    liked_texts = [f"{j.title} {j.description[:500]}" for j in liked_jobs]
-    profile_text = profile.role_description or "" if profile else ""
-    gaps = detect_gaps(liked_texts, profile_text)
+    # --- Course recommendations with gap reasons ---
     courses_raw = recommend_courses(gaps, limit=3)
     all_courses_raw = recommend_all_courses(gaps, limit=15)
 
-    courses = [CourseItem(id=c.id, title=c.title, provider=c.provider, url=c.url,
-                          tags=c.tags, level=c.level, description=c.description,
-                          quality_score=c.quality_score) for c in courses_raw]
-    all_courses = [CourseItem(id=c.id, title=c.title, provider=c.provider, url=c.url,
-                              tags=c.tags, level=c.level, description=c.description,
-                              quality_score=c.quality_score) for c in all_courses_raw]
+    courses = [
+        CourseItem(id=c.id, title=c.title, provider=c.provider, url=c.url,
+                   tags=c.tags, level=c.level, description=c.description,
+                   quality_score=c.quality_score,
+                   gap_reason=course_gap_reason(c, gaps, skill_counts, total_liked))
+        for c in courses_raw
+    ]
+    all_courses = [
+        CourseItem(id=c.id, title=c.title, provider=c.provider, url=c.url,
+                   tags=c.tags, level=c.level, description=c.description,
+                   quality_score=c.quality_score,
+                   gap_reason=course_gap_reason(c, gaps, skill_counts, total_liked))
+        for c in all_courses_raw
+    ]
 
-    # --- Activity log ---
+    # --- Activity log (only meaningful events) ---
     all_activity_result = await session.execute(
-        select(ActivityLog).where(ActivityLog.user_id == uid)
-        .order_by(ActivityLog.created_at.desc()).limit(50)
+        select(ActivityLog).where(
+            ActivityLog.user_id == uid,
+            ActivityLog.event_type.in_(_SHOWN_EVENT_TYPES),
+        ).order_by(ActivityLog.created_at.desc()).limit(50)
     )
     all_activity_rows = all_activity_result.scalars().all()
     all_activity = [
@@ -339,7 +370,12 @@ async def get_feedback_summary(
         disliked_count=disliked_count,
         viewed_count=viewed_count,
         feedback_count=feedback_count,
+        learning_status=learning_status,
+        learning_progress=learning_progress,
+        learning_message=learning_message,
+        impact_message=impact_message,
         insights=insights,
+        next_steps=next_steps,
         preferences=preferences,
         courses=courses,
         all_courses=all_courses,
@@ -348,76 +384,141 @@ async def get_feedback_summary(
     )
 
 
-def _generate_insights(
-    liked: list, disliked: list, total: int, liked_count: int, disliked_count: int
-) -> list[str]:
-    insights: list[str] = []
-    if total == 0:
-        return ["Rate a few jobs to unlock personalized insights."]
+def _compute_learning_status(total_signals: int) -> tuple[str, int, str]:
+    if total_signals < 5:
+        remaining = 5 - total_signals
+        return (
+            "Early stage", 10,
+            f"Rate {remaining} more job{'s' if remaining != 1 else ''} to start calibrating your matches",
+        )
+    if total_signals < 10:
+        remaining = 10 - total_signals
+        return (
+            "Building understanding", 35,
+            f"{remaining} more rating{'s' if remaining != 1 else ''} will significantly improve your results",
+        )
+    if total_signals < 20:
+        remaining = 20 - total_signals
+        return (
+            "Good understanding", 65,
+            f"Keep rating — {remaining} more will fine-tune your recommendations",
+        )
+    return "Strong understanding", 92, "Your profile is well-calibrated — keep rating to stay sharp"
 
-    # Approval rate
-    rate = round(liked_count / total * 100)
-    if rate >= 70:
-        insights.append(f"You approve of {rate}% of rated jobs — your filters are working well.")
-    elif rate <= 30:
-        insights.append(f"Only {rate}% approval rate — your criteria may be too broad or the pool needs tuning.")
-    else:
-        insights.append(f"{rate}% of rated jobs earned a thumbs-up so far.")
 
-    # Work mode preference from liked jobs
+def _compute_impact_message(total_signals: int) -> str:
+    if total_signals >= 20:
+        return "Your feedback has meaningfully shaped your match quality"
+    if total_signals >= 10:
+        return "Your recent ratings are actively improving your recommendations"
+    if total_signals >= 5:
+        return "Your feedback is starting to improve your matches"
+    return ""
+
+
+def _generate_insights(liked: list, disliked: list, total: int, liked_count: int, disliked_count: int) -> list[str]:
     from collections import Counter
-    liked_modes = Counter(j.work_mode for j in liked if j.work_mode)
-    if liked_modes:
-        top_mode = liked_modes.most_common(1)[0]
-        mode_pct = round(top_mode[1] / len(liked) * 100)
-        if mode_pct >= 60:
-            label = {"remote": "remote", "hybrid": "hybrid", "onsite": "on-site"}.get(top_mode[0], top_mode[0])
-            insights.append(f"{mode_pct}% of your liked roles are {label} — you have a clear work-mode preference.")
+    insights: list[str] = []
 
-    # Sector preference
+    if total == 0:
+        return []
+
+    # Work mode — liked pattern
+    liked_modes = Counter(j.work_mode for j in liked if j.work_mode)
+    if liked_modes and liked:
+        top_mode, top_count = liked_modes.most_common(1)[0]
+        mode_pct = round(top_count / len(liked) * 100)
+        mode_label = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}.get(top_mode, top_mode.title())
+        if mode_pct >= 60:
+            insights.append(f"{mode_pct}% of your liked roles are {mode_label} → set {mode_label} as your required work mode to cut noise")
+
+    # Work mode — disliked pattern
+    disliked_modes = Counter(j.work_mode for j in disliked if j.work_mode)
+    if disliked_modes and disliked:
+        top_dis, dis_count = disliked_modes.most_common(1)[0]
+        dis_pct = round(dis_count / len(disliked) * 100)
+        dis_label = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}.get(top_dis, top_dis.title())
+        if dis_pct >= 50 and dis_count >= 2:
+            insights.append(f"You consistently skip {dis_label} roles → filter them out in Profile to reduce noise")
+
+    # Sector — liked pattern
     liked_sectors = Counter(j.sector for j in liked if j.sector)
     if liked_sectors and liked_sectors.most_common(1)[0][1] >= 2:
-        top_sector = liked_sectors.most_common(1)[0][0]
-        insights.append(f"You're drawn to {top_sector} roles — consider adding it to your profile sectors.")
+        top_sector, sector_count = liked_sectors.most_common(1)[0]
+        sector_pct = round(sector_count / max(len(liked), 1) * 100)
+        insights.append(f"You engage most with {top_sector} roles ({sector_pct}% of likes) → add it to your preferred sectors")
 
-    # Disliked patterns
-    disliked_modes = Counter(j.work_mode for j in disliked if j.work_mode)
-    if disliked_modes:
-        top_dis = disliked_modes.most_common(1)[0]
-        if top_dis[1] >= 2 and top_dis[1] / max(len(disliked), 1) >= 0.5:
-            label = {"remote": "remote", "hybrid": "hybrid", "onsite": "on-site"}.get(top_dis[0], top_dis[0])
-            insights.append(f"You frequently dislike {label} roles — you can filter these out in Profile.")
-
-    # Company size preference
+    # Company size — liked pattern
     liked_sizes = Counter(j.company_size for j in liked if j.company_size)
     if liked_sizes and liked_sizes.most_common(1)[0][1] >= 2:
         top_size = liked_sizes.most_common(1)[0][0]
-        size_labels = {"startup": "startups (1–50)", "small": "small companies (51–200)",
-                       "medium": "mid-size companies (200–1000)", "large": "large companies (1000+)"}
-        label = size_labels.get(top_size, top_size)
-        insights.append(f"Most liked roles are at {label}.")
+        size_labels = {"startup": "startups", "small": "small companies", "medium": "mid-size companies", "large": "large companies"}
+        insights.append(f"Most of your liked roles are at {size_labels.get(top_size, top_size)} → update company size preference")
+
+    # Approval rate framing
+    rate = round(liked_count / total * 100) if total else 0
+    if rate >= 70:
+        insights.append(f"{rate}% approval rate — your filters are well-calibrated")
+    elif rate <= 25 and total >= 5:
+        insights.append(f"Only {rate}% approval — try widening your search criteria or updating your profile")
 
     return insights[:5]
+
+
+def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) -> list[str]:
+    from collections import Counter
+    from courses.recommender import gap_reason
+    steps: list[str] = []
+
+    # Step from work mode gap
+    liked_modes = Counter(j.work_mode for j in liked if j.work_mode)
+    if liked_modes and liked:
+        top_mode = liked_modes.most_common(1)[0][0]
+        top_pct = round(liked_modes[top_mode] / len(liked) * 100)
+        current_modes = (profile.work_modes if profile else None) or []
+        label = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}.get(top_mode, top_mode.title())
+        if top_pct >= 60 and top_mode not in current_modes:
+            steps.append(f"Set {label} as your required work mode — {top_pct}% of your liked roles are {label}")
+
+    # Step from sector gap
+    liked_sectors = Counter(j.sector for j in liked if j.sector)
+    if liked_sectors and liked_sectors.most_common(1)[0][1] >= 2:
+        top_sector = liked_sectors.most_common(1)[0][0]
+        current_sectors = (profile.preferred_sectors if profile else None) or []
+        if top_sector not in current_sectors:
+            steps.append(f"Add '{top_sector}' to your preferred sectors to surface more of these roles")
+
+    # Step from skill gap
+    if gaps:
+        label = gap_reason(gaps[0])
+        steps.append(f"Strengthen your {label} skills — they appear in most of the roles you like")
+
+    # Step from low approval rate
+    total = len(liked) + len(disliked)
+    if total >= 5 and len(liked) / total < 0.35:
+        steps.append("Run 'Reset Filters' in Pipeline to re-score all jobs with your current profile")
+
+    return steps[:3]
 
 
 def _build_preferences(profile) -> dict:
     if profile is None:
         return {}
     return {
-        "work_modes":        profile.work_modes or [],
-        "seniority_level":   profile.seniority_level,
-        "salary_min":        profile.salary_min,
-        "salary_max":        profile.salary_max,
-        "salary_currency":   profile.salary_currency,
-        "preferred_sectors": profile.preferred_sectors or [],
-        "company_type":      profile.company_type,
+        "work_modes":              profile.work_modes or [],
+        "seniority_level":         profile.seniority_level,
+        "salary_min":              profile.salary_min,
+        "salary_max":              profile.salary_max,
+        "salary_currency":         profile.salary_currency,
+        "preferred_sectors":       profile.preferred_sectors or [],
+        "company_type":            profile.company_type,
         "preferred_company_sizes": profile.preferred_company_sizes or [],
-        "preferred_companies": profile.preferred_companies or [],
-        "locations":         profile.locations or [],
-        "title_include":     profile.title_include or [],
-        "title_exclude":     profile.title_exclude or [],
+        "preferred_companies":     profile.preferred_companies or [],
+        "locations":               profile.locations or [],
+        "title_include":           profile.title_include or [],
+        "title_exclude":           profile.title_exclude or [],
         "visa_sponsorship_required": profile.visa_sponsorship_required,
-        "excluded_companies": profile.excluded_companies or [],
+        "excluded_companies":      profile.excluded_companies or [],
     }
 
 

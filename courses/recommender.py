@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections import Counter
 
 from courses.library import Course, COURSES
@@ -26,14 +25,14 @@ SKILL_KEYWORDS: dict[str, list[str]] = {
     "ci_cd":                ["ci/cd", "github actions", "gitlab ci", "jenkins", "circle ci", "pipeline automation"],
     "typescript":           ["typescript", " ts ", "angular", "nextjs", "next.js", "vue", "svelte"],
     "react":                ["react", "react.js", "reactjs", "hooks", "redux", "recoil", "zustand"],
-    "golang":               ["golang", " go ", "go language", "goroutine", "gRPC"],
+    "golang":               ["golang", " go ", "go language", "goroutine", "grpc"],
     "system_design":        ["system design", "distributed system", "scalab", "high availability", "fault toleran", "microservice", "event-driven architecture"],
     "security":             ["security", "oauth", "authentication", "authorization", "encryption", "jwt", "penetration test", "cybersecurity", "zero trust"],
     "product_management":   ["product manager", "product roadmap", "product strategy", "okr", "kpi", "stakeholder", "product owner", "agile", "scrum"],
     "analytics":            ["analytics", "tableau", "looker", "metabase", "power bi", "a/b test", "experimentation", "funnel", "retention", "cohort"],
 }
 
-_SKILL_TO_TAGS: dict[str, list[str]] = {
+SKILL_TO_TAGS: dict[str, list[str]] = {
     "python":             ["python", "pandas", "pytorch"],
     "machine_learning":   ["machine_learning", "scikit_learn", "python"],
     "deep_learning":      ["deep_learning", "python", "pytorch", "tensorflow"],
@@ -61,97 +60,103 @@ _SKILL_TO_TAGS: dict[str, list[str]] = {
     "analytics":          ["analytics", "tableau"],
 }
 
+_SKILL_LABELS: dict[str, str] = {
+    "python":             "Python",
+    "machine_learning":   "ML fundamentals",
+    "deep_learning":      "deep learning",
+    "llm":                "LLMs / RAG",
+    "nlp":                "NLP",
+    "mlops":              "MLOps",
+    "data_engineering":   "data engineering",
+    "kafka":              "Kafka / streaming",
+    "spark":              "Apache Spark",
+    "sql":                "SQL",
+    "nosql":              "NoSQL databases",
+    "vector_db":          "vector databases",
+    "aws":                "AWS",
+    "gcp":                "Google Cloud",
+    "kubernetes":         "Kubernetes",
+    "docker":             "Docker",
+    "terraform":          "Terraform / IaC",
+    "ci_cd":              "CI/CD",
+    "typescript":         "TypeScript",
+    "react":              "React",
+    "golang":             "Go",
+    "system_design":      "system design",
+    "security":           "security",
+    "product_management": "product management",
+    "analytics":          "analytics",
+}
+
+
+def gap_reason(gap: str) -> str:
+    """Human-readable label for a skill gap key."""
+    return _SKILL_LABELS.get(gap, gap.replace("_", " "))
+
 
 def extract_skills_from_text(text: str) -> set[str]:
-    """Return normalized skill keys found in the given text."""
     if not text:
         return set()
     lower = text.lower()
-    found: set[str] = set()
-    for skill, patterns in SKILL_KEYWORDS.items():
-        if any(p in lower for p in patterns):
-            found.add(skill)
-    return found
+    return {skill for skill, patterns in SKILL_KEYWORDS.items() if any(p in lower for p in patterns)}
+
+
+def skill_counts_in_texts(texts: list[str]) -> Counter[str]:
+    """Count how many texts mention each skill."""
+    counts: Counter[str] = Counter()
+    for text in texts:
+        for skill in extract_skills_from_text(text):
+            counts[skill] += 1
+    return counts
 
 
 def detect_gaps(liked_job_texts: list[str], profile_text: str) -> list[str]:
-    """
-    Return skills that appear frequently in liked job descriptions but
-    are absent from the user's profile text.
-    """
+    """Skills that appear frequently in liked jobs but are absent from the user profile."""
     if not liked_job_texts:
         return []
-
-    job_skills: Counter[str] = Counter()
-    for text in liked_job_texts:
-        for skill in extract_skills_from_text(text):
-            job_skills[skill] += 1
-
+    job_skills = skill_counts_in_texts(liked_job_texts)
     profile_skills = extract_skills_from_text(profile_text or "")
-
     threshold = max(1, len(liked_job_texts) // 3)
-    gaps = [
+    return [
         skill for skill, count in job_skills.most_common()
         if count >= threshold and skill not in profile_skills
     ]
-    return gaps
 
 
 def recommend_courses(gaps: list[str], limit: int = 3) -> list[Course]:
-    """Return the top `limit` courses that cover the detected skill gaps."""
     return _score_and_rank(gaps)[:limit]
 
 
 def recommend_all_courses(gaps: list[str], limit: int = 15) -> list[Course]:
-    """Return up to `limit` courses sorted by relevance to skill gaps."""
     return _score_and_rank(gaps)[:limit]
 
 
-def _gap_reason(gap: str) -> str:
-    labels: dict[str, str] = {
-        "python":             "Python",
-        "machine_learning":   "ML fundamentals",
-        "deep_learning":      "deep learning",
-        "llm":                "LLMs / RAG",
-        "nlp":                "NLP",
-        "mlops":              "MLOps",
-        "data_engineering":   "data engineering",
-        "kafka":              "Kafka / streaming",
-        "spark":              "Apache Spark",
-        "sql":                "SQL",
-        "nosql":              "NoSQL databases",
-        "vector_db":          "vector databases",
-        "aws":                "AWS",
-        "gcp":                "Google Cloud",
-        "kubernetes":         "Kubernetes",
-        "docker":             "Docker",
-        "terraform":          "Terraform / IaC",
-        "ci_cd":              "CI/CD",
-        "typescript":         "TypeScript",
-        "react":              "React",
-        "golang":             "Go",
-        "system_design":      "system design",
-        "security":           "security",
-        "product_management": "product management",
-        "analytics":          "analytics",
-    }
-    return labels.get(gap, gap.replace("_", " "))
+def course_gap_reason(course: Course, gaps: list[str], skill_counts: Counter[str], total_liked: int) -> str:
+    """Generate a human-readable reason tying a course to the user's detected gaps."""
+    course_tag_set = set(course.tags)
+    covered = [g for g in gaps if set(SKILL_TO_TAGS.get(g, [])) & course_tag_set]
+    if not covered:
+        return "Recommended based on your activity patterns"
+    top_gap = covered[0]
+    label = gap_reason(top_gap)
+    if total_liked > 0:
+        count = skill_counts.get(top_gap, 0)
+        pct = round(count / total_liked * 100)
+        if pct > 0:
+            return f"Covers {label} — present in ~{pct}% of roles you liked"
+    return f"Covers {label} — a skill gap in roles you engage with"
 
 
 def _score_and_rank(gaps: list[str]) -> list[Course]:
     if not gaps:
         return sorted(COURSES, key=lambda c: -c.quality_score)[:20]
-
     wanted_tags: set[str] = set()
     for gap in gaps:
-        wanted_tags.update(_SKILL_TO_TAGS.get(gap, [gap]))
-
-    scored: list[tuple[float, Course]] = []
-    for course in COURSES:
-        overlap = len(set(course.tags) & wanted_tags)
-        if overlap > 0:
-            score = overlap * course.quality_score
-            scored.append((score, course))
-
+        wanted_tags.update(SKILL_TO_TAGS.get(gap, [gap]))
+    scored = [
+        (len(set(c.tags) & wanted_tags) * c.quality_score, c)
+        for c in COURSES
+        if set(c.tags) & wanted_tags
+    ]
     scored.sort(key=lambda x: -x[0])
     return [c for _, c in scored]
