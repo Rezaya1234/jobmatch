@@ -2,6 +2,31 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listCompanies } from '../api'
 
+// Known domains keyed by company insight slug (derived from company display name)
+const SLUG_DOMAINS = {
+  'anthropic':   'anthropic.com',
+  'scale-ai':    'scale.ai',
+  'together-ai': 'together.ai',
+  'glean':       'glean.com',
+  'gong':        'gong.com',
+  'intercom':    'intercom.com',
+  'databricks':  'databricks.com',
+  'mistral-ai':  'mistral.ai',
+  'palantir':    'palantir.com',
+  'openai':      'openai.com',
+  'cohere':      'cohere.com',
+  'writer':      'writer.com',
+  'runway':      'runwayml.com',
+  'pinecone':    'pinecone.io',
+  'perplexity':  'perplexity.ai',
+  'elevenlabs':  'elevenlabs.io',
+  'cursor':      'cursor.sh',
+  'harvey-ai':   'harvey.ai',
+  'sierra-ai':   'sierra.ai',
+  'google':      'google.com',
+  'amazon':      'amazon.com',
+}
+
 function getDomain(url) {
   if (!url) return null
   try { return new URL(url).hostname.replace(/^www\./, '') }
@@ -9,20 +34,13 @@ function getDomain(url) {
 }
 
 function CompanyLogo({ name, website, slug, cls = 'w-12 h-12' }) {
-  const [failedWebsite, setFailedWebsite] = useState(false)
-  const [failedSlug, setFailedSlug] = useState(false)
-
-  const domain1 = getDomain(website)
-  const domain2 = slug ? `${slug}.com` : null
+  const [failed, setFailed] = useState(false)
+  const domain = getDomain(website) || SLUG_DOMAINS[slug] || null
   const initials = name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
   const colors = ['bg-violet-100 text-violet-700','bg-blue-100 text-blue-700','bg-emerald-100 text-emerald-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700','bg-cyan-100 text-cyan-700']
-  const imgCls = `${cls} rounded-xl object-contain border border-slate-100 bg-white p-1 shrink-0`
 
-  if (domain1 && !failedWebsite) {
-    return <img src={`https://logo.clearbit.com/${domain1}`} alt={name} className={imgCls} onError={() => setFailedWebsite(true)} />
-  }
-  if (domain2 && domain2 !== domain1 && !failedSlug) {
-    return <img src={`https://logo.clearbit.com/${domain2}`} alt={name} className={imgCls} onError={() => setFailedSlug(true)} />
+  if (domain && !failed) {
+    return <img src={`https://logo.clearbit.com/${domain}`} alt={name} className={`${cls} rounded-xl object-contain border border-slate-100 bg-white p-1 shrink-0`} onError={() => setFailed(true)} />
   }
   return (
     <div className={`${cls} rounded-xl flex items-center justify-center text-lg font-bold shrink-0 ${colors[name.charCodeAt(0) % colors.length]}`}>

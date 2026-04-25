@@ -239,10 +239,6 @@ export default function Pipeline() {
               className="bg-violet-600 text-white py-2 rounded-lg font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
               {insightsStatus === 'running' ? 'Starting...' : insightsStatus === 'accepted' ? '✓ Started' : insightsStatus === 'error' ? 'Failed' : 'Refresh Insights'}
             </button>
-            <button onClick={handleBackfillLogos} disabled={logoStatus === 'running'}
-              className="bg-slate-600 text-white py-2 rounded-lg font-medium hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm">
-              {logoStatus === 'running' ? 'Updating...' : logoStatus && logoStatus !== 'error' ? '✓ ' + logoStatus : logoStatus === 'error' ? 'Failed' : 'Backfill Logos'}
-            </button>
           </div>
         </div>
       </div>
