@@ -71,23 +71,43 @@ function ScoreBadge({ pct }) {
 // Extract a 1-2 line "What you'll do" snippet from the job description
 // ---------------------------------------------------------------------------
 
-function extractWhatYouDo(description) {
-  if (!description) return null
-  const respMarkers = /(?:what you['']ll do|responsibilities|what you will do|your role|key responsibilities|in this role|you will|you['']ll)/i
-  const lines = description.split(/\n+/)
+const RESP_HEADER_RE = /^(?:what you['']ll do|responsibilities|key responsibilities|your role|in this role|what you['']ll be doing|the role|day.to.day|what you['']ll own|what you['']ll build|what you['']ll lead|role overview)/i
+const NEXT_SECTION_RE = /^(?:what you['']ll bring|requirements|qualifications|about us|benefits|who you are|you bring|you have|compensation|what we offer)/i
+
+function parseResponsibilities(description) {
+  if (!description) return []
+  const lines = description.split(/\n/).map(l => l.trim()).filter(Boolean)
+  let start = -1
   for (let i = 0; i < lines.length; i++) {
-    if (respMarkers.test(lines[i])) {
-      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-        const next = lines[j].trim().replace(/^[-•*]\s*/, '')
-        if (next.length >= 20) return next.length > 130 ? next.slice(0, 127) + '…' : next
-      }
-    }
+    const bare = lines[i].replace(/^[#*•\-:]+\s*/, '').trim()
+    if (RESP_HEADER_RE.test(bare) && bare.length < 80) { start = i; break }
   }
-  const aboutUs = /^(?:about us|about the company|who we are|overview|we are|we['']re)/i
-  const sentences = description.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/)
-  for (const sent of sentences) {
+  if (start === -1) return []
+  const bullets = []
+  for (let i = start + 1; i < Math.min(start + 10, lines.length) && bullets.length < 3; i++) {
+    const bare = lines[i].replace(/^[#*•\-:]+\s*/, '').trim()
+    if (NEXT_SECTION_RE.test(bare)) break
+    const clean = bare.replace(/^[-•*\d.]+\s*/, '').trim()
+    if (clean.length >= 20 && clean.length < 200) bullets.push(clean)
+  }
+  return bullets
+}
+
+function extractWhatYouDo(description) {
+  const bullets = parseResponsibilities(description)
+  if (bullets.length > 0) {
+    // Take the first bullet; ensure it reads as a complete sentence
+    const text = bullets[0]
+    const sentence = text.charAt(0).toUpperCase() + text.slice(1)
+    const ended = sentence.match(/[.!?]$/) ? sentence : sentence + '.'
+    return ended.length > 150 ? ended.slice(0, 147) + '…' : ended
+  }
+  // Fallback: first substantive non-intro sentence
+  if (!description) return null
+  const skipRe = /^(?:about us|about the company|who we are|we are|we['']re|our company|join us)/i
+  for (const sent of description.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/)) {
     const clean = sent.trim()
-    if (clean.length >= 30 && !aboutUs.test(clean)) return clean.length > 130 ? clean.slice(0, 127) + '…' : clean
+    if (clean.length >= 40 && !skipRe.test(clean)) return clean.length > 150 ? clean.slice(0, 147) + '…' : clean
   }
   return null
 }
