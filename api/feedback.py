@@ -423,56 +423,77 @@ def _compute_impact_message(total_signals: int) -> str:
 
 def _generate_insights(liked: list, disliked: list, total: int, liked_count: int, disliked_count: int) -> list[str]:
     from collections import Counter
-    insights: list[str] = []
 
     if total == 0:
         return []
 
     MODE_LABEL = {"remote": "Remote", "hybrid": "Hybrid", "onsite": "On-site"}
 
-    # Strongest skipped-mode signal first (most striking data point)
-    disliked_modes = Counter(j.work_mode for j in disliked if j.work_mode)
+    liked_modes    = Counter(j.work_mode    for j in liked    if j.work_mode)
+    disliked_modes = Counter(j.work_mode    for j in disliked if j.work_mode)
+    liked_sectors  = Counter(j.sector       for j in liked    if j.sector)
+    liked_sizes    = Counter(j.company_size for j in liked    if j.company_size)
+
+    # --- Contrast: same work mode dominates both liked and disliked ---
+    # e.g. "You prefer On-site roles but also skip many On-site opportunities"
+    contrast: str | None = None
+    if liked_modes and disliked_modes and liked and disliked:
+        top_lk_mode = liked_modes.most_common(1)[0][0]
+        top_dis_mode = disliked_modes.most_common(1)[0][0]
+        lk_pct  = round(liked_modes[top_lk_mode]    / max(len(liked),    1) * 100)
+        dis_pct = round(disliked_modes[top_dis_mode] / max(len(disliked), 1) * 100)
+        if top_lk_mode == top_dis_mode and lk_pct >= 50 and dis_pct >= 40:
+            ml = MODE_LABEL.get(top_lk_mode, top_lk_mode.title())
+            contrast = (
+                f"You prefer {ml} roles but also skip many {ml} opportunities — "
+                f"this suggests inconsistency in filtering or role quality"
+            )
+
+    # --- Individual observations ---
+    obs: list[str] = []
+
+    # Skipped work mode (most striking negative signal)
     if disliked_modes and disliked:
         top_dis, dis_count = disliked_modes.most_common(1)[0]
         dis_pct = round(dis_count / max(len(disliked), 1) * 100)
         dl = MODE_LABEL.get(top_dis, top_dis.title())
         if dis_pct >= 50 and dis_count >= 2:
-            insights.append(f"{dis_pct}% of roles you skipped were {dl}")
+            obs.append(f"{dis_pct}% of roles you skipped were {dl} roles")
 
     # Liked work mode
-    liked_modes = Counter(j.work_mode for j in liked if j.work_mode)
     if liked_modes and liked:
         top_mode, top_count = liked_modes.most_common(1)[0]
         mode_pct = round(top_count / max(len(liked), 1) * 100)
         ml = MODE_LABEL.get(top_mode, top_mode.title())
         if mode_pct >= 60:
-            insights.append(f"{mode_pct}% of roles you liked were {ml}")
+            obs.append(f"{mode_pct}% of roles you liked were {ml} roles")
 
     # Sector concentration
-    liked_sectors = Counter(j.sector for j in liked if j.sector)
     if liked_sectors and liked_sectors.most_common(1)[0][1] >= 2:
         top_sector, sec_count = liked_sectors.most_common(1)[0]
         sec_pct = round(sec_count / max(len(liked), 1) * 100)
-        insights.append(f"{sec_pct}% of your liked roles are in {top_sector}")
+        obs.append(f"{sec_pct}% of your liked roles are in {top_sector}")
 
     # Company size concentration
-    liked_sizes = Counter(j.company_size for j in liked if j.company_size)
     if liked_sizes and liked_sizes.most_common(1)[0][1] >= 2:
         top_size, size_count = liked_sizes.most_common(1)[0]
         size_pct = round(size_count / max(len(liked), 1) * 100)
         size_label = {"startup": "startups", "small": "small companies",
                       "medium": "mid-size companies", "large": "large companies"}.get(top_size, top_size)
-        insights.append(f"{size_pct}% of your liked roles are at {size_label}")
+        obs.append(f"{size_pct}% of your liked roles are at {size_label}")
 
     # Approval rate — only when notably high or low
     rate = round(liked_count / total * 100) if total else 0
     if total >= 5:
         if rate >= 70:
-            insights.append(f"You've approved {rate}% of rated roles")
+            obs.append(f"You've approved {rate}% of rated roles")
         elif rate <= 25:
-            insights.append(f"You've approved only {rate}% of rated roles")
+            obs.append(f"You've approved only {rate}% of rated roles")
 
-    return insights[:3]
+    # If contrast fires: show max 2 individual obs + contrast = 3 total
+    if contrast:
+        return obs[:2] + [contrast]
+    return obs[:3]
 
 
 def _generate_next_steps(liked: list, disliked: list, gaps: list[str], profile) -> list[NextStep]:
