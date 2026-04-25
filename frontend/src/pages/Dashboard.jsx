@@ -80,8 +80,11 @@ function stripHtml(html) {
   return doc.body.textContent || ''
 }
 
-const RESP_HEADER_RE = /^(?:what you['']ll do|responsibilities|key responsibilities|your role|in this role|what you['']ll be doing|the role|day.to.day|what you['']ll own|what you['']ll build|what you['']ll lead|role overview)/i
-const NEXT_SECTION_RE = /^(?:what you['']ll bring|requirements|qualifications|about us|benefits|who you are|you bring|you have|compensation|what we offer)/i
+const RESP_HEADER_RE = /^(?:what you['']ll do|responsibilities|key responsibilities|your role|in this role|what you['']ll be doing|the role|day.to.day|what you['']ll own|what you['']ll build|what you['']ll lead|role overview|about the role|position overview|position summary|your responsibilities|core responsibilities|role responsibilities|you will|you'll)/i
+const NEXT_SECTION_RE = /^(?:what you['']ll bring|requirements|qualifications|about us|about the company|benefits|who you are|you bring|you have|compensation|what we offer|perks|our company|who we are)/i
+
+// Action verbs that signal a responsibility bullet rather than company prose
+const ACTION_VERB_RE = /^(?:lead|build|design|develop|drive|own|manage|partner|collaborate|define|create|deliver|work|ensure|support|implement|establish|identify|analyse|analyze|evaluate|launch|improve|scale|grow|execute|oversee|shape|contribute|coordinate|report|maintain|review|mentor|hire|recruit)/i
 
 function parseResponsibilities(description) {
   if (!description) return []
@@ -91,35 +94,31 @@ function parseResponsibilities(description) {
     const bare = lines[i].replace(/^[#*•\-:]+\s*/, '').trim()
     if (RESP_HEADER_RE.test(bare) && bare.length < 80) { start = i; break }
   }
-  if (start === -1) return []
-  const bullets = []
-  for (let i = start + 1; i < Math.min(start + 10, lines.length) && bullets.length < 3; i++) {
-    const bare = lines[i].replace(/^[#*•\-:]+\s*/, '').trim()
-    if (NEXT_SECTION_RE.test(bare)) break
-    const clean = bare.replace(/^[-•*\d.]+\s*/, '').trim()
-    if (clean.length >= 20 && clean.length < 200) bullets.push(clean)
+  if (start !== -1) {
+    const bullets = []
+    for (let i = start + 1; i < Math.min(start + 20, lines.length) && bullets.length < 4; i++) {
+      const bare = lines[i].replace(/^[#*•\-:]+\s*/, '').trim()
+      if (NEXT_SECTION_RE.test(bare)) break
+      const clean = bare.replace(/^[-•*\d.]+\s*/, '').trim()
+      if (clean.length >= 20 && clean.length < 200) bullets.push(clean)
+    }
+    if (bullets.length > 0) return bullets
   }
-  return bullets
+  // Fallback: scan all lines for the first action-verb bullet
+  for (const line of lines) {
+    const clean = line.replace(/^[-•*\d.]+\s*/, '').trim()
+    if (clean.length >= 20 && clean.length < 200 && ACTION_VERB_RE.test(clean)) return [clean]
+  }
+  return []
 }
 
 function extractWhatYouDo(description) {
   const bullets = parseResponsibilities(description)
-  if (bullets.length > 0) {
-    // Take the first bullet; ensure it reads as a complete sentence
-    const text = bullets[0]
-    const sentence = text.charAt(0).toUpperCase() + text.slice(1)
-    const ended = sentence.match(/[.!?]$/) ? sentence : sentence + '.'
-    return ended.length > 150 ? ended.slice(0, 147) + '…' : ended
-  }
-  // Fallback: first substantive non-intro sentence
-  if (!description) return null
-  const plain = stripHtml(description)
-  const skipRe = /^(?:about us|about the company|who we are|we are|we['']re|our company|join us)/i
-  for (const sent of plain.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/)) {
-    const clean = sent.trim()
-    if (clean.length >= 40 && !skipRe.test(clean)) return clean.length > 150 ? clean.slice(0, 147) + '…' : clean
-  }
-  return null
+  if (bullets.length === 0) return null
+  return bullets.map(b => {
+    const s = b.charAt(0).toUpperCase() + b.slice(1)
+    return s.match(/[.!?]$/) ? s : s + '.'
+  }).join(' ')
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +317,7 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
         <div className="hidden md:flex flex-1 min-w-0 flex-col justify-center gap-1.5 border-l border-slate-100 pl-3">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5">What you'll do</p>
           {extractWhatYouDo(match.description) ? (
-            <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{extractWhatYouDo(match.description)}</p>
+            <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">{extractWhatYouDo(match.description)}</p>
           ) : signals.length > 0 ? signals.map((s, i) => (
             <div key={i} className="flex items-center gap-2 min-w-0">
               <span className="w-1 h-1 rounded-full bg-violet-300 shrink-0" />
