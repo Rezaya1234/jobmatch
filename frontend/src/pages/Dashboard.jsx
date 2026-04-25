@@ -650,7 +650,10 @@ function ScoreTrendChart({ matches }) {
   const [hovered, setHovered] = useState(null)
 
   const byDate = {}
-  for (const m of matches) {
+  const sortedMatches = [...matches].sort((a, b) =>
+    new Date(a.emailed_at || a.created_at || 0) - new Date(b.emailed_at || b.created_at || 0)
+  )
+  for (const m of sortedMatches) {
     const ts = m.emailed_at || m.created_at
     if (!ts || !m.score) continue
     const day = new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
