@@ -12,13 +12,40 @@ const DIMENSIONS = [
 ]
 const DIM_LABELS = Object.fromEntries(DIMENSIONS.map(d => [d.key, d.label]))
 
-const GAP_COACHING = {
-  skills_match:       'Highlight matching skills more prominently in your profile and cover note',
-  experience_level:   'Emphasize project outcomes that demonstrate the required seniority',
-  industry_alignment: 'Tailor your summary to surface relevant domain experience',
-  salary:             'Your expected range may differ — review the posting for flexibility signals',
-  function_type:      'This role has a different focus than your current trajectory',
-  career_trajectory:  'Frame your career story to align with this direction',
+const DIM_FIT_PHRASES = {
+  skills_match:       'Your technical background lines up well with what this role needs.',
+  experience_level:   'The seniority level here matches where you are in your career.',
+  industry_alignment: "This is in the kind of space you've been targeting.",
+  salary:             "The compensation looks aligned with what you're looking for.",
+  function_type:      "The type of work here fits the direction you've been moving.",
+  career_trajectory:  'This could be a natural next step from where you are now.',
+}
+
+const GAP_ADVISOR = {
+  skills_match:       "You'd likely need to show stronger technical depth for this role.",
+  experience_level:   "The seniority bar here might be a stretch — worth addressing directly in your application.",
+  industry_alignment: "This leans into a space that's a bit outside your recent focus.",
+  salary:             "The compensation range here might be different from what you're targeting.",
+  function_type:      "This leans more toward a different function than your recent work.",
+  career_trajectory:  "The career direction here is a bit of a pivot from your current path.",
+}
+
+const COURSE_OUTCOMES = {
+  python:           "Useful if you want to round out your Python for data or ML work.",
+  machine_learning: "Good for building credibility in ML engineering roles.",
+  deep_learning:    "Helpful if you're moving toward AI research or applied ML.",
+  llm:              "Worth it if you want to work on AI-native products.",
+  nlp:              "Relevant for NLP and text-heavy engineering roles.",
+  mlops:            "Directly applicable if production ML is part of this role.",
+  data_engineering: "Useful for data infrastructure and pipeline-heavy roles.",
+  sql:              "Helpful for any role where data analysis is expected.",
+  aws:              "Good for cloud-heavy roles — most of them require this now.",
+  kubernetes:       "Worth it for infrastructure or platform engineering roles.",
+  docker:           "Increasingly expected in backend or ML engineering roles.",
+  react:            "Good if you need to show frontend depth.",
+  typescript:       "Worth adding if full-stack or frontend is part of the picture.",
+  system_design:    "Useful if this role expects strong architectural thinking.",
+  analytics:        "Good foundation for data or product analytics roles.",
 }
 
 const SKILL_KEYWORDS_JS = {
@@ -40,21 +67,21 @@ const SKILL_KEYWORDS_JS = {
 }
 
 const SKILL_COURSES = {
-  python:           { name: 'Python for Data Science & AI', provider: 'Coursera' },
-  machine_learning: { name: 'ML Specialization (Andrew Ng)', provider: 'Coursera' },
-  deep_learning:    { name: 'Deep Learning Specialization', provider: 'Coursera' },
-  llm:              { name: 'LangChain & LLM Development', provider: 'DeepLearning.AI' },
-  nlp:              { name: 'NLP with Transformers', provider: 'Hugging Face' },
-  mlops:            { name: 'MLOps Specialization', provider: 'Coursera' },
-  data_engineering: { name: 'Data Engineering Fundamentals', provider: 'dbt Labs' },
-  sql:              { name: 'SQL for Data Analysis', provider: 'Coursera' },
-  aws:              { name: 'AWS Cloud Practitioner', provider: 'AWS' },
-  kubernetes:       { name: 'Kubernetes for Developers', provider: 'Udemy' },
-  docker:           { name: 'Docker Mastery', provider: 'Udemy' },
-  react:            { name: 'React — The Complete Guide', provider: 'Udemy' },
-  typescript:       { name: 'TypeScript Masterclass', provider: 'Udemy' },
-  system_design:    { name: 'Grokking System Design', provider: 'Educative' },
-  analytics:        { name: 'Google Data Analytics Certificate', provider: 'Coursera' },
+  python:           { skill: 'python',           name: 'Python for Data Science & AI',      provider: 'Coursera' },
+  machine_learning: { skill: 'machine_learning', name: 'ML Specialization (Andrew Ng)',      provider: 'Coursera' },
+  deep_learning:    { skill: 'deep_learning',    name: 'Deep Learning Specialization',       provider: 'Coursera' },
+  llm:              { skill: 'llm',              name: 'LangChain & LLM Development',        provider: 'DeepLearning.AI' },
+  nlp:              { skill: 'nlp',              name: 'NLP with Transformers',              provider: 'Hugging Face' },
+  mlops:            { skill: 'mlops',            name: 'MLOps Specialization',               provider: 'Coursera' },
+  data_engineering: { skill: 'data_engineering', name: 'Data Engineering Fundamentals',      provider: 'dbt Labs' },
+  sql:              { skill: 'sql',              name: 'SQL for Data Analysis',              provider: 'Coursera' },
+  aws:              { skill: 'aws',              name: 'AWS Cloud Practitioner',             provider: 'AWS' },
+  kubernetes:       { skill: 'kubernetes',       name: 'Kubernetes for Developers',          provider: 'Udemy' },
+  docker:           { skill: 'docker',           name: 'Docker Mastery',                     provider: 'Udemy' },
+  react:            { skill: 'react',            name: 'React — The Complete Guide',         provider: 'Udemy' },
+  typescript:       { skill: 'typescript',       name: 'TypeScript Masterclass',             provider: 'Udemy' },
+  system_design:    { skill: 'system_design',    name: 'Grokking System Design',             provider: 'Educative' },
+  analytics:        { skill: 'analytics',        name: 'Google Data Analytics Certificate',  provider: 'Coursera' },
 }
 
 function detectSkillsFromText(text) {
@@ -87,6 +114,22 @@ function buildGaps(job) {
       val,
       severe: val < 0.60,
     }))
+}
+
+function buildSummary(pct, gaps) {
+  if (pct >= 85 && gaps.length === 0) return "This looks like a genuinely strong fit."
+  if (pct >= 85 && gaps.length > 0)  return "This looks like a strong fit overall, with a couple of areas worth tightening up."
+  if (pct >= 70 && gaps.length <= 1) return "This is a solid match — there's one area you'd want to address."
+  if (pct >= 70)                      return "A reasonable fit, but there are a few areas you'd need to work on."
+  if (pct >= 55)                      return "There are some gaps here, but it could still be worth a look."
+  return "This is a stretch role — but sometimes those are the most interesting ones."
+}
+
+function scoreLabel(pct) {
+  if (pct >= 85) return 'Strong fit'
+  if (pct >= 70) return 'Good fit'
+  if (pct >= 55) return 'Moderate fit'
+  return 'Partial fit'
 }
 
 export default function DetailsDrawer({ job, userId, currentRating, onClose, onFeedback }) {
@@ -194,7 +237,7 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
           {/* Meta chips */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${scoreColor}`}>
-              {pct}% match
+              {scoreLabel(pct)}
             </span>
             {job.work_mode && (
               <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">{job.work_mode}</span>
@@ -210,21 +253,24 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
             )}
           </div>
 
-          {/* 1. Why it's worth your time */}
+          {/* Summary sentence */}
+          <p className="text-sm text-slate-600 leading-relaxed">{buildSummary(pct, gaps)}</p>
+
+          {/* 1. Why this could be a good fit */}
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Why it's worth your time</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Why this could be a good fit</p>
             {reasoning && (
               <p className="text-sm text-slate-700 leading-relaxed mb-3">{reasoning}</p>
             )}
             {topDims.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {topDims.map(([key, val]) => (
-                  <span key={key} className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-100 px-2.5 py-1 rounded-full">
-                    <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <div className="space-y-2">
+                {topDims.map(([key]) => (
+                  <div key={key} className="flex items-start gap-2">
+                    <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    {DIM_LABELS[key] || key} · {Math.round(val * 100)}%
-                  </span>
+                    <span className="text-sm text-slate-700">{DIM_FIT_PHRASES[key] || 'This area aligns well with your background.'}</span>
+                  </div>
                 ))}
               </div>
             )}
@@ -233,28 +279,24 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
             )}
           </div>
 
-          {/* 2. What might hold you back */}
+          {/* 2. Where you might need to stretch */}
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">What might hold you back</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Where you might need to stretch</p>
             {gaps.length === 0 ? (
               Object.keys(job.dimension_scores || {}).length === 0
-                ? <p className="text-sm text-slate-400">Score breakdown not available for this role yet.</p>
-                : <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
-                    <svg className="w-4 h-4 text-green-600 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                ? <p className="text-sm text-slate-400">Detailed breakdown not available for this role yet.</p>
+                : <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
+                    <svg className="w-4 h-4 text-green-600 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <p className="text-sm text-green-700 font-medium">No significant gaps — you're a strong candidate for this role.</p>
+                    <p className="text-sm text-green-700">Nothing stands out as a major gap. You look well-positioned for this one.</p>
                   </div>
             ) : (
               <div className="space-y-2.5">
-                {gaps.map(({ key, label, val, severe }) => (
+                {gaps.map(({ key, severe }) => (
                   <div key={key} className={`rounded-xl p-3 border ${severe ? 'bg-rose-50 border-rose-100' : 'bg-amber-50 border-amber-100'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-semibold ${severe ? 'text-rose-800' : 'text-amber-800'}`}>{label}</span>
-                      <span className={`text-xs font-mono ${severe ? 'text-rose-600' : 'text-amber-600'}`}>{Math.round(val * 100)}%</span>
-                    </div>
-                    <p className={`text-xs leading-relaxed ${severe ? 'text-rose-700' : 'text-amber-700'}`}>
-                      {GAP_COACHING[key] || 'Consider how to address this in your application'}
+                    <p className={`text-sm leading-relaxed ${severe ? 'text-rose-700' : 'text-amber-700'}`}>
+                      {GAP_ADVISOR[key] || 'This is an area worth addressing before you apply.'}
                     </p>
                   </div>
                 ))}
@@ -262,19 +304,19 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
             )}
           </div>
 
-          {/* 3. How to improve your chances */}
+          {/* 3. How to get closer to roles like this */}
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">How to improve your chances</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">How to get closer to roles like this</p>
             {suggestedCourses.length > 0 ? (
               <div className="space-y-2">
                 {suggestedCourses.map((course, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
-                    <svg className="w-4 h-4 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div key={i} className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+                    <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-blue-700 truncate">{course.name}</p>
-                      <p className="text-[10px] text-blue-500">{course.provider}</p>
+                      <p className="text-xs text-blue-600 mt-0.5 leading-snug">{COURSE_OUTCOMES[course.skill] || ''}</p>
                     </div>
                   </div>
                 ))}
@@ -285,9 +327,9 @@ export default function DetailsDrawer({ job, userId, currentRating, onClose, onF
             ) : (
               <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                 <p className="text-sm text-slate-500">
-                  Visit{' '}
+                  Head to{' '}
                   <a href="/feedback" className="text-violet-600 font-medium hover:underline">Feedback & Insights</a>
-                  {' '}for personalized learning recommendations based on all your activity.
+                  {' '}to see learning recommendations based on your activity across all roles.
                 </p>
               </div>
             )}
