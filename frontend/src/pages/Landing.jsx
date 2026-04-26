@@ -11,16 +11,34 @@ const Icon = ({ path, className = 'w-6 h-6' }) => (
 )
 
 const ICONS = {
-  sparkle:    'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z',
-  chart:      'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-  brain:      'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z',
-  target:     'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
-  building:   'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
-  resume:     'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-  feedback:   'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
-  check:      'M5 13l4 4L19 7',
-  arrow:      'M17 8l4 4m0 0l-4 4m4-4H3',
-  path:       'M13 7l5 5m0 0l-5 5m5-5H6',
+  sparkle:   'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z',
+  chart:     'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+  brain:     'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z',
+  target:    'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+  building:  'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+  resume:    'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  feedback:  'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+  check:     'M5 13l4 4L19 7',
+  arrow:     'M17 8l4 4m0 0l-4 4m4-4H3',
+  path:      'M13 7l5 5m0 0l-5 5m5-5H6',
+  thumbUp:   'M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5',
+  thumbDown: 'M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5',
+}
+
+function WarningIcon() {
+  return (
+    <svg className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
+function XCircleIcon() {
+  return (
+    <svg className="w-4 h-4 text-rose-300 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+    </svg>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -37,7 +55,7 @@ function Hero() {
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight tracking-tight mb-5">
           Stop applying blindly.{' '}
-          <span className="text-violet-600">Start building your career.</span>
+          <span className="text-violet-600">Design your career.</span>
         </h1>
         <p className="text-lg text-slate-500 leading-relaxed mb-8 max-w-2xl mx-auto">
           StellaPath uses AI to help you find real opportunities, understand your gaps,
@@ -176,63 +194,109 @@ function HowItWorks() {
 
 function Differentiation() {
   const points = [
-    'Not a generic job board — every recommendation is scored against your actual background.',
-    'Not keyword search — StellaPath understands context, seniority, and career direction.',
-    'Learns from your behavior — each reaction makes future matches more relevant.',
-    'Helps you build a path, not just find a job — connected to where you want to be next.',
+    'Not a generic job board — grounded in your actual background',
+    'Not keyword search — understands context and direction',
+    'Learns from you — improves with every interaction',
+    'Built for your path — not just your next job',
   ]
 
   return (
     <section className="py-16 px-5 bg-slate-50">
-      <div className="max-w-4xl mx-auto">
-        <div className="grid md:grid-cols-2 gap-10 items-center">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4">
-              Built differently, on purpose
-            </h2>
-            <p className="text-slate-500 mb-6 leading-relaxed">
-              Most job sites give you a firehose of listings and hope something sticks.
-              StellaPath is designed to help you be intentional — understanding fit, gaps,
-              and path before you spend time applying.
-            </p>
-            <ul className="space-y-3">
-              {points.map((p, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <Icon path={ICONS.check} className="w-3 h-3" />
-                  </div>
-                  <span className="text-sm text-slate-600">{p}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+      <div className="max-w-3xl mx-auto">
+        <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-5">
+          Built differently, on purpose
+        </h2>
+        <p className="text-slate-600 mb-4 leading-relaxed">
+          Most job sites give you a firehose of listings and hope something sticks. StellaPath does the
+          opposite. It narrows the noise and shows you only the roles that actually fit.
+        </p>
+        <p className="text-slate-600 mb-7 leading-relaxed">
+          Every morning, you get a small set of highly relevant opportunities — along with clear
+          insight into the role, the company, and what it takes to get there.
+        </p>
+        <ul className="space-y-3">
+          {points.map((p, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <div className="w-5 h-5 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
+                <Icon path={ICONS.check} className="w-3 h-3" />
+              </div>
+              <span className="text-sm text-slate-600">{p}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
 
-          {/* Simple visual card stack */}
-          <div className="relative hidden md:block">
-            <div className="absolute inset-0 flex flex-col gap-3 p-4 pointer-events-none" aria-hidden="true">
-              {[
-                { title: 'Staff ML Engineer', company: 'Anthropic', score: '94%', badge: 'Strong fit' },
-                { title: 'Senior AI Engineer', company: 'Scale AI',  score: '88%', badge: 'Good fit' },
-                { title: 'ML Platform Lead',  company: 'Databricks', score: '81%', badge: 'Good fit' },
-              ].map(({ title, company, score, badge }, i) => (
-                <div
-                  key={title}
-                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-center justify-between"
-                  style={{ opacity: 1 - i * 0.12, transform: `scale(${1 - i * 0.02})` }}
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{title}</p>
-                    <p className="text-xs text-slate-500">{company}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-base font-bold text-violet-700">{score}</p>
-                    <p className="text-xs text-green-600 font-medium">{badge}</p>
-                  </div>
+// ---------------------------------------------------------------------------
+// Job cards
+// ---------------------------------------------------------------------------
+
+const JOB_CARDS = [
+  {
+    title:   'Staff ML Engineer',
+    company: 'Anthropic',
+    score:   '94%',
+    badge:   'Strong fit',
+    summary: 'Lead research and production ML systems at the frontier of AI safety. Work closely with alignment and policy teams to ship models responsibly at scale.',
+  },
+  {
+    title:   'Senior AI Engineer',
+    company: 'Scale AI',
+    score:   '88%',
+    badge:   'Good fit',
+    summary: 'Build and scale data pipelines and evaluation frameworks that power AI systems across enterprise customers. High-impact, fast-moving environment.',
+  },
+  {
+    title:   'ML Platform Lead',
+    company: 'Databricks',
+    score:   '81%',
+    badge:   'Good fit',
+    summary: 'Own the internal ML platform used by data science teams across hundreds of enterprise deployments — a blend of infrastructure, tooling, and strategy.',
+  },
+]
+
+function JobCards() {
+  return (
+    <section className="py-16 px-5 bg-white">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-3">
+            What your matches look like
+          </h2>
+          <p className="text-slate-500 max-w-xl mx-auto">
+            Every morning you wake up to a small set of highly relevant opportunities — with context, not just a listing.
+          </p>
+        </div>
+        <div className="flex flex-col gap-4">
+          {JOB_CARDS.map(({ title, company, score, badge, summary }, i) => (
+            <div
+              key={title}
+              className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex items-start justify-between gap-4"
+              style={{ opacity: 1 - i * 0.1 }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-900 mb-0.5">{title}</p>
+                <p className="text-xs text-slate-500 mb-2">{company}</p>
+                <p className="text-sm text-slate-600 leading-relaxed">{summary}</p>
+                <div className="flex items-center gap-2 mt-3">
+                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-green-50 hover:text-green-700 rounded-lg transition-colors">
+                    <Icon path={ICONS.thumbUp} className="w-3.5 h-3.5" />
+                    Good fit
+                  </button>
+                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors">
+                    <Icon path={ICONS.thumbDown} className="w-3.5 h-3.5" />
+                    Not for me
+                  </button>
                 </div>
-              ))}
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-base font-bold text-violet-700">{score}</p>
+                <p className="text-xs text-green-600 font-medium">{badge}</p>
+              </div>
             </div>
-            <div className="h-52" />
-          </div>
+          ))}
         </div>
       </div>
     </section>
@@ -302,18 +366,11 @@ const ROWS = [
   },
 ]
 
-const TIER_ICON = { yes: '✅', partial: '⚠️', no: '❌' }
-const TIER_COLOR = {
-  yes:     'text-green-700',
-  partial: 'text-amber-600',
-  no:      'text-rose-500',
-}
-
 function TierCell({ text, tier }) {
   return (
     <div className="flex items-start gap-1.5">
-      <span className="text-sm leading-snug shrink-0 mt-0.5">{TIER_ICON[tier]}</span>
-      <span className={`text-sm leading-snug ${TIER_COLOR[tier]}`}>{text}</span>
+      {tier === 'partial' ? <WarningIcon /> : <XCircleIcon />}
+      <span className="text-sm leading-snug text-slate-900">{text}</span>
     </div>
   )
 }
@@ -322,24 +379,6 @@ function Comparison() {
   return (
     <section className="py-20 px-5 bg-white">
       <div className="max-w-5xl mx-auto">
-
-        {/* Headline + intro */}
-        <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 leading-tight">
-            Stop searching for jobs.<br className="hidden sm:block" />{' '}
-            Start building the career you actually want.
-          </h2>
-          <p className="text-slate-600 max-w-2xl mx-auto leading-relaxed mb-4">
-            Most platforms help you find opportunities. StellaPath helps you choose the right ones
-            and become a stronger candidate for them.
-          </p>
-          <p className="text-slate-500 max-w-2xl mx-auto leading-relaxed text-sm">
-            Today, job seekers spend hours scrolling through listings, applying to roles they were
-            never truly a fit for, and getting rejected without knowing why. StellaPath does the
-            work for you. Every morning, your most relevant opportunities are ready, along with
-            clear insight into the role, the company, and how to move forward.
-          </p>
-        </div>
 
         {/* Section label */}
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest text-center mb-6">
@@ -377,7 +416,9 @@ function Comparison() {
                     </td>
                     <td className="px-5 py-4 bg-violet-50/60 align-top">
                       <div className="flex items-start gap-1.5">
-                        <span className="text-sm leading-snug shrink-0 mt-0.5">✅</span>
+                        <div className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
+                          <Icon path={ICONS.check} className="w-2.5 h-2.5" />
+                        </div>
                         <span className="text-sm font-medium text-slate-900 leading-snug">{row.stella}</span>
                       </div>
                     </td>
@@ -396,9 +437,14 @@ function Comparison() {
 
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-5 mt-4 justify-center text-xs text-slate-500">
-          <span className="flex items-center gap-1.5"><span>✅</span> Full feature</span>
-          <span className="flex items-center gap-1.5"><span>⚠️</span> Partial or limited</span>
-          <span className="flex items-center gap-1.5"><span>❌</span> Not a core feature</span>
+          <span className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+              <Icon path={ICONS.check} className="w-2.5 h-2.5" />
+            </div>
+            Full feature
+          </span>
+          <span className="flex items-center gap-1.5"><WarningIcon /> Partial or limited</span>
+          <span className="flex items-center gap-1.5"><XCircleIcon /> Not a core feature</span>
         </div>
 
         {/* Closing statement */}
@@ -438,34 +484,6 @@ function Comparison() {
   )
 }
 
-function FinalCTA() {
-  return (
-    <section className="py-20 px-5 text-center">
-      <div className="max-w-2xl mx-auto">
-        <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center mx-auto mb-6">
-          <Icon path={ICONS.sparkle} className="w-6 h-6 text-white" />
-        </div>
-        <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4">
-          Start your career path with StellaPath
-        </h2>
-        <p className="text-slate-500 mb-8 leading-relaxed">
-          Set up your profile in minutes and get personalized job recommendations that
-          match your background and goals — not just your job title.
-        </p>
-        <Link to="/signup"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 transition-colors shadow-sm"
-        >
-          Get started free
-          <Icon path={ICONS.arrow} className="w-4 h-4" />
-        </Link>
-        <p className="mt-4 text-xs text-slate-400">
-          StellaPath provides guidance and recommendations, not employment guarantees.
-        </p>
-      </div>
-    </section>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -482,8 +500,8 @@ export default function Landing() {
       <ValueProps />
       <HowItWorks />
       <Differentiation />
+      <JobCards />
       <Comparison />
-      <FinalCTA />
     </div>
   )
 }
