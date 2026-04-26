@@ -345,7 +345,7 @@ const ROWS = [
   },
   {
     feature: 'Personalized job memory',
-    stella:  'Fresh opportunities prioritized based on what you\'ve already seen',
+    stella:  'New opportunities recommended daily based on your feedback',
     li:      'Jobs may reappear based on reposts and ranking',
     indeed:  'Jobs may reappear across searches and alerts',
     liTier:  'partial', indeedTier: 'partial',
