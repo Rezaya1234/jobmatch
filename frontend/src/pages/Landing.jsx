@@ -239,6 +239,205 @@ function Differentiation() {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Comparison section
+// ---------------------------------------------------------------------------
+
+const ROWS = [
+  {
+    feature: 'Career focus',
+    stella:  'Built around your long-term career path',
+    li:      'Job search + networking focused',
+    indeed:  'Primarily job search',
+    liTier:  'partial', indeedTier: 'no',
+  },
+  {
+    feature: 'Learns and improves over time',
+    stella:  'Adapts using your feedback and interactions',
+    li:      'Based on profile and activity signals',
+    indeed:  'Based on search and activity patterns',
+    liTier:  'partial', indeedTier: 'partial',
+  },
+  {
+    feature: 'Fit and gap clarity',
+    stella:  'Explains why a role fits and highlights gaps for each opportunity',
+    li:      'Limited insights, varies by feature',
+    indeed:  'Limited',
+    liTier:  'partial', indeedTier: 'partial',
+  },
+  {
+    feature: 'Actionable guidance',
+    stella:  'Specific suggestions to improve for roles like this',
+    li:      'Limited guidance depending on feature',
+    indeed:  'Not a core feature',
+    liTier:  'partial', indeedTier: 'no',
+  },
+  {
+    feature: 'How jobs reach you',
+    stella:  'No endless scrolling. 3 highly curated roles delivered daily',
+    li:      'Feed, search, and alerts',
+    indeed:  'Search and alerts',
+    liTier:  'partial', indeedTier: 'partial',
+  },
+  {
+    feature: 'Personalized job memory',
+    stella:  'Fresh opportunities prioritized based on what you\'ve already seen',
+    li:      'Jobs may reappear based on reposts and ranking',
+    indeed:  'Jobs may reappear across searches and alerts',
+    liTier:  'partial', indeedTier: 'partial',
+  },
+  {
+    feature: 'Company insights',
+    stella:  'Structured, candidate-focused view of company context and hiring signals',
+    li:      'Company pages with general information and activity',
+    indeed:  'Basic company details and job-related information',
+    liTier:  'partial', indeedTier: 'partial',
+  },
+  {
+    feature: 'All-in-one experience',
+    stella:  'Jobs, insights, and growth in a single, connected experience',
+    li:      'Split across job search, networking, and learning experiences',
+    indeed:  'Primarily job search',
+    liTier:  'partial', indeedTier: 'no',
+  },
+]
+
+const TIER_ICON = { yes: '✅', partial: '⚠️', no: '❌' }
+const TIER_COLOR = {
+  yes:     'text-green-700',
+  partial: 'text-amber-600',
+  no:      'text-rose-500',
+}
+
+function TierCell({ text, tier }) {
+  return (
+    <div className="flex items-start gap-1.5">
+      <span className="text-sm leading-snug shrink-0 mt-0.5">{TIER_ICON[tier]}</span>
+      <span className={`text-sm leading-snug ${TIER_COLOR[tier]}`}>{text}</span>
+    </div>
+  )
+}
+
+function Comparison() {
+  return (
+    <section className="py-20 px-5 bg-white">
+      <div className="max-w-5xl mx-auto">
+
+        {/* Headline + intro */}
+        <div className="text-center mb-12">
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 leading-tight">
+            Stop searching for jobs.<br className="hidden sm:block" />{' '}
+            Start building the career you actually want.
+          </h2>
+          <p className="text-slate-600 max-w-2xl mx-auto leading-relaxed mb-4">
+            Most platforms help you find opportunities. StellaPath helps you choose the right ones
+            and become a stronger candidate for them.
+          </p>
+          <p className="text-slate-500 max-w-2xl mx-auto leading-relaxed text-sm">
+            Today, job seekers spend hours scrolling through listings, applying to roles they were
+            never truly a fit for, and getting rejected without knowing why. StellaPath does the
+            work for you. Every morning, your most relevant opportunities are ready, along with
+            clear insight into the role, the company, and how to move forward.
+          </p>
+        </div>
+
+        {/* Section label */}
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest text-center mb-6">
+          StellaPath vs Traditional Job Platforms
+        </p>
+
+        {/* Table */}
+        <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-4 bg-slate-50 w-[22%]">
+                    Feature
+                  </th>
+                  <th className="text-left text-xs font-semibold text-violet-700 uppercase tracking-wide px-5 py-4 bg-violet-50 w-[32%]">
+                    StellaPath
+                  </th>
+                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-4 bg-slate-50 w-[23%]">
+                    LinkedIn
+                  </th>
+                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-4 bg-slate-50 w-[23%]">
+                    Indeed / ZipRecruiter
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {ROWS.map((row, i) => (
+                  <tr
+                    key={row.feature}
+                    className={`border-b border-slate-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}
+                  >
+                    <td className="px-5 py-4 text-sm font-medium text-slate-800 align-top">
+                      {row.feature}
+                    </td>
+                    <td className="px-5 py-4 bg-violet-50/60 align-top">
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-sm leading-snug shrink-0 mt-0.5">✅</span>
+                        <span className="text-sm font-medium text-slate-900 leading-snug">{row.stella}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 align-top">
+                      <TierCell text={row.li} tier={row.liTier} />
+                    </td>
+                    <td className="px-5 py-4 align-top">
+                      <TierCell text={row.indeed} tier={row.indeedTier} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap items-center gap-5 mt-4 justify-center text-xs text-slate-500">
+          <span className="flex items-center gap-1.5"><span>✅</span> Full feature</span>
+          <span className="flex items-center gap-1.5"><span>⚠️</span> Partial or limited</span>
+          <span className="flex items-center gap-1.5"><span>❌</span> Not a core feature</span>
+        </div>
+
+        {/* Closing statement */}
+        <p className="text-center text-base font-semibold text-slate-900 mt-10 max-w-2xl mx-auto leading-relaxed">
+          Instead of applying to more jobs, StellaPath helps you apply to the right ones
+          and become a stronger candidate for them.
+        </p>
+
+        {/* CTA */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
+          <Link
+            to="/signup"
+            className="w-full sm:w-auto px-6 py-3 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 transition-colors shadow-sm text-center"
+          >
+            Get started
+          </Link>
+          <Link
+            to="/signin"
+            className="w-full sm:w-auto px-6 py-3 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors text-center"
+          >
+            Sign in
+          </Link>
+        </div>
+
+        {/* Legal disclaimer */}
+        <p className="mt-8 text-xs text-slate-400 leading-relaxed text-center max-w-3xl mx-auto italic">
+          Competitor features are based on publicly available information as of 2026 and may change
+          without notice. Feature availability may vary by region, subscription level, or product
+          updates. StellaPath features reflect capabilities available at launch. Career guidance,
+          skill gap insights, company insights, and learning suggestions are provided for
+          informational purposes only and do not guarantee job placement, interview selection,
+          or hiring outcomes.
+        </p>
+
+      </div>
+    </section>
+  )
+}
+
 function FinalCTA() {
   return (
     <section className="py-20 px-5 text-center">
