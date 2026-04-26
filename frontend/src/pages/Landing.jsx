@@ -482,6 +482,7 @@ export default function Landing() {
       <ValueProps />
       <HowItWorks />
       <Differentiation />
+      <Comparison />
       <FinalCTA />
     </div>
   )
