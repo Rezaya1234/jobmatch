@@ -119,6 +119,7 @@ class JobSearchAgent:
                 description=raw.get("description") or "",
                 posted_at=raw.get("posted_at"),
                 source=slug,
+                sector=source.get("sector"),
             ).on_conflict_do_nothing(index_elements=["url"])
             await self._session.execute(stmt)
             new_count += 1
