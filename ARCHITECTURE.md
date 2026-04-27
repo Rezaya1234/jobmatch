@@ -228,7 +228,7 @@ Relaxation:  One additional level in fallback
 | Model | Key Fields | Purpose | Version Tracking |
 |-------|-----------|---------|-----------------|
 | User | id, email, resume_text, preferences, constraint_flags (strict/flexible per constraint), cold_start, profile_version | Core user identity and preferences | profile_version increments on any profile change |
-| Job | id, url, title, company, description, active_status, job_source, job_last_seen_at, job_inactive_reason, embedding_vector | Scraped job data | job_updated_at tracked for Call 2 cache invalidation |
+| Job | id, url, title, company, description, active_status, job_source, job_last_seen_at, job_inactive_reason, embedding_vector | Scraped job data. description exposed in JobResponse API model and rendered as 150-200 char truncated snippet on Open Positions job cards. Full description available in detail drawer. | job_updated_at tracked for Call 2 cache invalidation |
 | JobMatch | id, user_id, job_id, match_run_id, per_dimension_scores, dimension_data_available (bool per dimension), dimension_score_confidence (high/medium/low per dimension), weighted_score, normalized_score, low_confidence_flag | Match result per user per job per run | Tied to match_run_id and profile_version |
 | FeedbackEvent | id, feedback_event_id, user_id, job_id, signal_type, signal_value, timestamp, interaction_source, commentary | Immutable event log — append only, never modified | feedback_event_id unique per event |
 | JobUserState | user_id, job_id, current_status, shown_at, last_interaction_at, interaction_type | Current status of each user-job relationship — separate from event log | Updated on each interaction, not immutable |
@@ -353,6 +353,7 @@ Action:                         Review pipeline logs
 | Personalized dashboard | ✅ | - | - |
 | Application tracking | ✅ | - | - |
 | Generic job search tab | ✅ | - | - |
+| Job description snippets on Open Positions cards (150-200 chars, truncated from stored description — no extra scraping or compute) | ✅ | - | - |
 | Post-hire engagement | ✅ | - | - |
 | Fallback job labeling | ✅ | - | - |
 | Strict/flexible constraint flags | ✅ | - | - |
