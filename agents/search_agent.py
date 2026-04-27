@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import uuid
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from sqlalchemy import delete, func, select, update
@@ -8,19 +10,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.ats_fetchers import fetch_company_jobs
 from agents.company_sources import COMPANY_SOURCES
-from db.models import Feedback, Job
+from db.models import Feedback, Job, SourceTrustScore
 
 logger = logging.getLogger(__name__)
 
 _MAX_TOTAL_JOBS = 10_000
-_CONCURRENCY = 5        # parallel network fetches
+_CONCURRENCY = 5
 _TIMEOUT = 20
+_HEALTH_CHECK_LIMIT = 50    # max job URLs to HEAD-check per run
+_TRUST_SKIP = 0.50          # skip source entirely below this
+_TRUST_WARN = 0.70          # log warning below this
+_DECAY = 0.85               # exponential decay for rolling counts (~7 days half-life)
+
+
+def _compute_trust(success: float, fail: float, dead: float, returned: int) -> float:
+    total = success + fail
+    parse_pct = success / total if total > 0 else 1.0
+    dead_pct = dead / returned if returned > 0 else 0.0
+    returned_ok = 1.0 if returned > 0 else 0.5
+    return round(parse_pct * 0.5 + (1.0 - min(dead_pct, 1.0)) * 0.3 + returned_ok * 0.2, 4)
 
 
 class JobSearchAgent:
     """
     Fetches all open positions directly from company career pages via ATS APIs.
     On each run: inserts new jobs, marks closed ones inactive, enforces 10k cap.
+    Phase A: tracks per-source trust scores and health-checks recently scraped URLs.
     """
 
     def __init__(self, session: AsyncSession) -> None:
@@ -28,15 +43,36 @@ class JobSearchAgent:
 
     async def run(self, **_kwargs) -> int:
         """Sync all companies. Returns count of newly inserted jobs."""
-        # Phase 1: fetch all companies concurrently (network I/O only)
+        # Load existing trust scores — used to skip low-trust sources
+        trust_map = await self._load_trust_scores()
+
+        # Determine which sources to fetch this run
+        sources_to_fetch = []
+        for source in COMPANY_SOURCES:
+            slug = source["slug"]
+            score = trust_map.get(slug, {}).get("score", 1.0)
+            if score < _TRUST_SKIP:
+                logger.warning(
+                    "Skipping %s — trust score %.2f below skip threshold %.2f",
+                    source["name"], score, _TRUST_SKIP,
+                )
+            else:
+                sources_to_fetch.append(source)
+
+        # Phase 1: fetch all sources concurrently (network I/O only)
         sem = asyncio.Semaphore(_CONCURRENCY)
         async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
-            fetch_tasks = [self._fetch(client, sem, source) for source in COMPANY_SOURCES]
-            fetched = await asyncio.gather(*fetch_tasks)
+            fetch_tasks = [self._fetch(client, sem, s) for s in sources_to_fetch]
+            results = await asyncio.gather(*fetch_tasks)
 
-        # Phase 2: write to DB sequentially (avoid shared-session race conditions)
+        # Phase 2: write to DB sequentially, collect per-source stats
         new_total = 0
-        for source, raw_jobs in zip(COMPANY_SOURCES, fetched):
+        fetch_stats: dict[str, dict] = {}
+        for source, (raw_jobs, fetch_ok) in zip(sources_to_fetch, results):
+            slug = source["slug"]
+            fetch_stats[slug] = {"returned": len(raw_jobs), "ok": fetch_ok}
+            if not raw_jobs:
+                continue
             try:
                 new, closed = await self._sync_to_db(source, raw_jobs)
                 if new or closed:
@@ -46,6 +82,15 @@ class JobSearchAgent:
                 logger.exception("DB sync failed for %s", source["name"])
                 await self._session.rollback()
 
+        # Phase 3: update trust scores (decay old counts + add today's result)
+        await self._update_trust_scores(fetch_stats, trust_map)
+
+        # Phase 4: HEAD-check a sample of recently scraped active jobs
+        dead_by_source = await self._health_check_sample()
+        if dead_by_source:
+            await self._record_dead_links(dead_by_source)
+
+        # Phase 5: enforce 10k job cap
         removed = await self._enforce_job_limit()
         if removed:
             logger.info("Job cap enforced — removed %d oldest jobs", removed)
@@ -58,9 +103,14 @@ class JobSearchAgent:
 
     async def _fetch(
         self, client: httpx.AsyncClient, sem: asyncio.Semaphore, source: dict
-    ) -> list[dict]:
+    ) -> tuple[list[dict], bool]:
         async with sem:
-            return await fetch_company_jobs(client, source)
+            try:
+                jobs = await fetch_company_jobs(client, source)
+                return jobs, True
+            except Exception:
+                logger.exception("Fetch failed for %s", source["name"])
+                return [], False
 
     # ------------------------------------------------------------------
     # Phase 2: DB sync (sequential)
@@ -73,7 +123,6 @@ class JobSearchAgent:
         slug = source["slug"]
         current_urls = {j["url"] for j in raw_jobs if j.get("url")}
 
-        # All known jobs for this company (active or inactive)
         result = await self._session.execute(
             select(Job.id, Job.url, Job.is_active).where(Job.source_company == slug)
         )
@@ -100,7 +149,7 @@ class JobSearchAgent:
                 update(Job).where(Job.id.in_(reactivate_ids)).values(is_active=True)
             )
 
-        # Insert new jobs — ON CONFLICT DO NOTHING guards against duplicates
+        # Insert new jobs
         new_urls = current_urls - existing_urls
         new_count = 0
         for raw in raw_jobs:
@@ -128,7 +177,117 @@ class JobSearchAgent:
         return new_count, len(closed_ids)
 
     # ------------------------------------------------------------------
-    # 10k cap: delete oldest inactive jobs with no user feedback
+    # Phase 3: trust score tracking
+    # ------------------------------------------------------------------
+
+    async def _load_trust_scores(self) -> dict:
+        result = await self._session.execute(select(SourceTrustScore))
+        return {
+            row.source_slug: {
+                "score": row.rolling_trust_score,
+                "success": row.parse_success_count,
+                "fail": row.parse_fail_count,
+                "dead": row.dead_link_count,
+                "returned_prev": row.jobs_returned_last,
+            }
+            for row in result.scalars().all()
+        }
+
+    async def _update_trust_scores(
+        self, fetch_stats: dict[str, dict], existing: dict
+    ) -> None:
+        now = datetime.now(timezone.utc)
+        for slug, stats in fetch_stats.items():
+            prev = existing.get(slug, {})
+            # Exponential decay on rolling counts — weights recent runs more
+            new_success = prev.get("success", 0.0) * _DECAY + (1.0 if stats["ok"] else 0.0)
+            new_fail = prev.get("fail", 0.0) * _DECAY + (0.0 if stats["ok"] else 1.0)
+            new_dead = prev.get("dead", 0.0) * _DECAY  # updated separately after health check
+            new_score = _compute_trust(new_success, new_fail, new_dead, stats["returned"])
+
+            if new_score < _TRUST_WARN:
+                logger.warning("Low trust score for %s: %.2f", slug, new_score)
+
+            stmt = pg_insert(SourceTrustScore).values(
+                id=uuid.uuid4(),
+                source_slug=slug,
+                jobs_returned_last=stats["returned"],
+                jobs_returned_prev=prev.get("returned_prev", 0),
+                parse_success_count=new_success,
+                parse_fail_count=new_fail,
+                dead_link_count=new_dead,
+                rolling_trust_score=new_score,
+                last_scrape_at=now,
+            ).on_conflict_do_update(
+                index_elements=["source_slug"],
+                set_={
+                    "jobs_returned_prev": SourceTrustScore.jobs_returned_last,
+                    "jobs_returned_last": stats["returned"],
+                    "parse_success_count": new_success,
+                    "parse_fail_count": new_fail,
+                    "dead_link_count": new_dead,
+                    "rolling_trust_score": new_score,
+                    "last_scrape_at": now,
+                },
+            )
+            await self._session.execute(stmt)
+
+        await self._session.commit()
+
+    # ------------------------------------------------------------------
+    # Phase 4: URL health check
+    # ------------------------------------------------------------------
+
+    async def _health_check_sample(self) -> dict[str, int]:
+        """HEAD-check recently scraped active jobs. Returns dead count per source slug."""
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+        result = await self._session.execute(
+            select(Job.id, Job.url, Job.source_company)
+            .where(Job.is_active.is_(True), Job.scraped_at >= cutoff)
+            .order_by(Job.scraped_at.desc())
+            .limit(_HEALTH_CHECK_LIMIT)
+        )
+        jobs = result.all()
+        if not jobs:
+            return {}
+
+        dead_ids: list = []
+        dead_by_source: dict[str, int] = {}
+        sem = asyncio.Semaphore(10)
+
+        async def check(job_id, url, slug):
+            async with sem:
+                try:
+                    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as c:
+                        r = await c.head(url)
+                    if r.status_code in (404, 410):
+                        dead_ids.append(job_id)
+                        dead_by_source[slug] = dead_by_source.get(slug, 0) + 1
+                except Exception:
+                    pass  # network error — don't penalise
+
+        await asyncio.gather(*[check(j.id, j.url, j.source_company) for j in jobs])
+
+        if dead_ids:
+            await self._session.execute(
+                update(Job).where(Job.id.in_(dead_ids)).values(is_active=False)
+            )
+            await self._session.commit()
+            logger.info("Health check — marked %d dead links inactive", len(dead_ids))
+
+        return dead_by_source
+
+    async def _record_dead_links(self, dead_by_source: dict[str, int]) -> None:
+        for slug, count in dead_by_source.items():
+            await self._session.execute(
+                update(SourceTrustScore)
+                .where(SourceTrustScore.source_slug == slug)
+                .values(dead_link_count=SourceTrustScore.dead_link_count + count)
+            )
+        await self._session.commit()
+
+    # ------------------------------------------------------------------
+    # Phase 5: 10k cap — delete oldest inactive jobs with no user feedback
     # ------------------------------------------------------------------
 
     async def _enforce_job_limit(self) -> int:
@@ -136,13 +295,10 @@ class JobSearchAgent:
             select(func.count()).select_from(Job).where(Job.is_active.is_(True))
         )
         total = count_result.scalar() or 0
-
         if total <= _MAX_TOTAL_JOBS:
             return 0
 
         excess = total - _MAX_TOTAL_JOBS
-
-        # Delete oldest active jobs that have no user feedback
         jobs_with_feedback = select(Feedback.job_id).distinct()
         subq = (
             select(Job.id)
