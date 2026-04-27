@@ -13,12 +13,11 @@ logger = logging.getLogger(__name__)
 
 _PREFIX = "Represent this for job matching: "
 
-try:
-    from sentence_transformers import SentenceTransformer
-    _AVAILABLE = True
-except ImportError:
-    _AVAILABLE = False
-    logger.warning("sentence-transformers not installed — embedding stage will be skipped")
+
+def _is_available() -> bool:
+    """Check without importing — avoids loading torch at startup."""
+    import importlib.util
+    return importlib.util.find_spec("sentence_transformers") is not None
 
 
 @lru_cache(maxsize=1)
@@ -50,7 +49,7 @@ async def embed_and_score(
     Returns None if sentence-transformers is unavailable.
     Runs in a thread pool to avoid blocking the async event loop.
     """
-    if not _AVAILABLE or not job_texts:
+    if not _is_available() or not job_texts:
         return None
 
     model = _model_small() if model_size == "small" else _model_large()
