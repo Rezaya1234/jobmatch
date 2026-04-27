@@ -171,7 +171,7 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <CompanyLogo slug={job.source_company} company={job.company} />
+            <CompanyLogo slug={job.source} company={job.company} />
             <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{job.company}</p>
             {job.work_mode && (
               <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{job.work_mode}</span>
