@@ -123,6 +123,8 @@ function SkeletonRow() {
             <div className="h-3 bg-slate-100 rounded-full w-12" />
           </div>
           <div className="h-4 bg-slate-200 rounded w-2/3 mb-2" />
+          <div className="h-3 bg-slate-100 rounded w-full mb-1" />
+          <div className="h-3 bg-slate-100 rounded w-4/5 mb-2" />
           <div className="flex gap-2">
             <div className="h-3 bg-slate-100 rounded w-16" />
             <div className="h-3 bg-slate-100 rounded w-20" />
@@ -193,6 +195,12 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
             </a>
           ) : (
             <p className="text-sm font-semibold text-slate-900 leading-snug mt-0.5">{job.title}</p>
+          )}
+
+          {job.description && (
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed line-clamp-2">
+              {job.description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)}
+            </p>
           )}
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">

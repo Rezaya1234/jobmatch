@@ -26,6 +26,7 @@ class JobResponse(BaseModel):
     source: str | None
     posted_at: datetime | None
     created_at: datetime
+    description: str | None
 
 
 _SORT_MAP = {
@@ -78,6 +79,7 @@ async def list_jobs(
             source=j.source,
             posted_at=j.posted_at,
             created_at=j.created_at,
+            description=j.description or None,
         )
         for j in result.scalars().all()
     ]
