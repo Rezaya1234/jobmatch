@@ -241,7 +241,7 @@ Future upgrade path:
 
 ```
 Scraping:
-  Sources:     21 company career pages
+  Sources:     41 company career pages
   Schedule:    3:00 AM UTC daily
   Tool:        BeautifulSoup / Scrapy
   Dedup:       URL hash
