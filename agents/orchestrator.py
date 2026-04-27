@@ -18,7 +18,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.feedback_agent import FeedbackAgent
@@ -149,16 +149,11 @@ class OrchestratorAgent:
             stats.total_emailed += emailed
             return
 
-        # Step 2: Heuristic scoring (no LLM)
-        if profile is not None:
-            await self._score_heuristic(user_id, profile)
+        # Step 2: Soft constraints + heuristic + BGE embedding → top 10-15 candidates
+        candidates = await filter_agent.get_candidates(user_id)
 
-        # Step 3: Embedding scoring (local model, async)
-        if profile is not None:
-            await self._score_embeddings(user_id, profile)
-
-        # Step 4: LLM scoring — only if enough unshown candidates
-        pending = await self._count_pending_llm_candidates(user_id)
+        # Step 3: LLM scoring — only if enough candidates survived Phase B
+        pending = len(candidates)
         if pending >= _MIN_CANDIDATES_FOR_LLM:
             await self._emit(f"Scoring top candidates with AI ({pending} candidates)...")
             match_agent = MatchAgent(self._session, self._llm)
@@ -197,62 +192,6 @@ class OrchestratorAgent:
         # Step 6: Send email
         emailed = await self._send_email(user_id)
         stats.total_emailed += emailed
-
-    # ------------------------------------------------------------------
-    # Heuristic scoring
-    # ------------------------------------------------------------------
-
-    async def _score_heuristic(self, user_id: str, profile: UserProfile) -> None:
-        from agents.heuristic_scorer import score_heuristic
-        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-        result = await self._session.execute(
-            select(JobMatch, Job)
-            .join(Job, JobMatch.job_id == Job.id)
-            .where(
-                JobMatch.user_id == uid,
-                JobMatch.passed_hard_filter.is_(True),
-                JobMatch.heuristic_score.is_(None),
-                JobMatch.shown_at.is_(None),
-            )
-        )
-        rows = result.all()
-        if not rows:
-            return
-        for match, job in rows:
-            match.heuristic_score = score_heuristic(job, profile)
-        await self._session.commit()
-        logger.debug("User %s — heuristic scored %d matches", user_id, len(rows))
-
-    # ------------------------------------------------------------------
-    # Embedding scoring
-    # ------------------------------------------------------------------
-
-    async def _score_embeddings(self, user_id: str, profile: UserProfile) -> None:
-        from agents.embedding_scorer import compute_embedding_scores
-        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-        result = await self._session.execute(
-            select(JobMatch, Job)
-            .join(Job, JobMatch.job_id == Job.id)
-            .where(
-                JobMatch.user_id == uid,
-                JobMatch.passed_hard_filter.is_(True),
-                JobMatch.embedding_score.is_(None),
-                JobMatch.shown_at.is_(None),
-            )
-        )
-        rows = result.all()
-        if not rows:
-            return
-        profile_text = profile.role_description or ""
-        job_texts = [
-            f"{job.title} {(job.description or '')}"[:500]
-            for _, job in rows
-        ]
-        scores = await compute_embedding_scores(job_texts, profile_text)
-        for (match, _), score in zip(rows, scores):
-            match.embedding_score = score
-        await self._session.commit()
-        logger.debug("User %s — embedding scored %d matches", user_id, len(rows))
 
     # ------------------------------------------------------------------
     # 3-job delivery selection with 6-step fallback
@@ -349,15 +288,11 @@ class OrchestratorAgent:
 
         filter_agent = FilterAgent(self._session)
         await filter_agent.run(user_id)
+        candidates = await filter_agent.get_candidates(user_id)
 
-        if profile is not None:
-            await self._score_heuristic(user_id, profile)
-            await self._score_embeddings(user_id, profile)
-
-        pending = await self._count_pending_llm_candidates(user_id)
-        if pending < _MIN_CANDIDATES_FOR_LLM:
+        if len(candidates) < _MIN_CANDIDATES_FOR_LLM:
             logger.info(
-                "User %s — only %d candidates on-demand, skipping LLM", user_id, pending
+                "User %s — only %d candidates on-demand, skipping LLM", user_id, len(candidates)
             )
             return 0
 
@@ -400,22 +335,6 @@ class OrchestratorAgent:
             return {}
         result = await self._session.execute(select(Job).where(Job.id.in_(job_ids)))
         return {str(j.id): j for j in result.scalars().all()}
-
-    async def _count_pending_llm_candidates(self, user_id: str) -> int:
-        """Count unshown, hard-filter-passed jobs that haven't been LLM-scored yet."""
-        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-        result = await self._session.execute(
-            select(func.count()).select_from(JobMatch)
-            .join(Job, JobMatch.job_id == Job.id)
-            .where(
-                JobMatch.user_id == uid,
-                JobMatch.passed_hard_filter.is_(True),
-                JobMatch.score.is_(None),
-                JobMatch.shown_at.is_(None),
-                Job.is_active.is_(True),
-            )
-        )
-        return result.scalar() or 0
 
     async def _get_profile(self, user_id: str) -> UserProfile | None:
         uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
