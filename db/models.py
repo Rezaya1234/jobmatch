@@ -79,6 +79,7 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -392,4 +393,105 @@ class JobDescriptionHistory(Base):
     version_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     valid_from: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
     valid_to: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Admin Dashboard models
+# ---------------------------------------------------------------------------
+
+class AgentLog(Base):
+    """Append-only log of all agent activity. Feeds the Admin Dashboard activity log."""
+
+    __tablename__ = "agent_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    log_level: Mapped[str] = mapped_column(String(20), nullable=False, default="INFO")
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    run_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    timestamp: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
+class AdminAlert(Base):
+    """Active and historical alerts for the admin dashboard."""
+
+    __tablename__ = "admin_alerts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)  # INFO / WARNING / CRITICAL
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    metric_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    metric_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    baseline_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    baseline_comparison: Mapped[str | None] = mapped_column(Text, nullable=True)
+    failure_type: Mapped[str | None] = mapped_column(String(20), nullable=True)  # data / model / infra
+    triggered_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    dismissed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dismissed_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    suppressed_until: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TestAgentMetrics(Base):
+    """Daily snapshot of evaluation metrics with baselines and drift flags."""
+
+    __tablename__ = "test_agent_metrics"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_date: Mapped[date] = mapped_column(Date, nullable=False, unique=True, index=True)
+    precision_at_50: Mapped[float | None] = mapped_column(Float, nullable=True)
+    precision_at_15: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recall_at_50: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ndcg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
+    false_positive_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sample_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    drift_flags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    baseline_7day: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    label_sources: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AlertThresholds(Base):
+    """Editable per-metric alert thresholds. Defaults hard-coded as fallback if table empty."""
+
+    __tablename__ = "alert_thresholds"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    metric_name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    warning_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    critical_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class EvaluatedJob(Base):
+    """Ground truth labels for pipeline evaluation. Three sources: LLM, user feedback, human audit."""
+
+    __tablename__ = "evaluated_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    label_source: Mapped[str] = mapped_column(String(20), nullable=False)  # LLM / user / human
+    relevance_label: Mapped[str] = mapped_column(String(20), nullable=False)  # relevant / not_relevant
+    confidence_weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    rejection_stage: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dimension_scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    near_miss: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

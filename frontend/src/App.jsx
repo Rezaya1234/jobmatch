@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Pipeline from './pages/Pipeline'
 import Architecture from './pages/Architecture'
 import QA from './pages/QA'
+import Admin from './pages/Admin'
 import Matches from './pages/Matches'
 import CompanyInsights from './pages/CompanyInsights'
 import CompanyDetail from './pages/CompanyDetail'
@@ -257,6 +258,9 @@ export default function App() {
         <Route path="/signin"          element={<PublicLayout><SignIn /></PublicLayout>} />
         <Route path="/signup"          element={<PublicLayout><SignUp /></PublicLayout>} />
         <Route path="/forgot-password" element={<PublicLayout><ForgotPassword /></PublicLayout>} />
+
+        {/* Admin — own layout, no sidebar, access guarded in component */}
+        <Route path="/admin" element={<Admin />} />
 
         {/* Authenticated app shell — handles all /dashboard, /positions, etc. */}
         <Route path="/*" element={<AppShell />} />

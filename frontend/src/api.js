@@ -40,3 +40,29 @@ export const parseProfile = (id, text, resumeFile) => {
   if (resumeFile) form.append('resume', resumeFile)
   return http.post(`/users/${id}/profile/parse`, form).then(r => r.data)
 }
+
+// Admin
+const adm = (path, opts = {}) => {
+  const uid = localStorage.getItem('userId')
+  return http.get(`/admin/${path}`, { params: { user_id: uid, ...opts.params }, ...opts }).then(r => r.data)
+}
+export const adminCheck = () => adm('check')
+export const adminPipelineStatus = () => adm('pipeline-status')
+export const adminRecommendedActions = () => adm('recommended-actions')
+export const adminTestAgentMetrics = () => adm('test-agent-metrics')
+export const adminAgentLogs = (params = {}) => adm('agent-logs', { params })
+export const adminPipelineFunnel = () => adm('pipeline-funnel')
+export const adminSourceHealth = () => adm('source-health')
+export const adminAlerts = (params = {}) => adm('alerts', { params })
+export const adminDismissAlert = (alertId) => {
+  const uid = localStorage.getItem('userId')
+  return http.patch(`/admin/alerts/${alertId}/dismiss`, null, { params: { user_id: uid } }).then(r => r.data)
+}
+export const adminUserActivity = () => adm('user-activity')
+export const adminJobScoring = (params = {}) => adm('job-scoring', { params })
+export const adminWeightEvolution = (params = {}) => adm('weight-evolution', { params })
+export const adminGetThresholds = () => adm('thresholds')
+export const adminUpdateThresholds = (thresholds) => {
+  const uid = localStorage.getItem('userId')
+  return http.patch('/admin/thresholds', { thresholds }, { params: { user_id: uid } }).then(r => r.data)
+}

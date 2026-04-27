@@ -89,6 +89,13 @@ Pages:
   Company Insights    Company behavior and scores
   Profile Setup       3-column AI-assisted onboarding
   Settings            Preferences and account
+  /admin              Internal ML control center —
+                      admin users only (is_admin=true).
+                      Pipeline status, metric cards,
+                      Test Agent evaluation, source health,
+                      alerts, job scoring explorer,
+                      weight evolution, replay mode.
+                      Own layout, no shared sidebar.
 
 Key components:
   Sidebar             Fixed left nav, 240px desktop,
@@ -261,6 +268,28 @@ Health checks:
   On failure:  Mark inactive, log reason,
                remove from vector index
 
+Company hiring snapshots (Phase C):
+  Schedule:    End of daily scrape cycle
+  Per company: active_job_count,
+               new_jobs_since_yesterday,
+               removed_jobs_since_yesterday,
+               jobs by department / seniority /
+               location (JSON)
+  Storage:     One row per company per day —
+               upsert on company_id + snapshot_date
+  Cost:        $0 — existing PostgreSQL only
+
+Description versioning (Phase C):
+  Schedule:    End of daily scrape cycle
+  Method:      MD5 hash of description text
+               compared to Job.description_hash
+  On change:   Close current JobDescriptionHistory
+               row (valid_to = now()), insert new row,
+               increment description_version
+  No change:   Update last_seen_at only —
+               zero new records, zero storage cost
+  Library:     hashlib (Python stdlib — no new deps)
+
 Vector index rebuild:
   Schedule:    4:00 AM UTC daily
   Model:       BGE-small (Stage 1 only in index)
@@ -397,6 +426,12 @@ Before beta (immediate):
   ✅ Add source trust scoring
   ✅ Add strict/flexible constraint flags
   ✅ Add dimension confidence levels
+  ✅ Phase C: CompanyHiringSnapshot daily snapshots
+  ✅ Phase C: JobDescriptionHistory versioning
+  🔲 Admin dashboard — /admin ML control center
+       (pipeline status, metric cards, Test Agent
+        evaluation, job scoring explorer, alerts,
+        source health, weight evolution, replay mode)
 
 Phase 2 (post beta):
   Qdrant self-hosted for vector search

@@ -54,9 +54,12 @@ SEARCH AGENT (3:00 AM UTC) — global scraper, no user context
 ✅ Scrape 41 company career pages → deduplicate by URL →
    mark closed jobs inactive → re-activate returned jobs →
    enforce 10k job cap
-🔲 Phase A: HTTP HEAD health check per job → source trust
+✅ Phase A: HTTP HEAD health check per job → source trust
    scoring (rolling 30 days) → alert if trust < 0.70 →
    skip sources with trust < 0.50
+🔲 Phase C: Save CompanyHiringSnapshot (once per company per day) →
+   check description MD5 hash → write JobDescriptionHistory only
+   on change → no new services, no cost increase
 ↓
 VECTOR INDEX (4:00 AM UTC)
 Rebuild daily embedding index
@@ -64,7 +67,7 @@ Rebuild daily embedding index
 FILTER AGENT (5:00 AM UTC) — per user
 ✅ Hard constraint filtering (job type, work mode, location,
    visa sponsorship, excluded titles, excluded companies)
-🔲 Phase B: soft constraint filtering (salary, role type,
+✅ Phase B: soft constraint filtering (salary, role type,
    experience, seniority) → heuristic scoring (keyword +
    title overlap) → Stage 1 BGE-small (threshold 0.60,
    0.50 cold start) → Stage 2 BGE-large (threshold 0.70) →
@@ -212,8 +215,10 @@ Relaxation:  One additional level in fallback
 | Agent | Executive Summary | Responsibilities | Flow | Technology Stack |
 |-------|------------------|-----------------|------|-----------------|
 | **Profile Agent** | Builds a structured understanding of who the user is and what they want before matching begins. Sets the foundation for all downstream personalization. | 1. Parse resume and extract structured profile (skills, experience, preferences, dealbreakers) 2. Initialize cold start weights for new users 3. Flag user as cold_start: true until 5 feedback signals accumulated 4. Set strict/flexible flag per constraint based on user input 5. Optional enrichment via LinkedIn and GitHub URLs 6. Trigger weight recalibration on preference updates | INPUT: Raw resume, preferences, strict/flexible flags per constraint, optional LinkedIn/GitHub URL HARD CONSTRAINTS INITIALIZED: Location type (strict/flexible), visa requirement, excluded titles, excluded companies SOFT CONSTRAINTS INITIALIZED: Salary floor, role type, experience floor, seniority ceiling COLD START WEIGHTS: skills_match: 0.35, experience_level: 0.25, salary: 0.20, industry_alignment: 0.10, function_type: 0.05, career_trajectory: 0.05 PROCESS: Extract structured profile → set default weights → set strict/flexible flags → flag cold start → store OUTPUT: Structured user profile → PostgreSQL → cold start flag and weights to Orchestration Agent | Python 3.12, FastAPI, SQLAlchemy, Claude Sonnet (profile parsing — resume content sent to Anthropic API only), PostgreSQL |
-| **Search Agent** | Global job scraper and source health monitor. Fetches all 41 company career pages daily, syncs to DB, and tracks per-source reliability. No user context — runs once per day at 3:00 AM UTC. | ✅ 1. Scrape 41 company career pages at 3:00 AM UTC ✅ 2. Deduplicate by URL — ON CONFLICT DO NOTHING ✅ 3. Mark closed jobs inactive (no longer in ATS feed) ✅ 4. Re-activate jobs that reappear in ATS ✅ 5. Enforce 10k job cap — remove oldest inactive jobs with no feedback 🔲 Phase A — 6. HTTP HEAD health check per active job URL — mark inactive if 404/410 🔲 Phase A — 7. Track per-source trust score: jobs_returned, parse_success_rate, dead_link_pct (rolling 30 days) 🔲 Phase A — 8. Log warning if source trust score drops below 0.70 🔲 Phase A — 9. Skip scrape for sources with trust score below 0.50 | INPUT: COMPANY_SOURCES (41 entries) SCRAPER HEALTH: Per source — last successful scrape timestamp, jobs returned vs yesterday, parse success/fail count. Alert if delta drops >50% or source returns zero. PHASE A NEW MODEL: SourceTrustScore — source_slug, jobs_returned_today, jobs_returned_yesterday, parse_success_count, parse_fail_count, dead_link_count, rolling_trust_score, last_scrape_at OUTPUT: Active job rows in PostgreSQL. SourceTrustScore rows updated per source. | Python 3.12, httpx (async), ats_fetchers, company_sources, SQLAlchemy, PostgreSQL |
-| **Filter Agent** | Per-user candidate selector. Applies hard and soft constraints, scores by relevance, filters by embedding similarity, and returns top 10-15 candidates per user for the Matching Agent. Precision first — maintains minimum recall so users always get jobs. | ✅ 1. Apply hard constraints: job type, work mode, location, visa sponsorship, excluded titles, excluded companies ✅ 2. Write pass/fail to job_matches with failure reason ✅ 3. Give benefit of the doubt when job field data is missing 🔲 Phase B — 4. Apply soft constraints: salary floor (±10% relaxation in fallback), role type, experience floor (±2yr), seniority ceiling (±1 level) 🔲 Phase B — 5. Heuristic scoring: keyword overlap between job title/description and user skills/title keywords 🔲 Phase B — 6. Stage 1 BGE-small embedding similarity (threshold 0.60 — relax to 0.50 for cold start users with fewer than 10 interactions) 🔲 Phase B — 7. Stage 2 BGE-large quality filter on top-50 from Stage 1 (threshold 0.70) 🔲 Phase B — 8. Remove previously shown job IDs (query ShownJobMemory) 🔲 Phase B — 9. Enforce max 10-15 output — pass to Matching Agent. If fewer than 3 survive → signal fallback to Orchestration Agent | INPUT: User profile (hard + soft constraints, cold_start flag, weights_version), all active jobs in PostgreSQL, ShownJobMemory for this user COLD START: Users with fewer than 10 interactions — BGE-small threshold relaxed from 0.60 to 0.50 to ensure minimum discovery PHASE B NEW DEPENDENCY: ShownJobMemory table — user_id, job_id, shown_at (create if not exists) OUTPUT: Top 10-15 job candidates → Matching Agent. If fewer than 3 survive hard constraints → fallback signal to Orchestration Agent | Python 3.12, SQLAlchemy, PostgreSQL, sentence-transformers (BAAI/bge-small-en-v1.5 384d ~8ms, BAAI/bge-large-en-v1.5 1024d ~45ms), spaCy, pgvector |
+| **Search Agent** | Global job scraper and source health monitor. Fetches all 41 company career pages daily, syncs to DB, and tracks per-source reliability. No user context — runs once per day at 3:00 AM UTC. | ✅ 1. Scrape 41 company career pages at 3:00 AM UTC ✅ 2. Deduplicate by URL — ON CONFLICT DO NOTHING ✅ 3. Mark closed jobs inactive (no longer in ATS feed) ✅ 4. Re-activate jobs that reappear in ATS ✅ 5. Enforce 10k job cap — remove oldest inactive jobs with no feedback ✅ Phase A — 6. HTTP HEAD health check per active job URL — mark inactive if 404/410 ✅ Phase A — 7. Track per-source trust score: jobs_returned, parse_success_rate, dead_link_pct (rolling 30 days) ✅ Phase A — 8. Log warning if source trust score drops below 0.70 ✅ Phase A — 9. Skip scrape for sources with trust score below 0.50
+🔲 Phase C — 10. Save CompanyHiringSnapshot — per company per day: active_job_count, new_jobs_since_yesterday, removed_jobs_since_yesterday, jobs_by_department/seniority/location (JSON) — upsert on company_id + snapshot_date
+🔲 Phase C — 11. Check description changes — MD5 hash each scraped description, compare to Job.description_hash, write JobDescriptionHistory row only if different, always update last_seen_at | INPUT: COMPANY_SOURCES (41 entries) SCRAPER HEALTH: Per source — last successful scrape timestamp, jobs returned vs yesterday, parse success/fail count. Alert if delta drops >50% or source returns zero. PHASE A NEW MODEL: SourceTrustScore — source_slug, jobs_returned_today, jobs_returned_yesterday, parse_success_count, parse_fail_count, dead_link_count, rolling_trust_score, last_scrape_at OUTPUT: Active job rows in PostgreSQL. SourceTrustScore rows updated per source. | Python 3.12, httpx (async), ats_fetchers, company_sources, SQLAlchemy, PostgreSQL |
+| **Filter Agent** | Per-user candidate selector. Applies hard and soft constraints, scores by relevance, filters by embedding similarity, and returns top 10-15 candidates per user for the Matching Agent. Precision first — maintains minimum recall so users always get jobs. | ✅ 1. Apply hard constraints: job type, work mode, location, visa sponsorship, excluded titles, excluded companies ✅ 2. Write pass/fail to job_matches with failure reason ✅ 3. Give benefit of the doubt when job field data is missing ✅ Phase B — 4. Apply soft constraints: salary floor (±10% relaxation in fallback), role type, experience floor (±2yr), seniority ceiling (±1 level) ✅ Phase B — 5. Heuristic scoring: keyword overlap between job title/description and user skills/title keywords ✅ Phase B — 6. Stage 1 BGE-small embedding similarity (threshold 0.60 — relax to 0.50 for cold start users with fewer than 10 interactions) ✅ Phase B — 7. Stage 2 BGE-large quality filter on top-50 from Stage 1 (threshold 0.70) ✅ Phase B — 8. Remove previously shown job IDs (query ShownJobMemory) ✅ Phase B — 9. Enforce max 10-15 output — pass to Matching Agent. If fewer than 3 survive → signal fallback to Orchestration Agent | INPUT: User profile (hard + soft constraints, cold_start flag, weights_version), all active jobs in PostgreSQL, ShownJobMemory for this user COLD START: Users with fewer than 10 interactions — BGE-small threshold relaxed from 0.60 to 0.50 to ensure minimum discovery PHASE B NEW DEPENDENCY: ShownJobMemory table — user_id, job_id, shown_at (create if not exists) OUTPUT: Top 10-15 job candidates → Matching Agent. If fewer than 3 survive hard constraints → fallback signal to Orchestration Agent | Python 3.12, SQLAlchemy, PostgreSQL, sentence-transformers (BAAI/bge-small-en-v1.5 384d ~8ms, BAAI/bge-large-en-v1.5 1024d ~45ms), spaCy, pgvector |
 | **Matching Agent** | The AI brain. Scores all filtered jobs in a single LLM call with explicit weighted dimensions. Computes final scores in code. Maximum 2 LLM calls per user per day. | 1. Receive top 10-15 jobs 2. Compress each job to ~300 tokens using spaCy 3. Check dimension_data_available and confidence flags per dimension per job 4. If salary missing — exclude from scoring, re-normalize remaining weights to sum to 1.0 5. Validate all weights sum to 1.0 before every LLM call 6. Batch ALL jobs into single Call 1 7. Compute weighted scores in code — never inside LLM 8. Normalize final scores 9. Flag low confidence jobs (2+ dimensions ambiguous) 10. Conditional Call 2 — structured decision content on top 3, active users only, cached per user_id + job_id + profile_version 11. Invalidate Call 2 cache when profile_version changes, weights shift >0.10 in any dimension, job_updated_at changes, or 7-day TTL expires | INPUT: Top 10-15 compressed jobs, user profile summary, dimension weights, cold start flag, dimension_data_available flags, dimension confidence levels ALLOWED DIMENSIONS — exactly these 6: skills_match, industry_alignment, experience_level, function_type, salary (excluded if data unavailable — weights re-normalized), career_trajectory DIMENSION CONFIDENCE LEVELS (per dimension per job): score: 0.0-1.0 or null, data_available: true/false, confidence: high/medium/low WEIGHT RULES: Sum to 1.0. No dimension above 0.50. No dimension below 0.05. Re-normalize if salary excluded. CALL 1 (always): Batch all jobs + weights + hallucination prevention → parse JSON → compute scores in code → normalize → rank CALL 2 (conditional, cached): Produces: why worth pursuing (2-3 sentences), what might hold user back, suggested course gaps, confidence level (high/medium/low), advisor-style summary. Cache key: user_id + job_id + profile_version. Invalidated by: profile_version change, >0.10 weight shift, job update, 7-day TTL. OUTPUT: Ranked list with per-dimension scores, confidence levels, weighted scores, normalized scores, low confidence flags, Call 2 structured content where cached | Python 3.12, Claude Haiku (Call 1), Claude Sonnet (Call 2 — conditional, cached), spaCy, JSON parsing with regex fallback, FastAPI |
 | **Feedback Agent** | The learning engine. Converts every user interaction into structured signals that make tomorrow's matches smarter. Maintains immutable event history and separate current state. | 1. Log all feedback to immutable event log 2. Update job_user_state separately — never overwrite event log 3. Collect signals with standardized values 4. Trigger weight update every 5 signals 5. Immediate trigger on applied, interview, or hired 6. Attribute signals to matching dimensions 7. Extract themes from commentary using LLM 8. Enforce drift protection — floor 0.05, ceiling 0.50 9. Normalize weights — always sum to 1.0 10. Increment weights_version on every update 11. Persist updated weights | INPUT: Feedback events — type, job_id, dimension scores, timestamp, optional commentary SIGNAL VALUES: thumbs_up: +2, thumbs_down: -2, click: +1, apply_click: +1, applied: +3 (immediate), not_interested: -1, interview: +4 (immediate), hired: +5 (immediate) STATE MANAGEMENT: feedback_event_log — immutable, append only. job_user_state — current status per user-job pair, updated on each interaction. DIMENSION ATTRIBUTION: Strong skills_match on liked jobs → increase skills_match. Disliked for seniority → decrease experience_level. Commentary "wrong function" → adjust function_type. Applied/interview → treat dimension scores as strong anchor. DRIFT PROTECTION: No dimension above 0.50. No dimension below 0.05. Enforced after every update. OUTPUT: Updated normalized weights → increment weights_version → PostgreSQL → available for next cycle | Python 3.12, Claude Haiku (commentary NLP — conditional), SQLAlchemy, PostgreSQL, FastAPI |
 | **Insights Agent** | The intelligence layer for company and career behavioral data. Owns company profiles, culture scores, hiring behavior patterns, and user-level career behavioral insights. Runs on its own cadence — not part of daily matching pipeline. | 1. Aggregate company behavioral data from feedback events — response rates, ghosting patterns, time to respond 2. Compute company accountability scores 3. Generate company profiles — size, stage, hiring behavior, culture rating 4. Generate user behavioral insights with tiered thresholds 5. Feed company snapshot to Matching Agent Call 2 6. Feed insights to Company Insights page and Dashboard 7. Update company scores weekly (Monday 5:00 AM UTC) 8. Update user insights daily (6:00 AM UTC) | INPUT: Aggregated feedback events (company behavior), individual user interaction history INSIGHT TIERS — user behavioral insights: <5 interactions: no insights — show "Interact with more jobs to unlock insights" 5-15 interactions: weak signals with caveat — "Early patterns based on limited interactions" 15+ interactions: strong signals — show confidently COMPANY INSIGHT PROCESS: Aggregate feedback per company → compute response rate, ghosting rate, avg response time → generate accountability score → store per company CADENCE: Company scores: Monday 5:00 AM UTC. User insights: daily 6:00 AM UTC. OUTPUT: Company profiles and scores → Company Insights page and Matching Agent Call 2. User insights → Dashboard Matching Insights section. | Python 3.12, Claude Haiku (insight generation), SQLAlchemy, PostgreSQL, FastAPI |
@@ -227,8 +232,8 @@ Relaxation:  One additional level in fallback
 
 | Model | Key Fields | Purpose | Version Tracking |
 |-------|-----------|---------|-----------------|
-| User | id, email, resume_text, preferences, constraint_flags (strict/flexible per constraint), cold_start, profile_version | Core user identity and preferences | profile_version increments on any profile change |
-| Job | id, url, title, company, description, active_status, job_source, job_last_seen_at, job_inactive_reason, embedding_vector | Scraped job data. description exposed in JobResponse API model and rendered as 150-200 char truncated snippet on Open Positions job cards. Full description available in detail drawer. | job_updated_at tracked for Call 2 cache invalidation |
+| User | id, email, resume_text, preferences, constraint_flags (strict/flexible per constraint), cold_start, profile_version, **is_admin** (boolean, default false) | Core user identity and preferences. is_admin gates the /admin route — redirect to main dashboard if false. | profile_version increments on any profile change |
+| Job | id, url, title, company, description, active_status, job_source, job_last_seen_at, job_inactive_reason, embedding_vector, **description_hash** (MD5 varchar), **description_version** (integer, default 1), **description_last_changed_at** (timestamp) | Scraped job data. description exposed in JobResponse API model and rendered as 150-200 char truncated snippet on Open Positions job cards. Full description available in detail drawer. description_hash enables zero-cost deduplication — new JobDescriptionHistory row written only when hash changes. | job_updated_at tracked for Call 2 cache invalidation. description_version increments only on content change. |
 | JobMatch | id, user_id, job_id, match_run_id, per_dimension_scores, dimension_data_available (bool per dimension), dimension_score_confidence (high/medium/low per dimension), weighted_score, normalized_score, low_confidence_flag | Match result per user per job per run | Tied to match_run_id and profile_version |
 | FeedbackEvent | id, feedback_event_id, user_id, job_id, signal_type, signal_value, timestamp, interaction_source, commentary | Immutable event log — append only, never modified | feedback_event_id unique per event |
 | JobUserState | user_id, job_id, current_status, shown_at, last_interaction_at, interaction_type | Current status of each user-job relationship — separate from event log | Updated on each interaction, not immutable |
@@ -239,6 +244,13 @@ Relaxation:  One additional level in fallback
 | UserInsight | user_id, insight_text, interaction_count, signal_tier (weak/strong), updated_at | User behavioral patterns from interaction history | interaction_count determines tier |
 | WeeklyRecapState | user_id, job_id, recap_sent_at | Tracks recap appearances — max 1 per job per user | Permanent — ensures no repeat recaps |
 | OrchestrationLog | match_run_id, user_id, run_date, jobs_evaluated, jobs_delivered, llm_calls_made, llm_cost, fallback_triggered, fallback_steps_used | Full pipeline run history and cost tracking | match_run_id unique per run |
+| **CompanyHiringSnapshot** | id, company_id (FK), snapshot_date (date), active_job_count, new_jobs_since_yesterday, removed_jobs_since_yesterday, jobs_by_department (JSON), jobs_by_seniority (JSON), jobs_by_location (JSON), created_at | One row per company per day — long-term hiring intelligence built from daily scrape data. Upsert on company_id + snapshot_date (update rather than insert duplicate). Indexed on company_id + snapshot_date. No new services — uses existing PostgreSQL only. | snapshot_date is the natural version key |
+| **AgentLog** | id, agent_name, timestamp, message, details (JSON), log_level, run_id | Append-only log of all agent activity. Feeds the Admin Dashboard activity log. Color-coded by agent in the UI. | run_id links entries to a specific pipeline run |
+| **AdminAlert** | id, severity, title, description, metric_name, metric_value, threshold_value, baseline_value, baseline_comparison (text), failure_type (data/model/infra), triggered_at, dismissed_at, dismissed_by, suppressed_until | Active and historical alerts. Suppressed within 24h if same root cause. Grouped if 3+ share root cause. | dismissed_at / suppressed_until control deduplication |
+| **TestAgentMetrics** | id, run_date, precision_at_50, precision_at_15, recall_at_50, ndcg, coverage, false_positive_rate, sample_size, confidence_score, drift_flags (JSON), baseline_7day (JSON), label_sources (JSON) | Daily snapshot of all 6 evaluation metrics with baselines, drift flags, and label source breakdown. | run_date is the natural key |
+| **AlertThresholds** | id, metric_name, warning_threshold, critical_threshold, updated_at | Editable per-metric thresholds. Updated via gear icon in admin top bar. Defaults hard-coded as fallback if table empty. | updated_at tracks last founder edit |
+| **EvaluatedJob** | id, run_date, job_id, user_id, label_source, relevance_label, confidence_weight, rejection_stage, rejection_reason, dimension_scores (JSON), near_miss (boolean) | Ground truth labels for evaluation. Three sources: LLM-as-judge, user feedback, human audit. near_miss = passed hard filter + BGE-small > 0.60 but did not reach top 15. | label_source distinguishes LLM / user / human labels |
+| **JobDescriptionHistory** | id, job_id (FK), description_text (text), description_hash (varchar), version_number (integer), valid_from (timestamp), valid_to (timestamp nullable), created_at | Immutable append-only log of job description changes. New row written only when MD5 hash differs from stored hash — same hash = no record, no storage cost. Current version: valid_to IS NULL. Previous versions: valid_to set to time of next change. | version_number matches Job.description_version at time of capture |
 
 ---
 
@@ -374,3 +386,601 @@ Action:                         Review pipeline logs
 | Cross-encoder reranking evaluation | - | - | ✅ |
 | Data licensing | - | - | ✅ |
 | Multilingual support | - | - | ✅ |
+| CompanyHiringSnapshot (hiring intelligence) | ✅ | - | - |
+| JobDescriptionHistory (description versioning) | ✅ | - | - |
+| Admin dashboard — pipeline status, metric cards, source health | ✅ | - | - |
+| Admin dashboard — Test Agent evaluation + drift detection | ✅ | - | - |
+| Admin dashboard — Job Scoring Explorer + Near Misses + Replay Mode | ✅ | - | - |
+| Admin dashboard — Recommended Actions (rules-based v1) | ✅ | - | - |
+| Admin dashboard — Recommended Actions (LLM-generated v2) | - | ✅ | - |
+| Admin dashboard — Weight Evolution + Alert Threshold settings | ✅ | - | - |
+
+---
+
+## 10. Phase C — Long-term Hiring Intelligence
+
+*Goal: Collect hiring intelligence over time using existing infrastructure only. No new services, no new dependencies, no cost increase.*
+
+### Design principles
+
+- Use existing Render PostgreSQL only
+- No new paid APIs or services
+- Storage cost near zero — write only on change (description versioning) or once per day per company (snapshots)
+- No new dependencies — hashlib (MD5) is Python stdlib
+- Piggybacks on the existing daily scrape cycle
+
+---
+
+### Task 1 — CompanyHiringSnapshot table
+
+One row per company per day. Upsert (UPDATE rather than INSERT if snapshot_date already exists for that company).
+
+```
+CompanyHiringSnapshot
+─────────────────────────────────────────────────
+id                        UUID, primary key
+company_id                FK → companies
+snapshot_date             date (not timestamp)
+active_job_count          integer
+new_jobs_since_yesterday  integer  (first_seen_at = today)
+removed_jobs_since_yesterday integer  (was active yesterday, gone today)
+jobs_by_department        JSON  (department → count)
+jobs_by_seniority         JSON  (level → count)
+jobs_by_location          JSON  (remote/hybrid/onsite → count)
+created_at                timestamp with timezone
+
+Index: (company_id, snapshot_date) — unique
+```
+
+Department classification: use job title keywords if a `department` field is not available on the scraped job.
+
+---
+
+### Task 2 — Job description versioning
+
+New fields added to the existing Job table:
+
+```
+description_hash              varchar  (MD5 hex of description text)
+description_version           integer  default 1
+description_last_changed_at   timestamp with timezone
+```
+
+New table — append-only, never updated:
+
+```
+JobDescriptionHistory
+─────────────────────────────────────────────────
+id                UUID, primary key
+job_id            FK → jobs
+description_text  text
+description_hash  varchar
+version_number    integer
+valid_from        timestamp with timezone
+valid_to          timestamp with timezone, nullable  (NULL = current version)
+created_at        timestamp with timezone
+```
+
+Save logic (runs for every job on every scrape):
+
+```
+1. Compute MD5(description_text)
+2. Compare to Job.description_hash
+3. If DIFFERENT:
+     - Set valid_to = now() on the current JobDescriptionHistory row
+     - Insert new JobDescriptionHistory row (valid_to = NULL)
+     - Update Job.description_hash, description_version += 1,
+       description_last_changed_at = now()
+4. If SAME:
+     - Update Job.last_seen_at only
+     - No new history row — zero storage cost
+```
+
+Most days for most jobs: hash is identical → zero new records.
+
+---
+
+### Task 3 — Search Agent pipeline additions
+
+Added at the end of every daily scrape cycle, after existing sync and health check steps:
+
+**Step A — Save company hiring snapshot**
+```
+For each company scraped today:
+  1. COUNT active jobs total
+  2. COUNT jobs where first_seen_at = today  (new)
+  3. COUNT jobs active yesterday, not today  (removed)
+  4. GROUP BY department (title keyword fallback if no field)
+  5. GROUP BY seniority level
+  6. GROUP BY location type (remote/hybrid/onsite)
+  7. UPSERT CompanyHiringSnapshot for today
+```
+
+**Step B — Check description changes**
+```
+For each job scraped today:
+  1. Compute MD5 hash of description
+  2. Compare to Job.description_hash
+  3. If different → close old history row, insert new row, update Job fields
+  4. If same → update last_seen_at only
+```
+
+---
+
+### Storage optimization rules
+
+| Rule | Reason |
+|------|--------|
+| Same description hash → no new JobDescriptionHistory row | Eliminates duplicate storage — most jobs don't change daily |
+| CompanyHiringSnapshot: one row per company per day | Small structured data — 41 companies × 365 days = ~15k rows/year |
+| FeedbackEvent stores profile_version reference, not full profile JSON | Avoids duplicating profile data across thousands of events |
+| Raw HTML discarded at scrape time | Only parsed structured fields written to DB |
+
+### Estimated storage at current volumes (41 companies)
+
+```
+CompanyHiringSnapshot:  41 rows/day × ~0.5 KB = ~20 KB/day → ~7 MB/year
+JobDescriptionHistory:  ~5% of 10k jobs change per day = ~500 rows/day × ~2 KB = ~1 MB/day → ~365 MB/year (worst case)
+                        Realistically <10% of that — most descriptions stable
+Net new cost:           $0 (within existing Render PostgreSQL plan)
+```
+
+---
+
+## 11. Admin Dashboard — Internal ML Control Center
+
+*Goal: Not just monitoring — a machine learning control center enabling the founder to detect issues, understand root causes, evaluate ranking quality, and take immediate corrective action. Internal only, never visible to regular users.*
+
+---
+
+### Access and routing
+
+```
+Route:  /admin
+Auth:   user.is_admin === true (added to User model, default false)
+Guard:  If not admin → redirect to main dashboard
+Layout: Own layout — no shared sidebar
+
+Top bar:
+  Left:   Stellapath logo
+  Center: "Admin" badge (purple)
+  Right:  Live UTC clock | Link back to main app | Gear icon (threshold settings)
+```
+
+---
+
+### Section 1 — Pipeline Status Bar
+
+Full-width banner at top of page.
+
+```
+Left:   Status indicator
+        🟢 Healthy    — last run successful
+        🟡 Degraded   — warnings present
+        🔴 Failed     — critical failure
+
+Center: Last run timestamp | Next scheduled run
+
+Right:  Users processed | Average match score | Total LLM cost today
+        Breakdown: Call 1 Haiku $X.XX | Call 2 Sonnet $X.XX | Per-user avg $X.XX
+```
+
+---
+
+### Section 2 — Recommended Actions
+
+*Purpose: Tell the founder what to do next.*
+
+Max 5 cards, sorted by severity. Only visible when triggered.
+
+Each card contains:
+```
+Severity:           WARNING / CRITICAL
+Title:              one line
+Description:        1-2 sentences
+Triggering metric:  name + current value
+Root cause:         inferred from signal group (rules-based v1)
+Recommended action: specific next step
+Dismiss button
+```
+
+Root cause grouping rules (v1 — rules-based, LLM-generated in Phase 2):
+
+| Signal Group | Root Cause | Recommended Action |
+|---|---|---|
+| Precision ↓ + Coverage ↓ + Near misses ↑ | Over-filtering in ranking | Relax similarity thresholds |
+| Thumbs up ↓ + Score stable | Score calibration drift | Review dimension weights |
+| Source jobs ↓ + Precision stable | Scraper quality degrading | Investigate source trust scores |
+
+CRITICAL triggers:
+- Precision@50 < 0.65
+- Pipeline not complete by 9 AM UTC
+- >5% of users received zero jobs
+- LLM failure rate > 10%
+
+WARNING triggers:
+- Precision drop >10% vs 7-day baseline
+- LLM cost spike >30% day over day
+- Thumbs up rate drop >15% week on week
+- Source trust score below 0.70
+- Source returning zero jobs
+- NDCG drops >10% vs baseline
+
+Empty state: ✅ "All systems nominal — no actions required"
+
+---
+
+### Section 3 — Metric Cards
+
+Five cards in a row:
+
+| Card | Primary Metric | Secondary | Color Rules |
+|---|---|---|---|
+| Match Quality | Thumbs up rate % (7-day rolling) | Trend + 14-day sparkline | standard |
+| Precision Metrics | Precision@50 today | Precision@15 + trend vs 7-day baseline | green >0.80, amber 0.65-0.80, red <0.65 |
+| LLM Cost Breakdown | Total cost today | Call 1 Haiku / Call 2 Sonnet / per-user avg + progress bar vs $600 budget | green <50%, amber 50-80%, red >80% |
+| Source Health | "X of Y sources healthy" | Failing sources listed | green all healthy, amber 1-2 failing, red 3+ failing |
+| User Activity | Users processed today | Feedback signals / cold start completions / trend vs yesterday | standard |
+
+---
+
+### Section 4 — Test Agent Evaluation
+
+**Ground truth definition**
+
+All metrics reference labeled data from three sources:
+
+```
+label_source:       "LLM" | "user" | "human"
+relevance_label:    relevant / not_relevant
+confidence_weight:  0.0–1.0
+```
+
+Sources: LLM-as-judge (primary), user feedback (thumbs up/down, applied, interview), human audit (founder review).
+
+**Metrics grid — all 6 metrics**
+
+| Metric | Description | Color Thresholds |
+|---|---|---|
+| Precision@50 | Relevant jobs in top 50 / 50 | green >0.80, amber 0.65-0.80, red <0.65 |
+| Precision@15 | Relevant jobs in top 15 / 15 | green >0.85, amber 0.75-0.85, red <0.75 |
+| Recall@50 (estimated) | Relevant in top 50 / total relevant in sample | shown with sample size |
+| NDCG | Ranking quality | green >0.80, amber 0.65-0.80, red <0.65 |
+| Coverage | Job type diversity | standard |
+| False Positive Rate | Irrelevant jobs delivered / total delivered | green <0.20, amber 0.20-0.35, red >0.35 |
+
+Each metric shows: today value | 7-day baseline | delta (+ or -) | color indicator
+
+**Recall@50 estimation method**
+
+```
+Sample: 100% of Top 50 and Top 15 + 1% random stratified sample of full pool
+Stratification: industry, seniority, location
+Formula: Recall@50 = relevant in top 50 / total relevant in sample
+Display: "Evaluated X jobs today (100% top 15, 1% full pool sample)"
+```
+
+**Confidence score**: calculated from sample size, label agreement, metric stability. Only shown when 100+ active users. Empty state: "Requires 100+ active users (currently X users)"
+
+**Drift Detection Panel**
+
+Title: "Drift Alerts"
+
+Triggers:
+- Embedding distribution shift exceeds threshold
+- Job category distribution shifts >10%
+- Average score shifts >8 points
+- Precision drops >10% vs baseline
+
+Sample alert format: "Precision dropped 12% vs 7-day baseline" | "Job category distribution changed (tech ↓ 8%, ops ↑ 6%)"
+
+Empty state: "No drift detected"
+
+---
+
+### Section 5 — Pipeline Funnel + Activity Log
+
+**Left (45%) — Pipeline Funnel**
+
+Title: "Pipeline Funnel — Today"
+
+Stages (job counts + drop-off % from previous stage + avg score at stage):
+```
+Jobs scraped
+  → After hard constraints
+  → After soft constraints
+  → After heuristics
+  → Top 50
+  → Top 15
+  → Delivered
+```
+
+Visual: horizontal step-down bar chart or funnel.
+
+**Right (55%) — Activity Log**
+
+Title: "Agent Activity Log — Today"
+
+Each entry:
+```
+Timestamp | Agent (color coded) | Short message | Expandable chevron → details
+```
+
+Agent color coding:
+```
+Search Agent:        blue
+Matching Agent:      purple
+Feedback Agent:      green
+Orchestration Agent: orange
+Test Agent:          red
+Insights Agent:      teal
+Email Agent:         gray
+Vector Index:        dark blue
+```
+
+Behavior: auto-refresh every 60 seconds | last 50 entries shown | "Load more" for older
+
+---
+
+### Section 6 — Match Quality Charts
+
+Full width below funnel and logs.
+
+```
+Chart 1 (line):  Average match score — last 30 days
+                 X: dates, Y: 0-100%, color: Stellapath purple
+
+Chart 2 (bar):   Score distribution — today
+                 Buckets: 0-60 | 60-70 | 70-80 | 80-90 | 90-100
+                 Color: green 80+, purple 70-80, gray <70
+```
+
+---
+
+### Section 7 — Source Health Table
+
+Title: "Scraper Source Health" | Subtitle: "Updated daily at 3:00 AM UTC"
+
+Columns: `Source | Sector | Jobs Today | % Change vs Yesterday | Trust Score | Status | Last Success`
+
+Status rules:
+```
+Green  "Healthy"   — normal
+Amber  "Degraded"  — <50% of yesterday's job count
+Red    "Failed"    — zero jobs or scrape error
+```
+
+Trust score color: green >0.80, amber 0.70-0.80, red <0.70
+
+Sort: Failed first → Degraded → Healthy
+
+Expandable rows show:
+- Error message (if failed)
+- 7-day job count mini chart
+- Sample job titles today
+- Trust score history 30 days
+
+---
+
+### Section 8 — Alert System
+
+Title: "Test Agent Alerts"
+
+Each alert card:
+```
+Severity:             INFO / WARNING / CRITICAL
+Timestamp
+Title + description
+Metric:               current value vs threshold
+baseline_comparison:  "vs 7-day baseline: was 0.84, now 0.71"
+failure_type:         "data" | "model" | "infra"
+Dismiss button
+Investigate button    → links to relevant dashboard section
+```
+
+Alert suppression rules:
+- No duplicate alerts within 24 hours
+- Group by root cause
+- If 3+ alerts share same root cause → single grouped alert with count
+
+Thresholds:
+
+| Severity | Trigger |
+|---|---|
+| INFO | Precision@50 drops 5-10% vs baseline |
+| INFO | LLM cost +15-30% day over day |
+| INFO | Source returning 30-50% fewer jobs |
+| WARNING | Precision@50 < 0.75 |
+| WARNING | Precision@15 < 0.85 |
+| WARNING | Thumbs up rate drops >15% week on week |
+| WARNING | LLM cost +30% day over day |
+| WARNING | Source trust score drops below 0.70 |
+| WARNING | NDCG drops >10% vs baseline |
+| CRITICAL | Precision@50 < 0.65 |
+| CRITICAL | Zero jobs to >5% of users |
+| CRITICAL | LLM failure rate >10% |
+| CRITICAL | Pipeline not complete by 9 AM UTC |
+| CRITICAL | False positive rate >0.35 |
+
+Empty state: ✅ "No active alerts — pipeline is healthy"
+
+---
+
+### Section 9 — User Activity Summary
+
+Title: "User Activity — Today"
+
+Six stat boxes in two rows. Each: large number + label + change vs yesterday with arrow.
+
+```
+Row 1:  Total active users | New profiles completed today | Feedback signals received today
+Row 2:  Cold start graduations today | Applied signals received | Interview signals received
+```
+
+---
+
+### Section 10 — Job Scoring Explorer
+
+Title: "Daily Job Scoring Explorer"
+
+Search by user email or job title. Filters: date, score range, reaction type.
+
+**Main table columns:**
+`User | Job Title | Company | Match Score | Top 50? | Top 15? | Rejection Stage | Reaction`
+
+Rejection Stage values:
+```
+"Hard constraint: [constraint name]"
+"Soft constraint: [constraint name]"
+"Heuristic: score [X]"
+"BGE-small: similarity [X]"
+"BGE-large: similarity [X]"
+"LLM: dimension [name] scored low"
+"Delivered"
+```
+
+Reaction column: 👍 👎 ⏳ ✅ 🎯
+
+**Expanded row shows:**
+- Full job description
+- All 6 dimension scores (bar charts)
+- Lowest scoring dimension highlighted
+- Dimension most influencing final score
+- Gap between user weights and actual scores
+- User's current weights
+- Call 2 reasoning (if generated)
+- "Why this failed" — e.g., "Rejected at BGE-large — similarity 0.58 below 0.70 threshold"
+
+**Near Misses tab:**
+
+```
+Near Miss Rate = missed relevant jobs / candidate jobs
+
+Criteria for near miss:
+  - Passed hard constraints
+  - Scored above 0.60 in BGE-small
+  - Did not reach top 15
+
+Columns: Job Title | Company | Stage 1 Score | Rejection Stage | Reason
+```
+
+**Replay Mode:**
+
+```
+1. Select a user
+2. Adjust thresholds or weights
+3. Re-run pipeline logic against stored job data
+
+Display: side-by-side Original top 15 vs New top 15 + score differences per job
+
+Note: uses stored job data from that run — does not re-scrape or re-embed
+```
+
+---
+
+### Section 11 — Weight Evolution
+
+Title: "Weight Evolution"
+
+```
+Tab 1 — Platform Average:
+  Line chart — all 6 dimensions over 30 days
+  skills_match: blue | industry_alignment: green | experience_level: purple
+  function_type: orange | salary: teal | career_trajectory: red
+
+Tab 2 — Individual User:
+  Search by user email
+  Weight evolution over time (line chart)
+  Feedback history below chart
+  Current weights as horizontal bar chart
+  Cold start status + signal count
+```
+
+---
+
+### Alert Threshold Settings
+
+Accessible via gear icon in top bar. All values editable and persisted to `AlertThresholds` table.
+
+| Setting | Default |
+|---|---|
+| Precision@50 warning | 0.75 |
+| Precision@50 critical | 0.65 |
+| Precision@15 warning | 0.85 |
+| Thumbs up rate drop warning | 15% |
+| LLM cost spike warning | 30% |
+| LLM daily budget | $600 |
+| Source trust score warning | 0.70 |
+| False positive rate critical | 0.35 |
+| Drift threshold | 10% |
+
+---
+
+### Backend endpoints
+
+All endpoints require admin authentication. Return JSON. Handle empty states gracefully (empty arrays, not errors).
+
+```
+GET   /admin/pipeline-status
+GET   /admin/recommended-actions
+GET   /admin/test-agent-metrics
+GET   /admin/agent-logs            (paginated)
+GET   /admin/pipeline-funnel
+GET   /admin/source-health
+GET   /admin/alerts
+PATCH /admin/alerts/:id/dismiss
+GET   /admin/user-activity
+GET   /admin/job-scoring
+GET   /admin/weight-evolution
+GET   /admin/thresholds
+PATCH /admin/thresholds
+```
+
+---
+
+### New database models
+
+```
+AgentLog
+  id, agent_name, timestamp, message, details (JSON), log_level, run_id
+
+AdminAlert
+  id, severity, title, description, metric_name, metric_value,
+  threshold_value, baseline_value, baseline_comparison (text),
+  failure_type (data | model | infra),
+  triggered_at, dismissed_at, dismissed_by, suppressed_until
+
+TestAgentMetrics
+  id, run_date, precision_at_50, precision_at_15, recall_at_50,
+  ndcg, coverage, false_positive_rate, sample_size, confidence_score,
+  drift_flags (JSON), baseline_7day (JSON), label_sources (JSON)
+
+AlertThresholds
+  id, metric_name, warning_threshold, critical_threshold, updated_at
+
+EvaluatedJob
+  id, run_date, job_id, user_id, label_source, relevance_label,
+  confidence_weight, rejection_stage, rejection_reason,
+  dimension_scores (JSON), near_miss (boolean)
+```
+
+User model addition: `is_admin: boolean (default false)`
+
+---
+
+### Styling
+
+```
+Background:       white
+Section bg:       light gray
+Accent:           Stellapath purple
+Design:           clean, minimal
+Responsive:       desktop only — no mobile needed
+
+Data refresh:
+  Pipeline log + alerts + recommended actions: every 60 seconds
+  Metric cards:                                every 5 minutes
+  All other sections:                          on page load
+```
+
+Every section requires a clean empty state, e.g.: "No pipeline runs yet — data will appear after first run"
