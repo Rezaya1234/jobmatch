@@ -1,6 +1,45 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { listJobs, getJobCount, submitFeedback, deleteFeedback, getFeedback } from '../api'
 
+// slug → domain for Clearbit logo lookup
+const SLUG_DOMAIN = {
+  anthropic: 'anthropic.com', scaleai: 'scale.ai', togetherai: 'together.ai',
+  gleanwork: 'glean.com', gongio: 'gong.com', intercom: 'intercom.com',
+  databricks: 'databricks.com', mistral: 'mistral.ai', palantir: 'palantir.com',
+  openai: 'openai.com', cohere: 'cohere.com', writer: 'writer.com',
+  runway: 'runwayml.com', pinecone: 'pinecone.io', perplexity: 'perplexity.ai',
+  elevenlabs: 'elevenlabs.io', cursor: 'cursor.sh', harvey: 'harvey.ai',
+  sierra: 'sierra.ai', google: 'google.com', amazon: 'amazon.com',
+  exxonmobil: 'exxonmobil.com', chevron: 'chevron.com',
+  conocophillips: 'conocophillips.com', eogresources: 'eoginc.com',
+  devonenergy: 'devonenergy.com', diamondbackenergy: 'diamondbackenergy.com',
+  apacorp: 'apacorp.com', coterra: 'coterra.com', occidental: 'oxy.com',
+  expandenergy: 'expandenergy.com', slb: 'slb.com', halliburton: 'halliburton.com',
+  bakerhughes: 'bakerhughes.com', technipfmc: 'technipfmc.com', novinc: 'nov.com',
+  weatherford: 'weatherford.com', tenaris: 'tenaris.com', archrock: 'archrock.com',
+  newpark: 'newpark.com', pattersonuti: 'patenergy.com',
+}
+
+function CompanyLogo({ slug, company }) {
+  const [failed, setFailed] = useState(false)
+  const domain = SLUG_DOMAIN[slug]
+  if (!domain || failed) {
+    return (
+      <div className="w-7 h-7 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-xs font-bold text-slate-500">
+        {(company || '?')[0].toUpperCase()}
+      </div>
+    )
+  }
+  return (
+    <img
+      src={`https://logo.clearbit.com/${domain}`}
+      alt={company}
+      onError={() => setFailed(true)}
+      className="w-7 h-7 rounded-md border border-slate-100 object-contain shrink-0 bg-white"
+    />
+  )
+}
+
 const PAGE_SIZE = 25
 
 const SORT_OPTIONS = [
@@ -78,7 +117,8 @@ function SkeletonRow() {
     <div className="bg-white rounded-xl border border-slate-200 p-4 border-l-4 border-l-slate-200 animate-pulse">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <div className="flex gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 bg-slate-200 rounded-md shrink-0" />
             <div className="h-3 bg-slate-200 rounded w-20" />
             <div className="h-3 bg-slate-100 rounded-full w-12" />
           </div>
@@ -131,6 +171,7 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
+            <CompanyLogo slug={job.source_company} company={job.company} />
             <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{job.company}</p>
             {job.work_mode && (
               <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{job.work_mode}</span>
