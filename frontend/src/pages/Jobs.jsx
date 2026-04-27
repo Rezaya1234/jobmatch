@@ -10,7 +10,7 @@ const SLUG_DOMAIN = {
   runway: 'runwayml.com', pinecone: 'pinecone.io', perplexity: 'perplexity.ai',
   elevenlabs: 'elevenlabs.io', cursor: 'cursor.sh', harvey: 'harvey.ai',
   sierra: 'sierra.ai', google: 'google.com', amazon: 'amazon.com',
-  exxonmobil: 'exxonmobil.com', chevron: 'chevron.com',
+  exxonmobil: 'exxonmobil.com', chevron: 'chevron.wd5.myworkdayjobs.com',
   conocophillips: 'conocophillips.com', eogresources: 'eoginc.com',
   devonenergy: 'devonenergy.com', diamondbackenergy: 'diamondbackenergy.com',
   apacorp: 'apacorp.com', coterra: 'coterra.com', occidental: 'oxy.com',
