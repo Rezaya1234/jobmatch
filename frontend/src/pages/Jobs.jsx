@@ -32,7 +32,7 @@ function CompanyLogo({ slug, company }) {
   }
   return (
     <img
-      src={`https://www.google.com/s2/favicons?sz=64&domain_url=https://${domain}`}
+      src={`https://icons.duckduckgo.com/ip3/${domain}.ico`}
       alt={company}
       onError={() => setFailed(true)}
       className="w-7 h-7 rounded-md border border-slate-100 object-contain shrink-0 bg-white"
