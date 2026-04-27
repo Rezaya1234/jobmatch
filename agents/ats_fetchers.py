@@ -364,12 +364,15 @@ async def _fetch_oracle_hcm(
     results = []
     offset = 0
     limit = 25
-    while True:
+    total = 9999   # updated from first response
+    while offset < min(total, 500):
+        finder = (
+            f"findReqs;siteNumber={oracle_site}"
+            f",limit={limit},offset={offset},sortBy=POSTING_DATES_DESC"
+        )
         params = {
-            "finder": f"findReqs;siteNumber={oracle_site}",
-            "limit": limit,
-            "offset": offset,
-            "totalResults": "true",
+            "finder": finder,
+            "onlyData": "true",
             "expand": "requisitionList",
         }
         resp = await client.get(base, params=params, headers=_ORACLE_HCM_HEADERS, timeout=_TIMEOUT)
@@ -378,7 +381,10 @@ async def _fetch_oracle_hcm(
         items = data.get("items", [])
         if not items:
             break
-        req_list = items[0].get("requisitionList", [])
+        item = items[0]
+        if offset == 0:
+            total = item.get("TotalJobsCount") or total
+        req_list = item.get("requisitionList", [])
         if not req_list:
             break
         for j in req_list:
@@ -402,10 +408,7 @@ async def _fetch_oracle_hcm(
                 "posted_at": _parse_iso(j.get("PostedDate")),
                 "source": slug,
             })
-        total = data.get("totalResults", 0)
         offset += limit
-        if offset >= min(total, 500):
-            break
     return results
 
 
