@@ -13,16 +13,33 @@ ATS types:
   google      — careers.google.com (unofficial JSON)
   amazon      — amazon.jobs (unofficial JSON)
 """
+import asyncio
 import logging
 import re
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 import httpx
+
+try:
+    from playwright.async_api import async_playwright as _async_playwright
+    _PLAYWRIGHT_OK = True
+except ImportError:
+    _PLAYWRIGHT_OK = False
 
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = 20
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; JobMatchBot/1.0)"}
+
+# Playwright browser launch flags safe for headless Linux containers
+_PW_ARGS = [
+    "--no-sandbox",
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--disable-extensions",
+]
+_PW_TIMEOUT = 25_000   # ms per page navigation
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +60,12 @@ async def fetch_company_jobs(client: httpx.AsyncClient, source: dict) -> list[di
             return await _fetch_ashby(client, slug, name)
         if ats == "workday":
             return await _fetch_workday(client, slug, name, source["workday_host"], source["workday_board"])
-        if ats == "successfactors":
-            return await _fetch_successfactors(client, slug, name, source["sf_company"])
+        if ats == "j2w":
+            return await _fetch_j2w(client, slug, name, source["j2w_base"])
+        if ats == "halliburton_html":
+            return await _fetch_halliburton_html(client, slug, name)
+        if ats == "slb_coveo":
+            return await _fetch_slb_coveo(slug, name)
         if ats == "oracle_hcm":
             return await _fetch_oracle_hcm(client, slug, name, source["oracle_host"], source["oracle_site"])
         if ats == "eog_html":
@@ -429,64 +450,365 @@ async def _fetch_recruitee(
 
 
 # ---------------------------------------------------------------------------
-# SAP SuccessFactors (used by ExxonMobil, Halliburton, etc.)
-# Uses the public XML sitemap feed — no authentication required.
+# J2W (Jobs2Web) — used by ExxonMobil, Expand Energy, Tenaris, TechnipFMC
+# POST /services/jobs/search with JSON body; paginate via startrow
 # ---------------------------------------------------------------------------
 
-import xml.etree.ElementTree as ET
+_J2W_HEADERS = {
+    **_HEADERS,
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+}
 
-_SF_HOST = "https://career4.successfactors.com"
-_SF_SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
-
-async def _fetch_successfactors(
+async def _fetch_j2w(
     client: httpx.AsyncClient,
     slug: str,
     company_name: str,
-    sf_company: str,
+    j2w_base: str,
 ) -> list[dict]:
-    resp = await client.get(
-        f"{_SF_HOST}/sitemal.xml",
-        params={"company": sf_company},
-        headers=_HEADERS,
-        timeout=_TIMEOUT,
-    )
-    resp.raise_for_status()
-    try:
-        root = ET.fromstring(resp.content)
-    except ET.ParseError:
-        logger.warning("SuccessFactors XML parse error for %s", company_name)
+    await client.get(j2w_base + "/", headers=_HEADERS, timeout=_TIMEOUT)
+    results = []
+    startrow = 0
+    limit = 25
+    while True:
+        body = {
+            "page": 0,
+            "keywords": "",
+            "locationsearch": "",
+            "sortby": "referencedate",
+            "sortdir": "desc",
+            "recordsperpage": limit,
+            "startrow": startrow,
+            "filterquery": {},
+        }
+        resp = await client.post(
+            f"{j2w_base}/services/jobs/search",
+            json=body,
+            headers=_J2W_HEADERS,
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        jobs = resp.json().get("jobList", [])
+        if not jobs:
+            break
+        for j in jobs:
+            urltitle = j.get("urltitle") or ""
+            url = f"{j2w_base}/jobs/{urltitle}" if urltitle else j2w_base
+            location = j.get("location") or ""
+            results.append({
+                "url": url,
+                "title": j.get("title", ""),
+                "company": company_name,
+                "source_company": slug,
+                "location_raw": location,
+                "work_mode": _infer_work_mode(location, j.get("title", "")),
+                "job_type": "full_time",
+                "description": "",
+                "posted_at": _parse_iso(j.get("referencedate", "").replace("[UTC]", "")),
+                "source": slug,
+            })
+        startrow += limit
+        if len(jobs) < limit or startrow >= 500:   # cap at 500 per company
+            break
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Halliburton — server-side rendered HTML at jobs.halliburton.com/search
+# Pagination via ?startrow=N query param; parse table.searchResults rows
+# ---------------------------------------------------------------------------
+
+_HAL_BASE = "https://jobs.halliburton.com"
+_HAL_HEADERS = {
+    **_HEADERS,
+    "Accept": "text/html,application/xhtml+xml",
+}
+_HAL_ROW_RE = re.compile(
+    r'<a\s+href="(/job/[^"]+)"\s+class="jobTitle-link">([^<]+)</a>'
+    r'.*?<span class="jobLocation">\s*(.*?)\s*</span>'
+    r'.*?<span class="jobDate">\s*(.*?)\s*</span>',
+    re.DOTALL | re.IGNORECASE,
+)
+_HAL_TOTAL_RE = re.compile(r'Results\s+\d+\s+to\s+\d+\s+of\s+(\d+)', re.IGNORECASE)
+
+
+async def _fetch_halliburton_html(
+    client: httpx.AsyncClient,
+    slug: str,
+    company_name: str,
+) -> list[dict]:
+    results = []
+    seen: set[str] = set()
+    startrow = 0
+    limit = 25
+    total = 9999   # will be updated from first page
+    while startrow < min(total, 500):
+        resp = await client.get(
+            f"{_HAL_BASE}/search",
+            params={"startrow": startrow},
+            headers=_HAL_HEADERS,
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        html = resp.text
+        if startrow == 0:
+            m = _HAL_TOTAL_RE.search(html)
+            if m:
+                total = int(m.group(1))
+        for m in _HAL_ROW_RE.finditer(html):
+            path, title, location, raw_date = m.group(1), m.group(2), m.group(3), m.group(4)
+            if path in seen:
+                continue
+            seen.add(path)
+            # raw_date looks like "Apr 27, 2026"
+            posted_at = _parse_hal_date(raw_date.strip())
+            results.append({
+                "url": f"{_HAL_BASE}{path}",
+                "title": title.strip(),
+                "company": company_name,
+                "source_company": slug,
+                "location_raw": location.strip(),
+                "work_mode": _infer_work_mode(location, title),
+                "job_type": "full_time",
+                "description": "",
+                "posted_at": posted_at,
+                "source": slug,
+            })
+        if not results and startrow == 0:
+            break
+        startrow += limit
+    return results
+
+
+def _parse_hal_date(value: str) -> datetime | None:
+    for fmt in ("%b %d, %Y", "%B %d, %Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+# ---------------------------------------------------------------------------
+# SAP SuccessFactors — Playwright browser automation
+# SF career portals load jobs via authenticated JS API calls; the only
+# reliable way to scrape them is to render the page in a real browser,
+# intercept the JSON API responses, and parse what comes back.
+# ---------------------------------------------------------------------------
+
+async def _fetch_successfactors(
+    slug: str,
+    company_name: str,
+    sf_company: str,
+    sf_url: str | None = None,
+) -> list[dict]:
+    if not _PLAYWRIGHT_OK:
+        logger.warning("Playwright not installed — skipping %s (SuccessFactors)", company_name)
+        return []
+    portal = sf_url or f"https://career4.successfactors.com/careers?company={sf_company}"
+    return await _playwright_sf(slug, company_name, portal)
+
+
+async def _playwright_sf(slug: str, company_name: str, portal_url: str) -> list[dict]:
+    collected: list[dict] = []
+
+    async def on_response(response):
+        ct = response.headers.get("content-type", "")
+        if "json" not in ct:
+            return
+        url = response.url
+        if not any(k in url for k in ("jobRequisition", "reqsearch", "jobPosting", "JobReq", "careers")):
+            return
+        try:
+            data = await response.json()
+            if isinstance(data, dict):
+                collected.append(data)
+        except Exception:
+            pass
+
+    async with _async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True, args=_PW_ARGS)
+        page = await browser.new_page()
+        page.on("response", on_response)
+        try:
+            await page.goto(portal_url, wait_until="networkidle", timeout=_PW_TIMEOUT)
+        except Exception:
+            try:
+                await page.goto(portal_url, wait_until="domcontentloaded", timeout=_PW_TIMEOUT)
+                await asyncio.sleep(6)
+            except Exception:
+                pass
+
+        # DOM fallback — grab all links that look like SF job detail pages
+        dom_jobs: list[dict] = await page.evaluate("""() => {
+            return Array.from(document.querySelectorAll('a[href]'))
+                .filter(a => /jobId|jobReqId|jobreqId|jobReq/i.test(a.href))
+                .map(a => ({ href: a.href, text: (a.textContent || '').trim() }))
+                .filter(j => j.text && j.text.length < 200);
+        }""")
+
+        await browser.close()
+
+    results = []
+    seen: set[str] = set()
+
+    # 1. Parse intercepted JSON API responses
+    job_id_fields = ("jobReqId", "jobId", "id", "requisitionId")
+    title_fields  = ("externalTitle", "title", "name", "positionName")
+    for data in collected:
+        jobs = (
+            data.get("d", {}).get("results", [])
+            or data.get("results", [])
+            or data.get("jobPostings", [])
+            or data.get("data", [])
+            or data.get("jobs", [])
+        )
+        if not isinstance(jobs, list):
+            continue
+        for j in jobs:
+            title  = next((j.get(f, "") for f in title_fields  if j.get(f)), "").strip()
+            job_id = next((str(j.get(f, "")) for f in job_id_fields if j.get(f)), "")
+            if not title or not job_id or job_id in seen:
+                continue
+            seen.add(job_id)
+            city    = j.get("city") or ""
+            state   = j.get("stateCode") or j.get("state") or ""
+            country = j.get("country") or ""
+            location = ", ".join(p for p in [city, state, country] if p)
+            apply_url = j.get("applyUrl") or j.get("externalJobPostingUrl") or f"{portal_url}&jobId={job_id}"
+            results.append({
+                "url": apply_url,
+                "title": title,
+                "company": company_name,
+                "source_company": slug,
+                "location_raw": location,
+                "work_mode": _infer_work_mode(location, title),
+                "job_type": "full_time",
+                "description": "",
+                "posted_at": None,
+                "source": slug,
+            })
+
+    # 2. DOM fallback — if the API interception got nothing
+    if not results:
+        job_id_re = re.compile(r'(?:jobId|jobReqId|jobreqId)=(\w+)', re.I)
+        for dom in dom_jobs:
+            href, text = dom["href"], dom["text"]
+            m = job_id_re.search(href)
+            uid = m.group(1) if m else href
+            if uid in seen:
+                continue
+            seen.add(uid)
+            results.append({
+                "url": href,
+                "title": text,
+                "company": company_name,
+                "source_company": slug,
+                "location_raw": "",
+                "work_mode": None,
+                "job_type": "full_time",
+                "description": "",
+                "posted_at": None,
+                "source": slug,
+            })
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# SLB — Coveo-powered career portal (careers.slb.com)
+# ---------------------------------------------------------------------------
+
+async def _fetch_slb_coveo(slug: str, company_name: str) -> list[dict]:
+    if not _PLAYWRIGHT_OK:
+        logger.warning("Playwright not installed — skipping SLB (Coveo)")
         return []
 
-    ns = {"sm": _SF_SITEMAP_NS}
+    collected: list[dict] = []
+
+    async def on_response(response):
+        ct = response.headers.get("content-type", "")
+        if "json" not in ct:
+            return
+        url = response.url
+        if not any(k in url for k in ("coveo", "search", "job")):
+            return
+        try:
+            data = await response.json()
+            if isinstance(data, dict) and ("results" in data or "data" in data):
+                collected.append(data)
+        except Exception:
+            pass
+
+    async with _async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True, args=_PW_ARGS)
+        page = await browser.new_page()
+        page.on("response", on_response)
+        try:
+            await page.goto("https://careers.slb.com/job-listing", wait_until="networkidle", timeout=_PW_TIMEOUT)
+        except Exception:
+            try:
+                await page.goto("https://careers.slb.com/job-listing", wait_until="domcontentloaded", timeout=_PW_TIMEOUT)
+                await asyncio.sleep(6)
+            except Exception:
+                pass
+
+        dom_jobs: list[dict] = await page.evaluate("""() => {
+            return Array.from(document.querySelectorAll('a[href]'))
+                .filter(a => /\\/job\\/|position|requisition/i.test(a.href) && a.href.includes('slb'))
+                .map(a => ({ href: a.href, text: (a.textContent || '').trim() }))
+                .filter(j => j.text && j.text.length > 3 && j.text.length < 200);
+        }""")
+
+        await browser.close()
+
     results = []
-    url_elements = root.findall("sm:url", ns) or root.findall("url") or root.findall(".//url")
-    for url_el in url_elements:
-        def _text(tag: str) -> str:
-            v = url_el.findtext(f"sm:{tag}", namespaces=ns) or url_el.findtext(tag) or ""
-            return v.strip()
+    seen: set[str] = set()
 
-        loc   = _text("loc")
-        title = _text("title") or _text("job_title") or _text("name")
-        if not loc or not title:
-            continue
+    # Parse Coveo search results
+    for data in collected:
+        jobs = data.get("results", []) or data.get("data", [])
+        for j in jobs:
+            raw   = j.get("raw", {}) if isinstance(j, dict) else {}
+            title = (raw.get("title") or raw.get("sljobname") or
+                     j.get("title") or j.get("name") or "").strip()
+            url   = j.get("clickUri") or j.get("uri") or j.get("url") or ""
+            if not title or not url or url in seen:
+                continue
+            seen.add(url)
+            location = raw.get("location") or raw.get("sllocation") or ""
+            results.append({
+                "url": url,
+                "title": title,
+                "company": company_name,
+                "source_company": slug,
+                "location_raw": location,
+                "work_mode": _infer_work_mode(location, title),
+                "job_type": "full_time",
+                "description": "",
+                "posted_at": None,
+                "source": slug,
+            })
 
-        city    = _text("city")
-        state   = _text("state")
-        country = _text("country")
-        location = ", ".join(p for p in [city, state, country] if p)
+    # DOM fallback
+    if not results:
+        for dom in dom_jobs:
+            if dom["href"] in seen:
+                continue
+            seen.add(dom["href"])
+            results.append({
+                "url": dom["href"],
+                "title": dom["text"],
+                "company": company_name,
+                "source_company": slug,
+                "location_raw": "",
+                "work_mode": None,
+                "job_type": "full_time",
+                "description": "",
+                "posted_at": None,
+                "source": slug,
+            })
 
-        results.append({
-            "url": loc,
-            "title": title,
-            "company": company_name,
-            "source_company": slug,
-            "location_raw": location,
-            "work_mode": _infer_work_mode(location, title),
-            "job_type": "full_time",
-            "description": "",
-            "posted_at": None,
-            "source": slug,
-        })
     return results
 
 

@@ -53,10 +53,10 @@ COMPANY_SOURCES: list[dict] = [
     {
         "name": "ExxonMobil",
         "slug": "exxonmobil",
-        "ats": "successfactors",
+        "ats": "j2w",
         "domain": "exxonmobil.com",
         "sector": "upstream_oil_gas",
-        "sf_company": "exxonmobilP",
+        "j2w_base": "https://jobs.exxonmobil.com",
     },
     {
         "name": "Chevron",
@@ -130,10 +130,10 @@ COMPANY_SOURCES: list[dict] = [
     {
         "name": "Expand Energy",
         "slug": "expandenergy",
-        "ats": "successfactors",
+        "ats": "j2w",
         "domain": "expandenergy.com",
         "sector": "upstream_oil_gas",
-        "sf_company": "expandenergy",   # jobs.expandenergy.com is SF-backed; company code TBD
+        "j2w_base": "https://jobs.expandenergy.com",
     },
 
     # -----------------------------------------------------------------------
@@ -142,17 +142,16 @@ COMPANY_SOURCES: list[dict] = [
     {
         "name": "SLB",
         "slug": "slb",
-        "ats": "custom",   # custom Coveo-based portal at careers.slb.com — no Workday instance
+        "ats": "slb_coveo",
         "domain": "slb.com",
         "sector": "oilfield_services",
     },
     {
         "name": "Halliburton",
         "slug": "halliburton",
-        "ats": "successfactors",
+        "ats": "halliburton_html",
         "domain": "halliburton.com",
         "sector": "oilfield_services",
-        "sf_company": "HALprod",
     },
     {
         "name": "Baker Hughes",
@@ -166,10 +165,10 @@ COMPANY_SOURCES: list[dict] = [
     {
         "name": "TechnipFMC",
         "slug": "technipfmc",
-        "ats": "successfactors",
+        "ats": "j2w",
         "domain": "technipfmc.com",
         "sector": "oilfield_services",
-        "sf_company": "d8ece663",   # found in SF CDN URL: rmkcdn.successfactors.com/d8ece663/...
+        "j2w_base": "https://careers.technipfmc.com",
     },
     {
         "name": "NOV Inc.",
@@ -192,10 +191,10 @@ COMPANY_SOURCES: list[dict] = [
     {
         "name": "Tenaris",
         "slug": "tenaris",
-        "ats": "successfactors",
+        "ats": "j2w",
         "domain": "tenaris.com",
         "sector": "oilfield_services",
-        "sf_company": "tenaris",   # recruitment.tenaris.com is SF-backed; company code TBD
+        "j2w_base": "https://recruitment.tenaris.com",
     },
     {
         "name": "Archrock",
