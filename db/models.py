@@ -1,8 +1,10 @@
 import enum
 import uuid
+from datetime import date
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -183,6 +185,11 @@ class Job(Base):
     scraped_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+    # Phase C — description versioning
+    description_hash: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    description_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    description_last_changed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     matches: Mapped[list["JobMatch"]] = relationship(back_populates="job")
     feedbacks: Mapped[list["Feedback"]] = relationship(back_populates="job")
     signals: Mapped[list["FeedbackSignal"]] = relationship(back_populates="job")
@@ -349,3 +356,40 @@ class CompanyInsight(Base):
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class CompanyHiringSnapshot(Base):
+    """One row per source per day — long-term hiring volume intelligence."""
+
+    __tablename__ = "company_hiring_snapshots"
+    __table_args__ = (
+        UniqueConstraint("source_slug", "snapshot_date", name="uq_company_snapshot_date"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_slug: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    snapshot_date: Mapped[date] = mapped_column(Date, nullable=False)
+    active_job_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    new_jobs_since_yesterday: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    removed_jobs_since_yesterday: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    jobs_by_department: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    jobs_by_seniority: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    jobs_by_location: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class JobDescriptionHistory(Base):
+    """Append-only log of job description changes. New row only when MD5 hash differs."""
+
+    __tablename__ = "job_description_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    description_text: Mapped[str] = mapped_column(Text, nullable=False)
+    description_hash: Mapped[str] = mapped_column(String(32), nullable=False)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    valid_from: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    valid_to: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

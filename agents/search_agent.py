@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -10,7 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.ats_fetchers import fetch_company_jobs
 from agents.company_sources import COMPANY_SOURCES
-from db.models import Feedback, Job, SourceTrustScore
+from db.models import (
+    CompanyHiringSnapshot,
+    Feedback,
+    Job,
+    JobDescriptionHistory,
+    SourceTrustScore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +29,33 @@ _TRUST_SKIP = 0.50          # skip source entirely below this
 _TRUST_WARN = 0.70          # log warning below this
 _DECAY = 0.85               # exponential decay for rolling counts (~7 days half-life)
 
+# Phase C — title keyword classifiers
+_SENIORITY_MAP: dict[str, list[str]] = {
+    "intern":     ["intern", "internship"],
+    "junior":     ["junior", "jr", "entry", "entry-level", "associate"],
+    "mid":        ["mid", "intermediate"],
+    "senior":     ["senior", "sr", "lead"],
+    "staff":      ["staff"],
+    "principal":  ["principal", "distinguished", "fellow"],
+    "manager":    ["manager"],
+    "director":   ["director"],
+    "executive":  ["vp", "vice president", "head of", "chief", "cto", "ceo", "coo", "cpo"],
+}
+
+_DEPARTMENT_MAP: dict[str, list[str]] = {
+    "engineering": ["engineer", "developer", "software", "backend", "frontend", "fullstack",
+                    "devops", "sre", "platform", "infrastructure", "security"],
+    "data_ml":     ["data", "machine learning", "ml", "ai", "analytics", "scientist", "analyst"],
+    "product":     ["product manager", "product", " pm "],
+    "design":      ["design", "designer", "ux", "ui"],
+    "marketing":   ["marketing", "growth", "content", "brand", "demand"],
+    "sales":       ["sales", "account executive", "business development"],
+    "operations":  ["operations", "ops", "supply chain", "logistics"],
+    "finance":     ["finance", "accounting", "financial"],
+    "hr":          ["hr", "human resources", "recruiting", "talent", "people"],
+    "legal":       ["legal", "counsel", "compliance"],
+}
+
 
 def _compute_trust(success: float, fail: float, dead: float, returned: int) -> float:
     total = success + fail
@@ -31,11 +65,32 @@ def _compute_trust(success: float, fail: float, dead: float, returned: int) -> f
     return round(parse_pct * 0.5 + (1.0 - min(dead_pct, 1.0)) * 0.3 + returned_ok * 0.2, 4)
 
 
+def _classify_titles(titles: list[str], keyword_map: dict[str, list[str]]) -> dict[str, int]:
+    """Classify job titles into categories using keyword matching. First match wins."""
+    counts: dict[str, int] = {}
+    for title in titles:
+        lower = title.lower()
+        matched = False
+        for category, keywords in keyword_map.items():
+            if any(kw in lower for kw in keywords):
+                counts[category] = counts.get(category, 0) + 1
+                matched = True
+                break
+        if not matched:
+            counts["other"] = counts.get("other", 0) + 1
+    return counts
+
+
+def _md5(text: str) -> str:
+    return hashlib.md5(text.encode("utf-8", errors="replace")).hexdigest()
+
+
 class JobSearchAgent:
     """
     Fetches all open positions directly from company career pages via ATS APIs.
     On each run: inserts new jobs, marks closed ones inactive, enforces 10k cap.
     Phase A: tracks per-source trust scores and health-checks recently scraped URLs.
+    Phase C: saves daily company hiring snapshots and versions job descriptions.
     """
 
     def __init__(self, session: AsyncSession) -> None:
@@ -68,13 +123,18 @@ class JobSearchAgent:
         # Phase 2: write to DB sequentially, collect per-source stats
         new_total = 0
         fetch_stats: dict[str, dict] = {}
+        all_raw_jobs: dict[str, list[dict]] = {}  # slug → raw jobs (Phase C)
+
         for source, (raw_jobs, fetch_ok) in zip(sources_to_fetch, results):
             slug = source["slug"]
-            fetch_stats[slug] = {"returned": len(raw_jobs), "ok": fetch_ok}
+            fetch_stats[slug] = {"returned": len(raw_jobs), "ok": fetch_ok, "new": 0, "closed": 0}
+            all_raw_jobs[slug] = raw_jobs
             if not raw_jobs:
                 continue
             try:
                 new, closed = await self._sync_to_db(source, raw_jobs)
+                fetch_stats[slug]["new"] = new
+                fetch_stats[slug]["closed"] = closed
                 if new or closed:
                     logger.info("%s — +%d new, -%d closed", source["name"], new, closed)
                 new_total += new
@@ -94,6 +154,12 @@ class JobSearchAgent:
         removed = await self._enforce_job_limit()
         if removed:
             logger.info("Job cap enforced — removed %d oldest jobs", removed)
+
+        # Phase C-A: save one hiring snapshot row per company per day
+        await self._save_company_snapshots(sources_to_fetch, fetch_stats)
+
+        # Phase C-B: version job descriptions — write history only when content changes
+        await self._check_description_changes(sources_to_fetch, all_raw_jobs)
 
         return new_total
 
@@ -313,3 +379,184 @@ class JobSearchAgent:
         deleted = len(result.fetchall())
         await self._session.commit()
         return deleted
+
+    # ------------------------------------------------------------------
+    # Phase C-A: company hiring snapshots
+    # ------------------------------------------------------------------
+
+    async def _save_company_snapshots(
+        self, sources: list[dict], fetch_stats: dict[str, dict]
+    ) -> None:
+        """Upsert one CompanyHiringSnapshot row per source per day."""
+        today = datetime.now(timezone.utc).date()
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        saved = 0
+
+        for source in sources:
+            slug = source["slug"]
+            stats = fetch_stats.get(slug, {})
+
+            # Total active jobs for this source
+            count_res = await self._session.execute(
+                select(func.count()).select_from(Job)
+                .where(Job.source_company == slug, Job.is_active.is_(True))
+            )
+            active_count = count_res.scalar() or 0
+
+            # New jobs first seen today
+            new_res = await self._session.execute(
+                select(func.count()).select_from(Job)
+                .where(
+                    Job.source_company == slug,
+                    Job.is_active.is_(True),
+                    Job.scraped_at >= today_start,
+                )
+            )
+            new_today = new_res.scalar() or 0
+
+            # Breakdown by work_mode (remote/hybrid/onsite)
+            loc_res = await self._session.execute(
+                select(Job.work_mode, func.count().label("cnt"))
+                .where(Job.source_company == slug, Job.is_active.is_(True))
+                .group_by(Job.work_mode)
+            )
+            jobs_by_location = {(row.work_mode or "unknown"): row.cnt for row in loc_res}
+
+            # Breakdowns by seniority and department from title keywords
+            title_res = await self._session.execute(
+                select(Job.title)
+                .where(Job.source_company == slug, Job.is_active.is_(True))
+            )
+            titles = [row.title for row in title_res]
+            jobs_by_seniority = _classify_titles(titles, _SENIORITY_MAP)
+            jobs_by_department = _classify_titles(titles, _DEPARTMENT_MAP)
+
+            stmt = pg_insert(CompanyHiringSnapshot).values(
+                id=uuid.uuid4(),
+                source_slug=slug,
+                snapshot_date=today,
+                active_job_count=active_count,
+                new_jobs_since_yesterday=new_today,
+                removed_jobs_since_yesterday=stats.get("closed", 0),
+                jobs_by_department=jobs_by_department,
+                jobs_by_seniority=jobs_by_seniority,
+                jobs_by_location=jobs_by_location,
+            ).on_conflict_do_update(
+                index_elements=["source_slug", "snapshot_date"],
+                set_={
+                    "active_job_count": active_count,
+                    "new_jobs_since_yesterday": new_today,
+                    "removed_jobs_since_yesterday": stats.get("closed", 0),
+                    "jobs_by_department": jobs_by_department,
+                    "jobs_by_seniority": jobs_by_seniority,
+                    "jobs_by_location": jobs_by_location,
+                },
+            )
+            await self._session.execute(stmt)
+            saved += 1
+
+        await self._session.commit()
+        logger.info("Phase C — company snapshots saved for %d sources", saved)
+
+    # ------------------------------------------------------------------
+    # Phase C-B: description versioning
+    # ------------------------------------------------------------------
+
+    async def _check_description_changes(
+        self, sources: list[dict], all_raw_jobs: dict[str, list[dict]]
+    ) -> None:
+        """
+        For every scraped job, compare MD5 hash of description to stored hash.
+        New hash → close old JobDescriptionHistory row, insert new, increment version.
+        Same hash → no-op.
+        Null hash (first time) → set initial hash, create first history row.
+        """
+        now = datetime.now(timezone.utc)
+        changes = 0
+
+        for source in sources:
+            slug = source["slug"]
+            raw_jobs = all_raw_jobs.get(slug, [])
+            if not raw_jobs:
+                continue
+
+            url_to_desc: dict[str, str] = {
+                j["url"]: (j.get("description") or "")
+                for j in raw_jobs if j.get("url")
+            }
+            if not url_to_desc:
+                continue
+
+            # Load matching Job rows in one query
+            result = await self._session.execute(
+                select(Job.id, Job.url, Job.description_hash, Job.description_version)
+                .where(
+                    Job.source_company == slug,
+                    Job.url.in_(list(url_to_desc.keys())),
+                )
+            )
+            rows = result.all()
+
+            for job_id, url, stored_hash, stored_version in rows:
+                desc = url_to_desc.get(url, "")
+                new_hash = _md5(desc)
+
+                if stored_hash is None:
+                    # First time — set initial hash and create history record
+                    await self._session.execute(
+                        update(Job).where(Job.id == job_id).values(
+                            description_hash=new_hash,
+                            description_version=1,
+                            description_last_changed_at=now,
+                        )
+                    )
+                    await self._session.execute(
+                        pg_insert(JobDescriptionHistory).values(
+                            id=uuid.uuid4(),
+                            job_id=job_id,
+                            description_text=desc,
+                            description_hash=new_hash,
+                            version_number=1,
+                            valid_from=now,
+                            valid_to=None,
+                        ).on_conflict_do_nothing()
+                    )
+                    changes += 1
+
+                elif new_hash != stored_hash:
+                    # Description changed — close current history row, open new one
+                    new_version = (stored_version or 1) + 1
+                    await self._session.execute(
+                        update(JobDescriptionHistory)
+                        .where(
+                            JobDescriptionHistory.job_id == job_id,
+                            JobDescriptionHistory.valid_to.is_(None),
+                        )
+                        .values(valid_to=now)
+                    )
+                    await self._session.execute(
+                        pg_insert(JobDescriptionHistory).values(
+                            id=uuid.uuid4(),
+                            job_id=job_id,
+                            description_text=desc,
+                            description_hash=new_hash,
+                            version_number=new_version,
+                            valid_from=now,
+                            valid_to=None,
+                        ).on_conflict_do_nothing()
+                    )
+                    await self._session.execute(
+                        update(Job).where(Job.id == job_id).values(
+                            description_hash=new_hash,
+                            description_version=new_version,
+                            description_last_changed_at=now,
+                        )
+                    )
+                    changes += 1
+                # Same hash — no action needed
+
+        if changes:
+            await self._session.commit()
+        logger.info("Phase C — description versioning: %d jobs updated", changes)
