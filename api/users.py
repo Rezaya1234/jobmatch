@@ -115,6 +115,8 @@ async def upsert_profile(
     if profile is None:
         profile = UserProfile(user_id=user_id)
         session.add(profile)
+    else:
+        profile.profile_version = (profile.profile_version or 1) + 1
 
     for field, value in body.model_dump().items():
         setattr(profile, field, value)

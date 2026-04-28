@@ -88,7 +88,7 @@ Single link to personalized dashboard →
 deliver to user inbox
 ↓
 USER INTERACTION
-Dashboard → feedback → email reply
+Dashboard → review jobs → feedback
 ↓
 FEEDBACK AGENT (real-time)
 Log event → update job_user_state →
@@ -147,43 +147,27 @@ NOT the same as: Match score
 
 Zero exceptions. One violation = immediate discard. Never relaxed under any circumstances including fallback.
 
-Users can mark each constraint as STRICT or FLEXIBLE.
-
 ```
 CONSTRAINT 1 — Location type
-Default:   STRICT
-Strict:    Must match exactly (remote/hybrid/onsite)
-Flexible:  ±1 tier relaxation allowed
-Note:      Job location data is inconsistent —
-           "onsite" sometimes allows remote,
-           "hybrid" is defined differently per company.
-           Allow users to mark flexible if they
-           want broader discovery.
+Rule:  Must match exactly (remote/hybrid/onsite)
+Note:  Job location data is inconsistent —
+       "onsite" sometimes allows remote,
+       "hybrid" is defined differently per company.
 
 CONSTRAINT 2 — Visa sponsorship
-Default:   STRICT
-Rule:      Must offer sponsorship if user requires it
-Flexible:  N/A — legal requirement, always strict
+Rule:  Must offer sponsorship if user requires it
 
 CONSTRAINT 3 — Excluded job titles
-Default:   STRICT
-Rule:      Title must not contain excluded keywords
-Flexible:  N/A — user explicitly blacklisted these
+Rule:  Title must not contain excluded keywords
 
 CONSTRAINT 4 — Excluded companies
-Default:   STRICT
-Rule:      Company must not be on user blacklist
-Flexible:  N/A — user explicitly blacklisted these
+Rule:  Company must not be on user blacklist
 
 CONSTRAINT 5 — Previously shown jobs
-Default:   STRICT (permanent)
-Rule:      Job ID must not exist in shown memory
-Flexible:  N/A — never repeat shown jobs
+Rule:  Job ID must not exist in shown memory (permanent)
 
 CONSTRAINT 6 — Job active status
-Default:   STRICT
-Rule:      URL must be verified live and active
-Flexible:  N/A — dead jobs never surface
+Rule:  URL must be verified live and active
 ```
 
 ### Soft constraints — relaxable in fallback
@@ -214,7 +198,7 @@ Relaxation:  One additional level in fallback
 
 | Agent | Executive Summary | Responsibilities | Flow | Technology Stack |
 |-------|------------------|-----------------|------|-----------------|
-| **Profile Agent** | Builds a structured understanding of who the user is and what they want before matching begins. Sets the foundation for all downstream personalization. | 1. Parse resume and extract structured profile (skills, experience, preferences, dealbreakers) 2. Initialize cold start weights for new users 3. Flag user as cold_start: true until 5 feedback signals accumulated 4. Set strict/flexible flag per constraint based on user input 5. Optional enrichment via LinkedIn and GitHub URLs 6. Trigger weight recalibration on preference updates | INPUT: Raw resume, preferences, strict/flexible flags per constraint, optional LinkedIn/GitHub URL HARD CONSTRAINTS INITIALIZED: Location type (strict/flexible), visa requirement, excluded titles, excluded companies SOFT CONSTRAINTS INITIALIZED: Salary floor, role type, experience floor, seniority ceiling COLD START WEIGHTS: skills_match: 0.35, experience_level: 0.25, salary: 0.20, industry_alignment: 0.10, function_type: 0.05, career_trajectory: 0.05 PROCESS: Extract structured profile → set default weights → set strict/flexible flags → flag cold start → store OUTPUT: Structured user profile → PostgreSQL → cold start flag and weights to Orchestration Agent | Python 3.12, FastAPI, SQLAlchemy, Claude Sonnet (profile parsing — resume content sent to Anthropic API only), PostgreSQL |
+| **Profile Agent** | Builds a structured understanding of who the user is and what they want before matching begins. Sets the foundation for all downstream personalization. | 1. Parse resume and extract structured profile (skills, experience, preferences, dealbreakers) 2. Initialize cold start weights for new users 3. Flag user as cold_start: true until 5 feedback signals accumulated 4. Optional enrichment via LinkedIn and GitHub URLs 5. Trigger weight recalibration on preference updates | INPUT: Raw resume, preferences, optional LinkedIn/GitHub URL HARD CONSTRAINTS INITIALIZED: Location type, visa requirement, excluded titles, excluded companies SOFT CONSTRAINTS INITIALIZED: Salary floor, role type, experience floor, seniority ceiling COLD START WEIGHTS: skills_match: 0.35, experience_level: 0.25, salary: 0.20, industry_alignment: 0.10, function_type: 0.05, career_trajectory: 0.05 PROCESS: Extract structured profile → set default weights → flag cold start → store OUTPUT: Structured user profile → PostgreSQL → cold start flag and weights to Orchestration Agent | Python 3.12, FastAPI, SQLAlchemy, Claude Sonnet (profile parsing — resume content sent to Anthropic API only), PostgreSQL |
 | **Search Agent** | Global job scraper and source health monitor. Fetches all 41 company career pages daily, syncs to DB, and tracks per-source reliability. No user context — runs once per day at 3:00 AM UTC. | ✅ 1. Scrape 41 company career pages at 3:00 AM UTC ✅ 2. Deduplicate by URL — ON CONFLICT DO NOTHING ✅ 3. Mark closed jobs inactive (no longer in ATS feed) ✅ 4. Re-activate jobs that reappear in ATS ✅ 5. Enforce 10k job cap — remove oldest inactive jobs with no feedback ✅ Phase A — 6. HTTP HEAD health check per active job URL — mark inactive if 404/410 ✅ Phase A — 7. Track per-source trust score: jobs_returned, parse_success_rate, dead_link_pct (rolling 30 days) ✅ Phase A — 8. Log warning if source trust score drops below 0.70 ✅ Phase A — 9. Skip scrape for sources with trust score below 0.50
 🔲 Phase C — 10. Save CompanyHiringSnapshot — per company per day: active_job_count, new_jobs_since_yesterday, removed_jobs_since_yesterday, jobs_by_department/seniority/location (JSON) — upsert on company_id + snapshot_date
 🔲 Phase C — 11. Check description changes — MD5 hash each scraped description, compare to Job.description_hash, write JobDescriptionHistory row only if different, always update last_seen_at | INPUT: COMPANY_SOURCES (41 entries) SCRAPER HEALTH: Per source — last successful scrape timestamp, jobs returned vs yesterday, parse success/fail count. Alert if delta drops >50% or source returns zero. PHASE A NEW MODEL: SourceTrustScore — source_slug, jobs_returned_today, jobs_returned_yesterday, parse_success_count, parse_fail_count, dead_link_count, rolling_trust_score, last_scrape_at OUTPUT: Active job rows in PostgreSQL. SourceTrustScore rows updated per source. | Python 3.12, httpx (async), ats_fetchers, company_sources, SQLAlchemy, PostgreSQL |
@@ -223,7 +207,7 @@ Relaxation:  One additional level in fallback
 | **Feedback Agent** | The learning engine. Converts every user interaction into structured signals that make tomorrow's matches smarter. Maintains immutable event history and separate current state. | 1. Log all feedback to immutable event log 2. Update job_user_state separately — never overwrite event log 3. Collect signals with standardized values 4. Trigger weight update every 5 signals 5. Immediate trigger on applied, interview, or hired 6. Attribute signals to matching dimensions 7. Extract themes from commentary using LLM 8. Enforce drift protection — floor 0.05, ceiling 0.50 9. Normalize weights — always sum to 1.0 10. Increment weights_version on every update 11. Persist updated weights | INPUT: Feedback events — type, job_id, dimension scores, timestamp, optional commentary SIGNAL VALUES: thumbs_up: +2, thumbs_down: -2, click: +1, apply_click: +1, applied: +3 (immediate), not_interested: -1, interview: +4 (immediate), hired: +5 (immediate) STATE MANAGEMENT: feedback_event_log — immutable, append only. job_user_state — current status per user-job pair, updated on each interaction. DIMENSION ATTRIBUTION: Strong skills_match on liked jobs → increase skills_match. Disliked for seniority → decrease experience_level. Commentary "wrong function" → adjust function_type. Applied/interview → treat dimension scores as strong anchor. DRIFT PROTECTION: No dimension above 0.50. No dimension below 0.05. Enforced after every update. OUTPUT: Updated normalized weights → increment weights_version → PostgreSQL → available for next cycle | Python 3.12, Claude Haiku (commentary NLP — conditional), SQLAlchemy, PostgreSQL, FastAPI |
 | **Insights Agent** | The intelligence layer for company and career behavioral data. Owns company profiles, culture scores, hiring behavior patterns, and user-level career behavioral insights. Runs on its own cadence — not part of daily matching pipeline. | 1. Aggregate company behavioral data from feedback events — response rates, ghosting patterns, time to respond 2. Compute company accountability scores 3. Generate company profiles — size, stage, hiring behavior, culture rating 4. Generate user behavioral insights with tiered thresholds 5. Feed company snapshot to Matching Agent Call 2 6. Feed insights to Company Insights page and Dashboard 7. Update company scores weekly (Monday 5:00 AM UTC) 8. Update user insights daily (6:00 AM UTC) | INPUT: Aggregated feedback events (company behavior), individual user interaction history INSIGHT TIERS — user behavioral insights: <5 interactions: no insights — show "Interact with more jobs to unlock insights" 5-15 interactions: weak signals with caveat — "Early patterns based on limited interactions" 15+ interactions: strong signals — show confidently COMPANY INSIGHT PROCESS: Aggregate feedback per company → compute response rate, ghosting rate, avg response time → generate accountability score → store per company CADENCE: Company scores: Monday 5:00 AM UTC. User insights: daily 6:00 AM UTC. OUTPUT: Company profiles and scores → Company Insights page and Matching Agent Call 2. User insights → Dashboard Matching Insights section. | Python 3.12, Claude Haiku (insight generation), SQLAlchemy, PostgreSQL, FastAPI |
 | **Orchestration Agent** | The conductor. Coordinates every agent in the correct sequence for every user every day. Enforces cost controls and delivery guarantee. Note: Long-term, monitoring responsibilities will split into a separate Monitoring Service (Phase 2). | 1. Receive daily trigger at 5:00 AM UTC 2. Check cold start flag per user → select weights 3. Trigger Search Agent → receive candidates 4. If fewer than 3 survive hard filtering → skip Matching Agent → go to fallback 5. Trigger Matching Agent → receive ranked jobs 6. Remove previously shown job IDs 7. Apply 3-job delivery guarantee with fallback 8. Label fallback jobs transparently — "Exploratory match" pill, gray, never presented as top recommendations 9. Deliver top 3 via Email Agent 10. Update shown job memory permanently 11. Route feedback to Feedback Agent 12. Trigger Insights Agent at 6:00 AM UTC 13. Enforce max 2 LLM calls per user per day 14. Alert if per-user LLM cost exceeds $1.50/month 15. Trigger weekly recap Monday 6:00 AM UTC 16. Log all runs via match_run_id | INPUT: Scheduled trigger → user list → profiles, weights, shown memory, cold start flags FALLBACK SEQUENCE: Step 1: Relax salary floor ±10% Step 2: Relax experience floor ±2 years Step 3: Relax seniority ceiling one level Step 4: Relax role type to adjacent Step 5: Pull from unseen active jobs last 7 days — verify URL live Step 6: Deliver 1-2 jobs with message "Fewer matches today" FALLBACK LABELS: Standard: no label. Fallback: "Exploratory match" gray pill. Tooltip: "Outside your usual preferences — fewer strong matches today." Hard constraints NEVER relaxed. COST CONTROLS: Max 10-15 jobs to Matching Agent. Max 2 LLM calls per user per day. $1.50/month alert per user. FUTURE SPLIT (Phase 2): Pipeline control → Orchestration Agent. Metrics, logs, alerts, costs → separate Monitoring Service. OUTPUT: 3 jobs per user → email triggered → shown memory updated → state persisted → logs written | Python 3.12, APScheduler (beta) → Redis + Celery (Phase 2), FastAPI, SQLAlchemy, PostgreSQL |
-| **Email Agent** | The delivery layer. Gets jobs into the user inbox every morning via a single personalized link. Captures feedback from email replies without requiring login. | 1. Receive top 3 jobs from Orchestration Agent 2. Render Stellapath-branded HTML email 3. Generate unique reply-to per user (feedback+{user_id}@stellapath.app) 4. Send daily digest at 7:00 AM UTC — single link to dashboard 5. Receive inbound replies via SendGrid parse webhook 6. Parse and route to Feedback Agent 7. Send weekly recap — missed high-score active jobs only, max 1 recap per job per user ever 8. Send post-hire celebration on job acceptance | INPUT: Top 3 jobs with scores, user name, email, ID DAILY DIGEST: Single dashboard link (not 3 job links). Stellapath branding. First name greeting. "Your 3 matches for today" teaser. Reply instructions. WEEKLY RECAP (Monday 6:00 AM UTC): Jobs from last 7 days, score ≥ 85%, zero interaction, URL verified active, max 1 recap per job per user. INBOUND: reply-to: feedback+{user_id}@stellapath.app → SendGrid parse → POST /webhooks/email-reply → extract user_id → route to Feedback Agent. OUTPUT: Email delivered → dashboard link → passive feedback captured | Python 3.12, SendGrid API, Jinja2, FastAPI (POST /webhooks/email-reply), aiohttp |
+| **Email Agent** | The delivery layer. Gets jobs into the user inbox every morning via a single link to the dashboard. No-reply sender — all interaction happens in the app. | 1. Receive top 3 jobs from Orchestration Agent 2. Render Stellapath-branded HTML email 3. Send daily digest at 7:00 AM UTC — single link to dashboard (no-reply) 4. Send weekly recap — missed high-score active jobs only, max 1 recap per job per user ever | INPUT: Top 3 jobs with scores, user name, email, ID DAILY DIGEST: Single dashboard link (not 3 job links). No-reply sender. Stellapath branding. First name greeting. "Your 3 matches for today" teaser. WEEKLY RECAP (Monday 6:00 AM UTC): Jobs from last 7 days, score ≥ 85%, zero interaction, URL verified active, max 1 recap per job per user. OUTPUT: Email delivered → user clicks link → reviews and reacts to jobs on dashboard | Python 3.12, SendGrid API, Jinja2, FastAPI |
 | **Vector Index** | The speed layer. Pre-computes and indexes all job embeddings daily so each user's ANN search returns top candidates in ~2ms regardless of how many jobs exist. | 1. Rebuild index daily at 4:00 AM UTC 2. Embed all active jobs using BGE-small (384d) 3. Store in vector index with HNSW algorithm 4. Serve per-user ANN queries in ~2ms 5. Remove inactive job embeddings 6. Scale horizontally as corpus grows | INPUT: All active job descriptions from PostgreSQL EMBEDDING: Compress → prefix "Represent this for job matching: {text}" → embed BGE-small → store HNSW QUERY: Embed user profile (1 embedding) → ANN query → top 50-100 in ~2ms → BGE-large Stage 2 SCALING: <10K users: pgvector ($0). 10K-50K: Qdrant self-hosted ($50-200/mo). 50K-100K+: Qdrant cluster or Pinecone ($200-500/mo). OUTPUT: Top 50-100 job IDs → BGE-large → top 15-20 to Matching Agent | BAAI/bge-small-en-v1.5 (384d, 8ms, $0), BAAI/bge-large-en-v1.5 (1024d, 45ms, $0), sentence-transformers, pgvector → Qdrant HNSW, PostgreSQL |
 
 ---
@@ -232,7 +216,7 @@ Relaxation:  One additional level in fallback
 
 | Model | Key Fields | Purpose | Version Tracking |
 |-------|-----------|---------|-----------------|
-| User | id, email, resume_text, preferences, constraint_flags (strict/flexible per constraint), cold_start, profile_version, **is_admin** (boolean, default false) | Core user identity and preferences. is_admin gates the /admin route — redirect to main dashboard if false. | profile_version increments on any profile change |
+| User | id, email, resume_text, preferences, cold_start, profile_version, weights_version, **is_admin** (boolean, default false) | Core user identity and preferences. is_admin gates the /admin route — redirect to main dashboard if false. | profile_version increments on any profile save; weights_version increments on every weight update |
 | Job | id, url, title, company, description, active_status, job_source, job_last_seen_at, job_inactive_reason, embedding_vector, **description_hash** (MD5 varchar), **description_version** (integer, default 1), **description_last_changed_at** (timestamp) | Scraped job data. description exposed in JobResponse API model and rendered as 150-200 char truncated snippet on Open Positions job cards. Full description available in detail drawer. description_hash enables zero-cost deduplication — new JobDescriptionHistory row written only when hash changes. | job_updated_at tracked for Call 2 cache invalidation. description_version increments only on content change. |
 | JobMatch | id, user_id, job_id, match_run_id, per_dimension_scores, dimension_data_available (bool per dimension), dimension_score_confidence (high/medium/low per dimension), weighted_score, normalized_score, low_confidence_flag | Match result per user per job per run | Tied to match_run_id and profile_version |
 | FeedbackEvent | id, feedback_event_id, user_id, job_id, signal_type, signal_value, timestamp, interaction_source, commentary | Immutable event log — append only, never modified | feedback_event_id unique per event |
@@ -361,14 +345,14 @@ Action:                         Review pipeline logs
 | Matching Agent Call 2 with caching | ✅ | - | - |
 | Scraper health dashboard | ✅ | - | - |
 | Company insights (basic) | ✅ | - | - |
-| Post-application feedback | ✅ | - | - |
+| Post-application feedback (in-app only) | ✅ | - | - |
 | Personalized dashboard | ✅ | - | - |
 | Application tracking | ✅ | - | - |
 | Generic job search tab | ✅ | - | - |
 | Job description snippets on Open Positions cards (150-200 chars, truncated from stored description — no extra scraping or compute) | ✅ | - | - |
-| Post-hire engagement | ✅ | - | - |
+| Post-hire engagement | ~~cancelled~~ | - | - |
 | Fallback job labeling | ✅ | - | - |
-| Strict/flexible constraint flags | ✅ | - | - |
+| Strict/flexible constraint flags | ~~cancelled~~ | - | - |
 | Source trust scoring | ✅ | - | - |
 | Failure mode handling | ✅ | - | - |
 | LinkedIn/GitHub enrichment | - | ✅ | - |

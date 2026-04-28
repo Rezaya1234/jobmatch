@@ -65,6 +65,9 @@ function JobCard({ match, userId, onFeedback, initialRating = null }) {
           </span>
         )}
         {match.sector && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full">{match.sector}</span>}
+        {match.is_fallback && (
+          <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded-full" title="Outside your usual preferences — fewer strong matches today.">Exploratory match</span>
+        )}
       </div>
 
       {match.reasoning && (

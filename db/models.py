@@ -142,6 +142,8 @@ class UserProfile(Base):
     cold_start: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     feedback_signal_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     learned_weights: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    profile_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    weights_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     # Engagement tracking
     last_engaged_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -226,6 +228,16 @@ class JobMatch(Base):
     score: Mapped[float | None] = mapped_column(Float, nullable=True)  # = normalized_score, kept for backward compat
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     low_confidence: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    is_fallback: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+
+    # Pipeline run tracking
+    match_run_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+
+    # Call 2 — deep per-job analysis (Sonnet, active users only)
+    call2_content: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    call2_generated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    call2_profile_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    call2_weights_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Delivery + recap tracking (shown memory — permanent, never cleared)
     shown_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -494,4 +506,24 @@ class EvaluatedJob(Base):
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     dimension_scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     near_miss: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class OrchestrationLog(Base):
+    """One row per user per pipeline run. Tracks jobs evaluated, delivered, LLM cost, and fallback depth."""
+
+    __tablename__ = "orchestration_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    match_run_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    run_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    jobs_evaluated: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    jobs_delivered: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    llm_calls_made: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    llm_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0")
+    fallback_triggered: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    fallback_steps_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -264,11 +264,17 @@ function detectSkillsFromText(text) {
     .map(([skill]) => skill)
 }
 
+function getDimScore(v) {
+  if (v != null && typeof v === 'object') return v.score ?? null
+  if (typeof v === 'number') return v
+  return null
+}
+
 function buildWhyWorthIt(job) {
   const scores = job.dimension_scores || {}
   const numeric = Object.entries(scores)
-    .filter(([, v]) => typeof v === 'number')
-    .sort(([, a], [, b]) => b - a)
+    .filter(([, v]) => getDimScore(v) != null)
+    .sort(([, a], [, b]) => (getDimScore(b) ?? 0) - (getDimScore(a) ?? 0))
   // Always take top 3 dims as strengths — these are matched roles, show what's working
   const topDims = numeric.slice(0, 3)
   return { reasoning: job.reasoning, topDims }
@@ -277,18 +283,21 @@ function buildWhyWorthIt(job) {
 function buildGaps(job) {
   const scores = job.dimension_scores || {}
   const all = Object.entries(scores)
-    .filter(([, v]) => typeof v === 'number')
-    .sort(([, a], [, b]) => a - b)
+    .filter(([, v]) => getDimScore(v) != null && v?.data_available !== false)
+    .sort(([, a], [, b]) => (getDimScore(a) ?? 0) - (getDimScore(b) ?? 0))
   // Only flag genuine gaps (< 0.75), max 2 — fit section must always be longer
   return all
-    .filter(([, v]) => v < 0.75)
+    .filter(([, v]) => (getDimScore(v) ?? 1) < 0.75)
     .slice(0, 2)
-    .map(([key, val]) => ({
-      key,
-      label: DIM_LABELS[key] || key.replace(/_/g, ' '),
-      val,
-      severe: val < 0.60,
-    }))
+    .map(([key, val]) => {
+      const score = getDimScore(val)
+      return {
+        key,
+        label: DIM_LABELS[key] || key.replace(/_/g, ' '),
+        val: score,
+        severe: score < 0.60,
+      }
+    })
 }
 
 function buildSummary(pct, gaps) {

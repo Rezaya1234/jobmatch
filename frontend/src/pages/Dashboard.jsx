@@ -136,8 +136,13 @@ function buildSignals(match, profile) {
 
   const scores = match.dimension_scores || {}
   const hasScores = Object.keys(scores).length > 0
+  function getDimScore(v) {
+    if (v != null && typeof v === 'object') return v.score ?? null
+    if (typeof v === 'number') return v
+    return null
+  }
   const dims = hasScores
-    ? Object.entries(scores).filter(([, v]) => typeof v === 'number').sort(([, a], [, b]) => b - a).map(([d]) => d)
+    ? Object.entries(scores).filter(([, v]) => getDimScore(v) != null).sort(([, a], [, b]) => (getDimScore(b) ?? 0) - (getDimScore(a) ?? 0)).map(([d]) => d)
     : ['experience_level', 'salary', 'industry_alignment', 'function_type']
 
   for (const dim of dims) {
@@ -309,6 +314,9 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
                 ${match.salary_min ? `${Math.round(match.salary_min / 1000)}k` : '?'}
                 {match.salary_max ? `–${Math.round(match.salary_max / 1000)}k` : '+'}
               </span>
+            )}
+            {match.is_fallback && (
+              <span className="text-[11px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded" title="Outside your usual preferences — fewer strong matches today.">Exploratory match</span>
             )}
           </div>
         </div>

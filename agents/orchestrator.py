@@ -21,11 +21,13 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from datetime import date
+
 from agents.feedback_agent import FeedbackAgent
 from agents.filter_agent import FilterAgent
-from agents.match_agent import MatchAgent
+from agents.match_agent import MatchAgent, _COST_PER_BATCH_USD, _COST_PER_CALL2_USD
 from agents.search_agent import JobSearchAgent
-from db.models import Job, JobMatch, User, UserProfile
+from db.models import Job, JobMatch, OrchestrationLog, User, UserProfile
 from llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -125,6 +127,11 @@ class OrchestratorAgent:
     async def _process_user(self, user_id: str, stats: PipelineStats) -> None:
         from mailer.sender import _email_cadence
 
+        match_run_id = str(uuid.uuid4())
+        run_date = date.today()
+        llm_calls = 0
+        llm_cost = 0.0
+
         profile = await self._get_profile(user_id)
         cadence = _email_cadence(
             getattr(profile, "last_engaged_at", None) if profile else None,
@@ -143,7 +150,6 @@ class OrchestratorAgent:
         stats.total_passed_filter += passed
 
         if cadence == "reengagement":
-            # User is dormant — send re-engagement email, skip scoring
             logger.info("User %s — reengagement cadence, skipping scoring", user_id)
             emailed = await self._send_email(user_id)
             stats.total_emailed += emailed
@@ -152,21 +158,32 @@ class OrchestratorAgent:
         # Step 2: Soft constraints + heuristic + BGE embedding → top 10-15 candidates
         candidates = await filter_agent.get_candidates(user_id)
 
-        # Step 3: LLM scoring — only if enough candidates survived Phase B
+        # Step 3: LLM scoring — only if enough candidates and within daily cap
         pending = len(candidates)
-        if pending >= _MIN_CANDIDATES_FOR_LLM:
+        scored = 0
+        calls_today = await self._llm_calls_today(user_id)
+        if calls_today >= 2:
+            logger.info("User %s — LLM cap reached (%d calls today), skipping LLM", user_id, calls_today)
+        elif pending >= _MIN_CANDIDATES_FOR_LLM:
             await self._emit(f"Scoring top candidates with AI ({pending} candidates)...")
             match_agent = MatchAgent(self._session, self._llm)
-            scored = await match_agent.run(user_id)
+            result = await match_agent.run(user_id, match_run_id=match_run_id)
+            scored = result.scored
             stats.total_scored += scored
+            if result.scored > 0:
+                llm_calls += 1
+                llm_cost += _COST_PER_BATCH_USD
+            if result.call2_count > 0:
+                llm_calls += 1
+                llm_cost += result.call2_count * _COST_PER_CALL2_USD
         else:
             logger.info(
                 "User %s — only %d LLM candidates (min %d), skipping LLM",
                 user_id, pending, _MIN_CANDIDATES_FOR_LLM,
             )
 
-        # Step 5: Select delivery jobs with 6-step fallback
-        delivery_matches = await self._select_delivery_jobs(user_id)
+        # Step 4: Select delivery jobs with 6-step fallback
+        delivery_matches, fallback_step = await self._select_delivery_jobs(user_id)
         if delivery_matches:
             now = datetime.now(timezone.utc)
             jobs_by_id = await self._load_jobs([str(m.job_id) for m in delivery_matches])
@@ -177,6 +194,7 @@ class OrchestratorAgent:
             await log_event(
                 self._session, user_id, "jobs_delivered",
                 job_count=len(delivery_matches),
+                match_run_id=match_run_id,
                 jobs=[{
                     "job_id": str(m.job_id),
                     "title": jobs_by_id[str(m.job_id)].title if str(m.job_id) in jobs_by_id else "?",
@@ -189,7 +207,23 @@ class OrchestratorAgent:
             await self._session.commit()
             logger.info("User %s — %d jobs marked for delivery", user_id, len(delivery_matches))
 
-        # Step 6: Send email
+        # Write orchestration log
+        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        orch_log = OrchestrationLog(
+            match_run_id=match_run_id,
+            user_id=uid,
+            run_date=run_date,
+            jobs_evaluated=passed,
+            jobs_delivered=len(delivery_matches),
+            llm_calls_made=llm_calls,
+            llm_cost_usd=round(llm_cost, 5),
+            fallback_triggered=fallback_step > 0,
+            fallback_steps_used=fallback_step,
+        )
+        self._session.add(orch_log)
+        await self._session.commit()
+
+        # Step 5: Send email
         emailed = await self._send_email(user_id)
         stats.total_emailed += emailed
 
@@ -199,20 +233,15 @@ class OrchestratorAgent:
 
     async def _select_delivery_jobs(
         self, user_id: str, target: int = _DELIVERY_TARGET
-    ) -> list[JobMatch]:
+    ) -> tuple[list[JobMatch], int]:
         """
-        Return up to `target` unshown matches using 6-step fallback:
-          1. LLM scored, score >= 0.70
-          2. LLM scored, score >= 0.50
-          3. LLM scored, score >= 0.30
-          4. LLM scored, any score (including low_confidence)
-          5. Heuristic/embedding scored only (no LLM)
-          6. Any hard-filter-passed job
-        Each step adds only jobs not already selected.
+        Return (matches, fallback_step) where fallback_step is 0 if primary
+        delivery (score >= 0.70) was sufficient, or 1-6 for the highest step used.
         """
         uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         selected: list[JobMatch] = []
         selected_ids: list = []
+        highest_step = 0
 
         async def _fetch(extra_wheres, order_clauses) -> list[JobMatch]:
             needed = target - len(selected)
@@ -229,30 +258,34 @@ class OrchestratorAgent:
                     *extra_wheres,
                 )
                 .order_by(*order_clauses)
-                .limit(needed * 2)  # fetch extra to account for dedup
+                .limit(needed * 2)
             )
             if selected_ids:
                 stmt = stmt.where(JobMatch.id.notin_(selected_ids))
             result = await self._session.execute(stmt)
             return list(result.scalars().all())
 
-        def _absorb(rows: list[JobMatch]) -> None:
+        def _absorb(rows: list[JobMatch], step: int) -> None:
+            nonlocal highest_step
             for r in rows:
                 if r.id not in selected_ids and len(selected) < target:
+                    r.is_fallback = step > 0
                     selected.append(r)
                     selected_ids.append(r.id)
+                    if step > highest_step:
+                        highest_step = step
 
-        # Steps 1-4: LLM-scored, progressive score thresholds
-        for threshold in (0.70, 0.50, 0.30, 0.0):
+        # Steps 1-4: LLM-scored, progressive score thresholds (step 0 = primary)
+        for step, threshold in enumerate((0.70, 0.50, 0.30, 0.0)):
             if len(selected) >= target:
                 break
             rows = await _fetch(
                 [JobMatch.score.isnot(None), JobMatch.score >= threshold],
                 [JobMatch.score.desc()],
             )
-            _absorb(rows)
+            _absorb(rows, step)
 
-        # Step 5: heuristic/embedding scored, no LLM score yet
+        # Step 5: heuristic/embedding scored, no LLM score
         if len(selected) < target:
             rows = await _fetch(
                 [JobMatch.score.is_(None), JobMatch.heuristic_score.isnot(None)],
@@ -261,21 +294,18 @@ class OrchestratorAgent:
                     JobMatch.heuristic_score.desc().nulls_last(),
                 ],
             )
-            _absorb(rows)
+            _absorb(rows, 5)
 
         # Step 6: any hard-filter-passed job
         if len(selected) < target:
-            rows = await _fetch(
-                [],
-                [Job.posted_at.desc().nulls_last()],
-            )
-            _absorb(rows)
+            rows = await _fetch([], [Job.posted_at.desc().nulls_last()])
+            _absorb(rows, 6)
 
         logger.info(
-            "User %s — delivery selection: %d/%d jobs (steps completed)",
-            user_id, len(selected), target,
+            "User %s — delivery selection: %d/%d jobs (fallback_step=%d)",
+            user_id, len(selected), target, highest_step,
         )
-        return selected
+        return selected, highest_step
 
     # ------------------------------------------------------------------
     # On-demand matching (triggered by dashboard visit)
@@ -284,7 +314,11 @@ class OrchestratorAgent:
     async def run_user_on_demand(self, user_id: str) -> int:
         """Filter + score for one user on dashboard visit. No email sent."""
         logger.info("On-demand matching for user %s", user_id)
-        profile = await self._get_profile(user_id)
+
+        calls_today = await self._llm_calls_today(user_id)
+        if calls_today >= 2:
+            logger.info("User %s — LLM cap reached on-demand (%d calls today), skipping", user_id, calls_today)
+            return 0
 
         filter_agent = FilterAgent(self._session)
         await filter_agent.run(user_id)
@@ -297,9 +331,9 @@ class OrchestratorAgent:
             return 0
 
         match_agent = MatchAgent(self._session, self._llm)
-        scored = await match_agent.run(user_id)
-        logger.info("On-demand scoring complete for user %s — %d scored", user_id, scored)
-        return scored
+        result = await match_agent.run(user_id)
+        logger.info("On-demand scoring complete for user %s — %d scored", user_id, result.scored)
+        return result.scored
 
     # ------------------------------------------------------------------
     # On-demand feedback pipeline
@@ -329,6 +363,19 @@ class OrchestratorAgent:
     # ------------------------------------------------------------------
     # DB helpers
     # ------------------------------------------------------------------
+
+    async def _llm_calls_today(self, user_id: str) -> int:
+        """Return total llm_calls_made recorded for this user today."""
+        from sqlalchemy import func as sqlfunc
+        uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        result = await self._session.execute(
+            select(sqlfunc.coalesce(sqlfunc.sum(OrchestrationLog.llm_calls_made), 0))
+            .where(
+                OrchestrationLog.user_id == uid,
+                OrchestrationLog.run_date == date.today(),
+            )
+        )
+        return int(result.scalar() or 0)
 
     async def _load_jobs(self, job_ids: list[str]) -> dict[str, Job]:
         if not job_ids:

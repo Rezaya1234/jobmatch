@@ -100,12 +100,14 @@ class FeedbackAgent:
         old_weights = dict(profile.learned_weights or DEFAULT_WEIGHTS)
         if new_weights != old_weights:
             profile.learned_weights = new_weights
+            profile.weights_version = (profile.weights_version or 0) + 1
             changed = True
             await log_event(
                 self._session, user_id, "weights_updated",
                 weights=new_weights,
                 weights_before=old_weights,
                 signal_count=total_signals,
+                weights_version=profile.weights_version,
                 cold_start=profile.cold_start,
             )
 
@@ -239,6 +241,15 @@ class FeedbackAgent:
 # Rule-based weight management
 # ---------------------------------------------------------------------------
 
+def _extract_dim_score(v) -> float | None:
+    """Handle both new {score, ...} format and legacy float values."""
+    if isinstance(v, dict):
+        return v.get("score")
+    if isinstance(v, (int, float)):
+        return float(v)
+    return None
+
+
 def _update_weights(profile: UserProfile, feedback_rows: list[dict]) -> dict:
     current = dict(profile.learned_weights or DEFAULT_WEIGHTS)
     for d in ALLOWED_DIMENSIONS:
@@ -257,7 +268,11 @@ def _update_weights(profile: UserProfile, feedback_rows: list[dict]) -> dict:
             dim_scores: dict = row.get("dimension_scores") or {}
             if dim_scores:
                 sorted_dims = sorted(
-                    [(d, s) for d, s in dim_scores.items() if d in ALLOWED_DIMENSIONS and s is not None],
+                    [
+                        (d, _extract_dim_score(v))
+                        for d, v in dim_scores.items()
+                        if d in ALLOWED_DIMENSIONS and _extract_dim_score(v) is not None
+                    ],
                     key=lambda x: x[1],
                     reverse=True,
                 )
