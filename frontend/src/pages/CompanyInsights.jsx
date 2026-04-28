@@ -1,31 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listCompanies } from '../api'
-
-// Known domains keyed by company insight slug (derived from company display name)
-const SLUG_DOMAINS = {
-  'anthropic':   'anthropic.com',
-  'scale-ai':    'scale.ai',
-  'together-ai': 'together.ai',
-  'glean':       'glean.com',
-  'gong':        'gong.com',
-  'intercom':    'intercom.com',
-  'databricks':  'databricks.com',
-  'mistral-ai':  'mistral.ai',
-  'palantir':    'palantir.com',
-  'openai':      'openai.com',
-  'cohere':      'cohere.com',
-  'writer':      'writer.com',
-  'runway':      'runwayml.com',
-  'pinecone':    'pinecone.io',
-  'perplexity':  'perplexity.ai',
-  'elevenlabs':  'elevenlabs.io',
-  'cursor':      'cursor.sh',
-  'harvey-ai':   'harvey.ai',
-  'sierra-ai':   'sierra.ai',
-  'google':      'google.com',
-  'amazon':      'amazon.com',
-}
+import { SLUG_DOMAINS } from '../utils/companyDomains'
 
 function getDomain(url) {
   if (!url) return null

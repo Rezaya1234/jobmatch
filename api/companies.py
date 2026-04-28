@@ -1,12 +1,13 @@
 import logging
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_session
-from db.models import CompanyInsight, Job
+from db.models import CompanyHiringSnapshot, CompanyInsight, FeedbackEvent, Job
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,25 @@ class CompanySummary(BaseModel):
     logo_url: str | None
     website: str | None
     hiring_areas: list | None
+
+
+class HiringVelocity(BaseModel):
+    jobs_today: int
+    jobs_7_days_ago: int
+    jobs_30_days_ago: int
+    week_change: int
+    week_change_pct: float
+    month_change: int
+    month_change_pct: float
+    trend: str
+    data_available: bool
+    snapshot_date: date | None
+
+
+class DepartmentBreakdownItem(BaseModel):
+    department: str
+    count: int
+    pct: float
 
 
 class CompanyDetail(BaseModel):
@@ -53,6 +73,9 @@ class CompanyDetail(BaseModel):
     risks: list | None
     active_job_count: int
     generated_at: str | None
+    hiring_velocity: HiringVelocity | None
+    department_breakdown: list[DepartmentBreakdownItem]
+    user_feedback_count: int
 
 
 class JobSummary(BaseModel):
@@ -113,6 +136,98 @@ async def get_company(
     row = result.scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Company not found")
+
+    # ---- Hiring velocity from CompanyHiringSnapshot ----
+    snap_result = await session.execute(
+        select(CompanyHiringSnapshot)
+        .where(CompanyHiringSnapshot.source_slug == slug)
+        .order_by(CompanyHiringSnapshot.snapshot_date.desc())
+        .limit(1)
+    )
+    recent = snap_result.scalar_one_or_none()
+
+    if recent:
+        snap_date = recent.snapshot_date
+        jobs_today = recent.active_job_count
+
+        snap_7_result = await session.execute(
+            select(CompanyHiringSnapshot)
+            .where(
+                CompanyHiringSnapshot.source_slug == slug,
+                CompanyHiringSnapshot.snapshot_date <= snap_date - timedelta(days=7),
+            )
+            .order_by(CompanyHiringSnapshot.snapshot_date.desc())
+            .limit(1)
+        )
+        snap_7 = snap_7_result.scalar_one_or_none()
+
+        snap_30_result = await session.execute(
+            select(CompanyHiringSnapshot)
+            .where(
+                CompanyHiringSnapshot.source_slug == slug,
+                CompanyHiringSnapshot.snapshot_date <= snap_date - timedelta(days=30),
+            )
+            .order_by(CompanyHiringSnapshot.snapshot_date.desc())
+            .limit(1)
+        )
+        snap_30 = snap_30_result.scalar_one_or_none()
+
+        jobs_7 = snap_7.active_job_count if snap_7 else jobs_today
+        jobs_30 = snap_30.active_job_count if snap_30 else jobs_today
+
+        week_change = jobs_today - jobs_7
+        week_change_pct = round((week_change / jobs_7 * 100) if jobs_7 else 0.0, 1)
+        month_change = jobs_today - jobs_30
+        month_change_pct = round((month_change / jobs_30 * 100) if jobs_30 else 0.0, 1)
+        trend = "up" if week_change > 0 else "down" if week_change < 0 else "flat"
+
+        hiring_velocity = HiringVelocity(
+            jobs_today=jobs_today,
+            jobs_7_days_ago=jobs_7,
+            jobs_30_days_ago=jobs_30,
+            week_change=week_change,
+            week_change_pct=week_change_pct,
+            month_change=month_change,
+            month_change_pct=month_change_pct,
+            trend=trend,
+            data_available=True,
+            snapshot_date=snap_date,
+        )
+
+        dept_raw: dict = recent.jobs_by_department or {}
+        sorted_depts = sorted(dept_raw.items(), key=lambda x: x[1], reverse=True)
+        total = sum(dept_raw.values()) or 1
+        top6 = sorted_depts[:6]
+        other_count = sum(v for _, v in sorted_depts[6:])
+        department_breakdown: list[DepartmentBreakdownItem] = [
+            DepartmentBreakdownItem(department=k, count=v, pct=round(v / total * 100, 1))
+            for k, v in top6
+        ]
+        if other_count > 0:
+            department_breakdown.append(
+                DepartmentBreakdownItem(
+                    department="Other",
+                    count=other_count,
+                    pct=round(other_count / total * 100, 1),
+                )
+            )
+    else:
+        hiring_velocity = HiringVelocity(
+            jobs_today=0, jobs_7_days_ago=0, jobs_30_days_ago=0,
+            week_change=0, week_change_pct=0.0,
+            month_change=0, month_change_pct=0.0,
+            trend="flat", data_available=False, snapshot_date=None,
+        )
+        department_breakdown = []
+
+    # ---- User feedback count (distinct users who interacted with this company's jobs) ----
+    fb_result = await session.execute(
+        select(func.count(FeedbackEvent.user_id.distinct()))
+        .join(Job, FeedbackEvent.job_id == Job.id)
+        .where(Job.company == row.company_name)
+    )
+    user_feedback_count = int(fb_result.scalar() or 0)
+
     return CompanyDetail(
         slug=row.slug,
         company_name=row.company_name,
@@ -138,6 +253,9 @@ async def get_company(
         risks=row.risks,
         active_job_count=row.active_job_count,
         generated_at=row.generated_at.isoformat() if row.generated_at else None,
+        hiring_velocity=hiring_velocity,
+        department_breakdown=department_breakdown,
+        user_feedback_count=user_feedback_count,
     )
 
 
