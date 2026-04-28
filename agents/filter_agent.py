@@ -457,6 +457,10 @@ class FilterAgent:
         if not job.location_raw:
             return FilterResult(passed=True)
 
+        # A job tagged remote passes location for any user who accepts remote
+        if job.work_mode == "remote" and "remote" in (profile.work_modes or []):
+            return FilterResult(passed=True)
+
         job_location = job.location_raw.lower()
         _US_ALIASES = {"united states", "usa", "us", "u.s.", "u.s.a.", "america"}
         accepted_set = {a.lower() for a in profile.locations}

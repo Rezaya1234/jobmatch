@@ -35,8 +35,8 @@
 | 18 | Job scraper — 10 upstream oil and gas | ✅ Complete | |
 | 19 | Job scraper — 10 oilfield services | ✅ Complete | |
 | 20 | Hard constraint filtering | ✅ Complete | 6 constraints |
-| 21 | Soft constraint filtering | 🔴 Pending | Phase B of Filter Agent |
-| 22 | BGE embedding pipeline | 🔴 Pending | Phase B of Filter Agent |
+| 21 | Soft constraint filtering | ✅ Complete | Phase B of Filter Agent |
+| 22 | BGE embedding pipeline | ✅ Complete | Phase B of Filter Agent |
 | 23 | Source trust scoring | 🔴 Pending | Phase A of Search Agent |
 | 24 | Match agent batch scoring Call 1 | ✅ Complete | |
 | 25 | Match agent Call 2 with caching | 🔴 Pending | Active users only |
@@ -47,13 +47,13 @@
 | 30 | Email agent — daily digest | 🔴 Pending | Needs SendGrid key |
 | 31 | Email agent — weekly recap | 🔴 Pending | |
 | 32 | Company insight one-pagers | ✅ Complete | Insights Agent built |
-| 33 | Fallback delivery with labels | 🔴 Pending | |
-| 34 | 3-job delivery guarantee | 🔴 Pending | |
+| 33 | Fallback delivery with labels | ✅ Complete | "Exploratory match" label in Dashboard + Matches pages |
+| 34 | 3-job delivery guarantee | ✅ Complete | 6-step fallback in orchestrator |
 | 35 | CompanyHiringSnapshot data collection | ✅ Complete | Wired into Search Agent |
 | 36 | Job description versioning hash-based | ✅ Complete | |
 | 37 | Admin dashboard — 11 sections | ✅ Complete | /admin route |
 | 38 | Test Agent implementation | 🔴 Pending | After admin dashboard |
-| 39 | Prompts directory created | 🔴 Pending | |
+| 39 | Prompts directory created | ✅ Complete | All 5 prompts in prompts/ directory |
 
 ### Frontend and UX
 
@@ -74,7 +74,7 @@
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|
-| 50 | Fix 2 failing tests | 🔴 Pending | |
+| 50 | Fix failing tests | ✅ Complete | 14 failures → 0; filter logic, template signatures, stale assertions |
 | 51 | End-to-end QA | 🔴 Pending | Before beta users |
 | 52 | C3.ai contract legal review | 🔴 Pending | Deadline June 30 2026 |
 | 53 | Beta user recruitment | 🔴 Pending | 10 active job seekers |

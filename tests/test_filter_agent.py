@@ -122,7 +122,7 @@ class TestLocation:
 
     def test_fails_when_no_location_matches(self, agent):
         result = agent._check_location(
-            make_job(location_raw="San Francisco, CA"),
+            make_job(work_mode="onsite", location_raw="San Francisco, CA"),
             make_profile(locations=["New York"]),
         )
         assert not result.passed

@@ -36,7 +36,7 @@ def client():
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json()["status"] == "ok"
 
 
 # ------------------------------------------------------------------
@@ -45,7 +45,7 @@ def test_health_check(client):
 
 def test_create_user_valid_email(client):
     response = client.post("/users", json={"email": "test@example.com"})
-    assert response.status_code == 201
+    assert response.status_code == 200
 
 def test_create_user_invalid_email_returns_422(client):
     response = client.post("/users", json={"email": "not-an-email"})

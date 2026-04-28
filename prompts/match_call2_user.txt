@@ -1,0 +1,25 @@
+Candidate:
+{profile_lines}
+
+Job: {job_title} at {company}
+{salary_str}
+Description excerpt:
+{desc_excerpt}
+
+Call-1 dimension scores: {dim_summary}
+
+Return JSON only:
+{
+  "why_worth_pursuing": "2-3 sentences why genuinely worth their time",
+  "potential_gaps": ["gap 1", "gap 2"],
+  "course_gaps": ["what to learn if relevant"],
+  "confidence": "high|medium|low",
+  "advisor_summary": "one direct candid sentence"
+}
+
+System prompt: "You are a candid career advisor. Be specific and honest. Return valid JSON only."
+
+Used by: agents/match_agent.py::_run_call2
+Model tier: STANDARD (claude-sonnet-4-6)
+Max tokens: 512
+Trigger: active users only (last_engaged_at within 7 days), cached per profile_version + weights snapshot (7-day TTL)

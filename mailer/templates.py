@@ -19,7 +19,7 @@ class JobDigestItem:
 # Daily digest
 # ------------------------------------------------------------------
 
-def build_html(recipient_email: str, items: list[JobDigestItem], date_str: str, frontend_url: str) -> str:
+def build_html(recipient_email: str, items: list[JobDigestItem], date_str: str, frontend_url: str = "") -> str:
     job_cards = "\n".join(_job_card_html(i, rank) for rank, i in enumerate(items, start=1))
     dashboard_url = f"{frontend_url}/dashboard" if frontend_url else "#"
     return f"""<!DOCTYPE html>
@@ -76,7 +76,7 @@ def build_html(recipient_email: str, items: list[JobDigestItem], date_str: str, 
 </html>"""
 
 
-def build_plain_text(recipient_email: str, items: list[JobDigestItem], date_str: str, frontend_url: str) -> str:
+def build_plain_text(recipient_email: str, items: list[JobDigestItem], date_str: str, frontend_url: str = "") -> str:
     dashboard_url = f"{frontend_url}/dashboard" if frontend_url else ""
     lines = [
         f"YOUR DAILY JOB DIGEST — {date_str}",

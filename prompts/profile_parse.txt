@@ -1,0 +1,33 @@
+Extract job search preferences from the text below and return ONLY a JSON object.
+
+Text:
+{combined}
+
+Return a JSON object with exactly these keys (use null if unknown):
+{
+  "work_modes": ["remote"|"hybrid"|"onsite"],
+  "job_types": ["full_time"|"part_time"|"contract"|"internship"],
+  "locations": ["country or city strings, e.g. United States"],
+  "seniority_level": "junior"|"mid"|"senior"|"staff"|"principal"|null,
+  "salary_min": integer or null,
+  "salary_max": integer or null,
+  "salary_currency": "USD",
+  "preferred_sectors": ["e.g. Technology", "Finance"],
+  "company_type": "public"|"private"|null,
+  "preferred_company_sizes": ["startup"|"small"|"medium"|"large"],
+  "preferred_companies": ["exact company names if mentioned, e.g. Google, OpenAI, Anthropic"],
+  "role_description": "2-3 sentence summary covering: their professional background and key skills, years/level of experience, and what kind of role/company they want next. This will be used to match them to jobs, so be specific about their skills and background."
+}
+
+Rules:
+- work_modes default to ["remote"] if not specified
+- job_types default to ["full_time"] if not specified
+- locations default to ["United States"] if not specified
+- Extract skills, titles, and interests to determine preferred_sectors
+- "large corporation" or "enterprise" → preferred_company_sizes: ["large"]
+- "startup" → preferred_company_sizes: ["startup"]
+- Return ONLY the JSON, no explanation.
+
+Used by: api/users.py::parse_profile_from_text
+Model tier: FAST (claude-haiku-4-5-20251001)
+Max tokens: 800
