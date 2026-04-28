@@ -68,6 +68,7 @@ export const adminUserActivity = () => adm('user-activity')
 export const adminJobScoring = (params = {}) => adm('job-scoring', { params })
 export const adminWeightEvolution = (params = {}) => adm('weight-evolution', { params })
 export const adminGetThresholds = () => adm('thresholds')
+export const adminMatchQualityCharts = () => adm('match-quality-charts')
 export const adminUpdateThresholds = (thresholds) => {
   const uid = localStorage.getItem('userId')
   return http.patch('/admin/thresholds', { thresholds }, { params: { user_id: uid } }).then(r => r.data)

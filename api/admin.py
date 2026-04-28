@@ -789,6 +789,75 @@ async def update_thresholds(
 
 
 # ---------------------------------------------------------------------------
+# Match Quality Charts
+# ---------------------------------------------------------------------------
+
+class ScoreTrendPoint(BaseModel):
+    date: str
+    avg_score: float
+    count: int
+
+
+class ScoreBucket(BaseModel):
+    bucket: str
+    count: int
+    range_min: float
+    range_max: float
+
+
+class MatchQualityChartsResponse(BaseModel):
+    trend: list[ScoreTrendPoint]
+    distribution: list[ScoreBucket]
+
+
+@router.get("/match-quality-charts", response_model=MatchQualityChartsResponse)
+async def get_match_quality_charts(
+    user_id: str = Query(...),
+    session: AsyncSession = Depends(get_session),
+) -> MatchQualityChartsResponse:
+    await _require_admin(user_id, session)
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+    # 30-day daily average score trend
+    trend_result = await session.execute(
+        select(
+            func.date(JobMatch.created_at).label("day"),
+            func.avg(JobMatch.normalized_score).label("avg_score"),
+            func.count(JobMatch.id).label("cnt"),
+        )
+        .where(JobMatch.normalized_score.isnot(None), JobMatch.created_at >= cutoff)
+        .group_by(func.date(JobMatch.created_at))
+        .order_by(func.date(JobMatch.created_at).asc())
+    )
+    trend = [
+        ScoreTrendPoint(
+            date=str(row.day),
+            avg_score=round(float(row.avg_score), 4),
+            count=row.cnt,
+        )
+        for row in trend_result.all()
+    ]
+
+    # Score distribution — 10 equal-width buckets 0→1
+    buckets: list[ScoreBucket] = []
+    for i in range(10):
+        lo = round(i / 10, 1)
+        hi = round((i + 1) / 10, 1)
+        label = f"{int(lo * 100)}–{int(hi * 100)}%"
+        cnt = await session.scalar(
+            select(func.count(JobMatch.id)).where(
+                JobMatch.normalized_score.isnot(None),
+                JobMatch.normalized_score >= lo,
+                JobMatch.normalized_score < (hi if hi < 1.0 else 1.001),
+            )
+        ) or 0
+        buckets.append(ScoreBucket(bucket=label, count=cnt, range_min=lo, range_max=hi))
+
+    return MatchQualityChartsResponse(trend=trend, distribution=buckets)
+
+
+# ---------------------------------------------------------------------------
 # User check (for frontend admin guard)
 # ---------------------------------------------------------------------------
 

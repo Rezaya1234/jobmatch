@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts'
+import {
   adminCheck,
   adminPipelineStatus,
   adminRecommendedActions,
@@ -13,6 +17,7 @@ import {
   adminUserActivity,
   adminJobScoring,
   adminWeightEvolution,
+  adminMatchQualityCharts,
   adminGetThresholds,
   adminUpdateThresholds,
   adminRunTestAgent,
@@ -722,6 +727,92 @@ function WeightEvolutionSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Section 6 — Match Quality Charts
+// ---------------------------------------------------------------------------
+
+function MatchQualityCharts() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    adminMatchQualityCharts()
+      .then(d => setData(d))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return (
+    <div className="grid md:grid-cols-2 gap-6">
+      <div className="h-48 animate-pulse bg-slate-50 rounded-xl" />
+      <div className="h-48 animate-pulse bg-slate-50 rounded-xl" />
+    </div>
+  )
+
+  if (!data || (data.trend.length === 0 && data.distribution.every(b => b.count === 0))) {
+    return <EmptyState message="No scored matches yet — charts will appear after first pipeline run" />
+  }
+
+  return (
+    <div className="grid md:grid-cols-2 gap-6">
+      {/* 30-day average score trend */}
+      <div>
+        <p className="text-xs font-semibold text-slate-600 mb-3">30-Day Average Score Trend</p>
+        {data.trend.length === 0 ? (
+          <EmptyState message="No trend data yet" />
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={data.trend} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tickFormatter={d => d.slice(5)}
+              />
+              <YAxis
+                domain={[0, 1]}
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                tickFormatter={v => `${Math.round(v * 100)}%`}
+              />
+              <Tooltip
+                formatter={(v) => [`${(v * 100).toFixed(1)}%`, 'Avg score']}
+                labelFormatter={l => `Date: ${l}`}
+                contentStyle={{ fontSize: 11 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="avg_score"
+                stroke="#7c3aed"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Score distribution */}
+      <div>
+        <p className="text-xs font-semibold text-slate-600 mb-3">Score Distribution (All Time)</p>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={data.distribution} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis dataKey="bucket" tick={{ fontSize: 9, fill: '#94a3b8' }} />
+            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
+            <Tooltip
+              formatter={(v) => [v.toLocaleString(), 'Matches']}
+              contentStyle={{ fontSize: 11 }}
+            />
+            <Bar dataKey="count" fill="#7c3aed" radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
 // Threshold Settings Modal
 // ---------------------------------------------------------------------------
 
@@ -948,6 +1039,11 @@ export default function Admin() {
         {/* User Activity */}
         <SectionCard title="User Activity" subtitle="Today">
           <UserActivitySection data={userActivity} loading={loading} />
+        </SectionCard>
+
+        {/* Match Quality Charts */}
+        <SectionCard title="Match Quality Charts" subtitle="30-day trend and score distribution">
+          <MatchQualityCharts />
         </SectionCard>
 
         {/* Job Scoring Explorer */}
