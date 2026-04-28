@@ -197,6 +197,17 @@ async def backfill_logos(
     return PipelineResponse(status="ok", detail=f"Backfilled {updated} company logo domains.")
 
 
+@router.post("/match/{user_id}", response_model=PipelineResponse, status_code=202)
+async def trigger_on_demand_match(
+    user_id: str,
+    background_tasks: BackgroundTasks,
+    llm: LLMClient = Depends(get_llm),
+) -> PipelineResponse:
+    """Run filter + score for a single user on-demand. Safe to call on profile completion."""
+    background_tasks.add_task(_run_on_demand_match, user_id, llm)
+    return PipelineResponse(status="accepted", detail=f"On-demand matching started for user {user_id}.")
+
+
 @router.post("/feedback/{user_id}", response_model=PipelineResponse, status_code=202)
 async def trigger_feedback_pipeline(
     user_id: str,
@@ -319,6 +330,16 @@ async def _run_rescore(user_id: str, llm: LLMClient) -> None:
             logger.exception("Re-score failed for user %s", user_id)
         finally:
             _state.finished_at = datetime.now(timezone.utc).isoformat()
+
+
+async def _run_on_demand_match(user_id: str, llm: LLMClient) -> None:
+    async with AsyncSessionLocal() as session:
+        orchestrator = OrchestratorAgent(session, llm)
+        try:
+            scored = await orchestrator.run_user_on_demand(user_id)
+            logger.info("On-demand match complete for user %s — %d scored", user_id, scored)
+        except Exception:
+            logger.exception("On-demand match failed for user %s", user_id)
 
 
 async def _run_feedback_pipeline(user_id: str, llm: LLMClient) -> None:

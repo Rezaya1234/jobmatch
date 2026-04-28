@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createUser, upsertProfile, getProfile, parseProfile } from '../api'
+import { createUser, upsertProfile, getProfile, parseProfile, triggerOnDemandMatch } from '../api'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -396,6 +396,10 @@ export default function Setup() {
     e.preventDefault()
     try {
       const user = await createUser(email)
+      if (!user.is_new) {
+        showStatus('That email already has an account — please sign in instead.', true)
+        return
+      }
       localStorage.setItem('userId', user.id)
       localStorage.setItem('userEmail', email)
       setUserId(user.id)
@@ -415,20 +419,24 @@ export default function Setup() {
     setGenerating(true)
     try {
       const extracted = await parseProfile(userId, aiText, resumeFile)
+      const needsSponsorship = profile.visa_types.length > 0 &&
+        !profile.visa_types.includes('no_sponsorship')
+
       const saved = await upsertProfile(userId, {
-        work_modes:                profile.work_modes,
-        job_types:                 profile.job_types,
-        locations:                 profile.locations,
-        seniority_level:           profile.seniority_levels[0] || null,
-        preferred_sectors:         profile.sectors,
-        preferred_companies:       profile.companies,
-        salary_min:                parseSalary(profile.min_salary) || null,
-        salary_max:                parseSalary(profile.max_salary) || null,
-        role_description:          extracted.role_description || null,
-        original_role_description: extracted.original_role_description || extracted.role_description || null,
-        title_include:             profile.title_include,
-        title_exclude:             profile.title_exclude,
-        visa_types:                profile.visa_types,
+        work_modes:                  profile.work_modes,
+        job_types:                   profile.job_types,
+        locations:                   profile.locations,
+        seniority_level:             profile.seniority_levels[0] || null,
+        preferred_sectors:           profile.sectors,
+        preferred_companies:         profile.companies,
+        salary_min:                  parseSalary(profile.min_salary) || null,
+        salary_max:                  parseSalary(profile.max_salary) || null,
+        role_description:            extracted.role_description || null,
+        original_role_description:   extracted.original_role_description || extracted.role_description || null,
+        title_include:               profile.title_include,
+        title_exclude:               profile.title_exclude,
+        visa_types:                  profile.visa_types,
+        visa_sponsorship_required:   needsSponsorship,
       })
       setProfile(p => ({
         ...p,
@@ -462,23 +470,30 @@ export default function Setup() {
   }
 
   async function handleLooksGood() {
+    // Derive visa_sponsorship_required: true if user needs employer sponsorship
+    const needsSponsorship = profile.visa_types.length > 0 &&
+      !profile.visa_types.includes('no_sponsorship')
+
     try {
       await upsertProfile(userId, {
-        work_modes:          profile.work_modes,
-        job_types:           profile.job_types,
-        locations:           profile.locations,
-        seniority_level:     profile.seniority_levels[0] || null,
-        preferred_sectors:   profile.sectors,
-        preferred_companies: profile.companies,
-        salary_min:          parseSalary(profile.min_salary) || null,
-        salary_max:          parseSalary(profile.max_salary) || null,
-        role_description:    aiText || null,
-        title_include:       profile.title_include,
-        title_exclude:       profile.title_exclude,
-        visa_types:          profile.visa_types,
-        profile_complete:    true,
+        work_modes:                  profile.work_modes,
+        job_types:                   profile.job_types,
+        locations:                   profile.locations,
+        seniority_level:             profile.seniority_levels[0] || null,
+        preferred_sectors:           profile.sectors,
+        preferred_companies:         profile.companies,
+        salary_min:                  parseSalary(profile.min_salary) || null,
+        salary_max:                  parseSalary(profile.max_salary) || null,
+        role_description:            aiProfile || aiText || null,
+        title_include:               profile.title_include,
+        title_exclude:               profile.title_exclude,
+        visa_types:                  profile.visa_types,
+        visa_sponsorship_required:   needsSponsorship,
+        profile_complete:            true,
       })
       localStorage.setItem('profileComplete', 'true')
+      // Fire on-demand matching in the background so new users get matches quickly
+      triggerOnDemandMatch(userId).catch(() => {})
       navigate('/dashboard')
     } catch (err) {
       showStatus('Error saving profile — please try again', true)

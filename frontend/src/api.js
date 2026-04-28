@@ -22,6 +22,7 @@ export const triggerDailyPipeline = () => http.post('/pipeline/daily').then(r =>
 export const triggerCollect = () => http.post('/pipeline/collect').then(r => r.data)
 export const triggerMatchAll = () => http.post('/pipeline/match-all').then(r => r.data)
 export const triggerFeedbackPipeline = (id) => http.post(`/pipeline/feedback/${id}`).then(r => r.data)
+export const triggerOnDemandMatch = (id) => http.post(`/pipeline/match/${id}`).then(r => r.data)
 export const triggerRescore = (id) => http.post(`/pipeline/rescore/${id}`).then(r => r.data)
 export const triggerResetFilters = (id) => http.post(`/pipeline/reset-filters/${id}`).then(r => r.data)
 export const triggerTestEmail = (id) => http.post(`/pipeline/test-email/${id}`).then(r => r.data)
