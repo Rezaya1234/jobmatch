@@ -814,7 +814,7 @@ export default function Dashboard() {
         getFeedback(userId).catch(() => []),
         getProfile(userId).catch(() => null),
       ])
-      if (prof && !prof.profile_complete) {
+      if (!prof || (!prof.profile_complete && !prof.role_description)) {
         navigate('/profile')
         return
       }
