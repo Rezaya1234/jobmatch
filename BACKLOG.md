@@ -66,9 +66,9 @@
 | 44 | Seniority level options update | 🔴 Pending | Prompt ready |
 | 45 | Landing page comparison table | ✅ Complete | Live on site |
 | 46 | Stellapath branding applied | 🔴 In Progress | |
-| 47 | Company insights page redesign | 🔴 Pending | Prompt ready |
-| 48 | Hiring momentum section on insights | 🔴 Pending | Prompt ready |
-| 49 | What to Expect redesign | 🔴 Pending | Traffic light and range bars |
+| 47 | Company insights page redesign | ✅ Complete | Two column layout, SLUG_DOMAINS shared util |
+| 48 | Hiring momentum section on insights | ✅ Complete | Velocity strip + department bar chart |
+| 49 | What to Expect redesign | ✅ Complete | Traffic light pill + gradient range bars |
 
 ### Quality and Legal
 
@@ -141,5 +141,5 @@
 | 1 | Prompts directory creation | Save all LLM prompts to GitHub |
 | 2 | Profile step enforcement | Enforce onboarding flow |
 | 3 | Visa and seniority UI updates | Profile page improvements |
-| 4 | Company insights page redesign | Two column layout, momentum, range bars |
+| 4 | Company insights page redesign | ~~Done~~ |
 | 5 | Test Agent implementation | Pipeline quality monitoring |
