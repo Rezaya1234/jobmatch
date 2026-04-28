@@ -268,11 +268,9 @@ async def record_engagement(
         profile.last_engaged_at = now
         await log_event(session, user_id, "dashboard_visit")
         await session.commit()
-        # Only run on-demand matching once per hour — prevents freezing the
-        # server by re-loading embedding models and running the full pipeline
-        # on every page visit.
+        # Only run on-demand matching once per day.
         from datetime import timedelta
-        if last is None or (now - last) > timedelta(hours=1):
+        if last is None or (now - last) > timedelta(hours=24):
             background_tasks.add_task(_run_on_demand_matching, user_id, llm)
 
 
