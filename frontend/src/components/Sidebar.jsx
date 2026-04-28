@@ -7,6 +7,7 @@ function useSignOut() {
   return () => {
     localStorage.removeItem('userId')
     localStorage.removeItem('userEmail')
+    localStorage.removeItem('profileComplete')
     navigate('/')
   }
 }

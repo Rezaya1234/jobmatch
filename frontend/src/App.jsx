@@ -31,6 +31,16 @@ import ForgotPassword from './pages/ForgotPassword'
 import './index.css'
 
 // ---------------------------------------------------------------------------
+// Route guard — requires completed profile
+// ---------------------------------------------------------------------------
+function RequireProfile({ children }) {
+  const userId = localStorage.getItem('userId')
+  if (!userId) return <Navigate to="/signup" replace />
+  if (localStorage.getItem('profileComplete') !== 'true') return <Navigate to="/profile" replace />
+  return children
+}
+
+// ---------------------------------------------------------------------------
 // Account menu dropdown
 // ---------------------------------------------------------------------------
 function AccountMenu({ email, onClose }) {
@@ -48,6 +58,7 @@ function AccountMenu({ email, onClose }) {
   function signOut() {
     localStorage.removeItem('userId')
     localStorage.removeItem('userEmail')
+    localStorage.removeItem('profileComplete')
     onClose()
     navigate('/')
   }
@@ -179,16 +190,16 @@ function AppShell() {
         <main className="flex-1 overflow-y-auto bg-slate-50 pb-16 md:pb-0">
           <div className="max-w-[1200px] mx-auto px-6 py-6">
             <Routes>
-              <Route path="/dashboard"    element={<Dashboard />} />
-              <Route path="/positions"    element={<Jobs />} />
-              <Route path="/matches"      element={<Matches />} />
+              <Route path="/dashboard"    element={<RequireProfile><Dashboard /></RequireProfile>} />
+              <Route path="/positions"    element={<RequireProfile><Jobs /></RequireProfile>} />
+              <Route path="/matches"      element={<RequireProfile><Matches /></RequireProfile>} />
               <Route path="/profile"      element={<Setup />} />
               <Route path="/pipeline"     element={<Pipeline />} />
               <Route path="/architecture" element={<Architecture />} />
               <Route path="/qa"           element={<QA />} />
-              <Route path="/insights"     element={<CompanyInsights />} />
-              <Route path="/insights/:slug" element={<CompanyDetail />} />
-              <Route path="/feedback"     element={<Feedback />} />
+              <Route path="/insights"     element={<RequireProfile><CompanyInsights /></RequireProfile>} />
+              <Route path="/insights/:slug" element={<RequireProfile><CompanyDetail /></RequireProfile>} />
+              <Route path="/feedback"     element={<RequireProfile><Feedback /></RequireProfile>} />
               <Route path="/settings"     element={<Settings />} />
               <Route path="/applications" element={
                 <ComingSoon
