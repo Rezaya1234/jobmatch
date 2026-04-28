@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     created_at: datetime
+    is_new: bool = False
 
 
 class ProfileRequest(BaseModel):
@@ -80,11 +81,24 @@ async def create_user(
 ) -> UserResponse:
     result = await session.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
-    if user is None:
+    is_new = user is None
+    if is_new:
         user = User(email=body.email)
         session.add(user)
         await session.commit()
         await session.refresh(user)
+    return _user_response(user, is_new=is_new)
+
+
+@router.get("/by-email", response_model=UserResponse)
+async def get_user_by_email(
+    email: str,
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    result = await session.execute(select(User).where(User.email == email.strip().lower()))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No account found for that email")
     return _user_response(user)
 
 
@@ -296,8 +310,8 @@ async def _get_user_or_404(user_id: str, session: AsyncSession) -> User:
     return user
 
 
-def _user_response(user: User) -> UserResponse:
-    return UserResponse(id=str(user.id), email=user.email, created_at=user.created_at)
+def _user_response(user: User, is_new: bool = False) -> UserResponse:
+    return UserResponse(id=str(user.id), email=user.email, created_at=user.created_at, is_new=is_new)
 
 
 def _profile_response(profile: UserProfile) -> ProfileResponse:

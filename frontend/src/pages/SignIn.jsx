@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createUser } from '../api'
+import { lookupUserByEmail, getProfile } from '../api'
 
 export default function SignIn() {
-  const [email, setEmail]     = useState('')
+  const [email,   setEmail]   = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
+  const [error,   setError]   = useState('')
   const navigate = useNavigate()
 
   async function handleSubmit(e) {
@@ -15,12 +15,30 @@ export default function SignIn() {
     setLoading(true)
     setError('')
     try {
-      const user = await createUser(trimmed)
+      const user = await lookupUserByEmail(trimmed)
       localStorage.setItem('userId', user.id)
       localStorage.setItem('userEmail', trimmed)
+
+      // Sync profileComplete so RequireProfile guard works for returning users
+      try {
+        const profile = await getProfile(user.id)
+        if (profile?.profile_complete) {
+          localStorage.setItem('profileComplete', 'true')
+        } else {
+          localStorage.removeItem('profileComplete')
+        }
+      } catch {
+        localStorage.removeItem('profileComplete')
+      }
+
       navigate('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Something went wrong. Please try again.')
+      const status = err.response?.status
+      if (status === 404) {
+        setError("No account found for that email. Did you mean to sign up?")
+      } else {
+        setError(err.response?.data?.detail || 'Something went wrong. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -31,9 +49,7 @@ export default function SignIn() {
       <div className="w-full">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Welcome back</h1>
-          <p className="text-slate-500 text-sm">
-            Enter your email to sign in or create an account.
-          </p>
+          <p className="text-slate-500 text-sm">Enter your email to sign in.</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">
@@ -55,7 +71,10 @@ export default function SignIn() {
 
             {error && (
               <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-                {error}
+                {error}{' '}
+                {error.includes('sign up') && (
+                  <Link to="/signup" className="font-semibold underline">Create account →</Link>
+                )}
               </p>
             )}
 
@@ -64,7 +83,7 @@ export default function SignIn() {
               disabled={loading || !email.trim()}
               className="w-full py-2.5 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Signing in…' : 'Continue'}
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
         </div>
@@ -73,11 +92,6 @@ export default function SignIn() {
           New to StellaPath?{' '}
           <Link to="/signup" className="text-violet-600 font-medium hover:underline">
             Create an account
-          </Link>
-        </p>
-        <p className="text-center text-xs text-slate-400 mt-2">
-          <Link to="/forgot-password" className="hover:underline">
-            Forgot your email?
           </Link>
         </p>
       </div>

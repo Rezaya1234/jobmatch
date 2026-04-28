@@ -4,6 +4,7 @@ const http = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api' })
 
 export const createUser = (email) => http.post('/users', { email }).then(r => r.data)
 export const getUser = (id) => http.get(`/users/${id}`).then(r => r.data)
+export const lookupUserByEmail = (email) => http.get('/users/by-email', { params: { email } }).then(r => r.data)
 export const upsertProfile = (id, profile) => http.post(`/users/${id}/profile`, profile).then(r => r.data)
 export const getProfile = (id) => http.get(`/users/${id}/profile`).then(r => r.data)
 export const getMatches = (id, minScore = 0, limit = 50, includeDisliked = false) =>

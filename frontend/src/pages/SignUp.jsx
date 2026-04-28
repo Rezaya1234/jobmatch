@@ -18,6 +18,17 @@ export default function SignUp() {
       const user = await createUser(trimmed)
       localStorage.setItem('userId', user.id)
       localStorage.setItem('userEmail', trimmed)
+      localStorage.removeItem('profileComplete')
+
+      if (!user.is_new) {
+        // Email already registered — tell them to sign in instead
+        setError('An account with that email already exists.')
+        localStorage.removeItem('userId')
+        localStorage.removeItem('userEmail')
+        setLoading(false)
+        return
+      }
+
       navigate('/profile')
     } catch (err) {
       setError(err.response?.data?.detail || 'Something went wrong. Please try again.')
@@ -55,7 +66,10 @@ export default function SignUp() {
 
             {error && (
               <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
-                {error}
+                {error}{' '}
+                {error.includes('already exists') && (
+                  <Link to="/signin" className="font-semibold underline">Sign in instead →</Link>
+                )}
               </p>
             )}
 
