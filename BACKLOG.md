@@ -52,7 +52,11 @@
 | 35 | CompanyHiringSnapshot data collection | ✅ Complete | Wired into Search Agent |
 | 36 | Job description versioning hash-based | ✅ Complete | |
 | 37 | Admin dashboard — 11 sections | ✅ Complete | /admin route |
-| 38 | Test Agent implementation | 🔴 Pending | After admin dashboard |
+| 38 | Test Agent implementation | ✅ Complete | agents/test_agent.py — precision@50, @15, recall, NDCG, coverage, FPR |
+| 38a | TestAgentMetrics table | ✅ Complete | db/models.py — daily snapshot with 7-day baseline and drift flags |
+| 38b | EvaluatedJob table | ✅ Complete | db/models.py — ground truth labels (LLM / user / human sources) |
+| 38c | Match Quality Charts | ✅ Complete | Admin Section 6 — 30-day trend line + score distribution bar (recharts) |
+| 38d | All 6 Test Agent metrics wired | ✅ Complete | Admin Section 4 — precision@50, @15, recall@50, NDCG, coverage, FPR with 7d baseline |
 | 39 | Prompts directory created | ✅ Complete | All 5 prompts in prompts/ directory |
 
 ### Frontend and UX
