@@ -321,18 +321,27 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
           </div>
         </div>
 
-        {/* MIDDLE: what you'll do */}
+        {/* MIDDLE: advisor summary or what you'll do */}
         <div className="hidden md:flex flex-1 min-w-0 flex-col justify-center gap-1.5 border-l border-slate-100 pl-3">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5">What you'll do</p>
-          {extractWhatYouDo(match.description) ? (
-            <p className="text-xs text-slate-900 leading-relaxed line-clamp-4">{extractWhatYouDo(match.description)}</p>
-          ) : signals.length > 0 ? signals.map((s, i) => (
-            <div key={i} className="flex items-center gap-2 min-w-0">
-              <span className="w-1 h-1 rounded-full bg-violet-300 shrink-0" />
-              <span className="text-xs text-slate-600 leading-snug truncate">{s}</span>
-            </div>
-          )) : (
-            <span className="text-xs text-slate-300 italic">Details loading…</span>
+          {match.call2_content?.advisor_summary ? (
+            <>
+              <p className="text-[10px] font-semibold text-violet-400 uppercase tracking-widest mb-0.5">Advisor take</p>
+              <p className="text-xs text-slate-900 leading-relaxed line-clamp-4">{match.call2_content.advisor_summary}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5">What you'll do</p>
+              {extractWhatYouDo(match.description) ? (
+                <p className="text-xs text-slate-900 leading-relaxed line-clamp-4">{extractWhatYouDo(match.description)}</p>
+              ) : signals.length > 0 ? signals.map((s, i) => (
+                <div key={i} className="flex items-center gap-2 min-w-0">
+                  <span className="w-1 h-1 rounded-full bg-violet-300 shrink-0" />
+                  <span className="text-xs text-slate-600 leading-snug truncate">{s}</span>
+                </div>
+              )) : (
+                <span className="text-xs text-slate-300 italic">Details loading…</span>
+              )}
+            </>
           )}
         </div>
 

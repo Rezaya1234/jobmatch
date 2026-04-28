@@ -25,6 +25,7 @@ class MatchResponse(BaseModel):
     url: str
     score: float | None
     reasoning: str | None
+    call2_content: dict | None
     dimension_scores: dict | None
     work_mode: str | None
     location_raw: str | None
@@ -138,6 +139,7 @@ def _to_response(match: JobMatch, job: Job) -> MatchResponse:
         url=job.url,
         score=match.score,
         reasoning=match.reasoning,
+        call2_content=match.call2_content,
         dimension_scores=match.dimension_scores,
         work_mode=job.work_mode,
         location_raw=job.location_raw,

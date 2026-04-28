@@ -443,9 +443,11 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
           {/* 1. Why this could be a good fit */}
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Why this could be a good fit</p>
-            {reasoning && (
+            {job.call2_content?.why_worth_pursuing ? (
+              <p className="text-sm text-slate-700 leading-relaxed mb-3">{job.call2_content.why_worth_pursuing}</p>
+            ) : reasoning ? (
               <p className="text-sm text-slate-700 leading-relaxed mb-3">{reasoning}</p>
-            )}
+            ) : null}
             {fitBullets.length > 0 && (
               <div className="space-y-2">
                 {fitBullets.map((text, i) => (
@@ -458,52 +460,87 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
                 ))}
               </div>
             )}
-            {!reasoning && fitBullets.length === 0 && (
+            {!job.call2_content?.why_worth_pursuing && !reasoning && fitBullets.length === 0 && (
               <p className="text-sm text-slate-400">Analysis in progress.</p>
+            )}
+            {/* Advisor callout */}
+            {job.call2_content?.advisor_summary && (
+              <div className="mt-3 flex items-start gap-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-3">
+                <svg className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <p className="text-xs text-violet-700 leading-relaxed">{job.call2_content.advisor_summary}</p>
+              </div>
             )}
           </div>
 
           {/* 2. Where you might need to stretch */}
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Where you might need to stretch</p>
-            {gapBullets.length === 0 ? (
-              Object.keys(job.dimension_scores || {}).length === 0
-                ? <p className="text-sm text-slate-400">Detailed breakdown not available for this role yet.</p>
-                : <div className="flex items-start gap-2">
-                    <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <p className="text-sm text-slate-700">Nothing stands out as a major gap. You look well-positioned for this one.</p>
+            {(() => {
+              const llmGaps = job.call2_content?.potential_gaps?.filter(Boolean) || []
+              if (llmGaps.length > 0) {
+                return (
+                  <div className="space-y-2">
+                    {llmGaps.map((text, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 mt-2" />
+                        <span className="text-sm text-slate-700 leading-relaxed">{text}</span>
+                      </div>
+                    ))}
                   </div>
-            ) : (
-              <div className="space-y-2">
-                {gapBullets.map((text, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 mt-2" />
-                    <span className="text-sm text-slate-700 leading-relaxed">{text}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+                )
+              }
+              if (gapBullets.length === 0) {
+                return Object.keys(job.dimension_scores || {}).length === 0
+                  ? <p className="text-sm text-slate-400">Detailed breakdown not available for this role yet.</p>
+                  : <div className="flex items-start gap-2">
+                      <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-sm text-slate-700">Nothing stands out as a major gap. You look well-positioned for this one.</p>
+                    </div>
+              }
+              return (
+                <div className="space-y-2">
+                  {gapBullets.map((text, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 mt-2" />
+                      <span className="text-sm text-slate-700 leading-relaxed">{text}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
 
           {/* 3. How to get closer to roles like this */}
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">How to get closer to roles like this</p>
             <div className="space-y-2">
-              {suggestedCourses.map((course, i) => (
-                <div key={i} className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
-                  <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-blue-700 truncate">{course.name}</p>
-                    <p className="text-xs text-blue-600 mt-0.5 leading-snug">{COURSE_OUTCOMES[course.skill] || ''}</p>
+              {(job.call2_content?.course_gaps?.filter(Boolean) || []).length > 0 ? (
+                (job.call2_content.course_gaps).map((gap, i) => (
+                  <div key={i} className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+                    <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <p className="text-xs text-blue-700 leading-snug">{gap}</p>
                   </div>
-                </div>
-              ))}
-              {suggestedCourses.length === 0 && (
-                <p className="text-sm text-slate-600">No specific courses detected for this role.</p>
+                ))
+              ) : suggestedCourses.length > 0 ? (
+                suggestedCourses.map((course, i) => (
+                  <div key={i} className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+                    <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-blue-700 truncate">{course.name}</p>
+                      <p className="text-xs text-blue-600 mt-0.5 leading-snug">{COURSE_OUTCOMES[course.skill] || ''}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-600">No specific skill gaps detected for this role.</p>
               )}
               <p className="text-xs text-slate-400 pt-0.5">
                 <a href="/feedback" className="text-violet-600 hover:underline font-medium">See all learning recommendations →</a>
