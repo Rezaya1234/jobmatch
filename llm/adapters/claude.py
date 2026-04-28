@@ -5,7 +5,7 @@ import anthropic
 from llm.client import LLMClient, Message, ModelTier
 
 _MODEL_MAP: dict[ModelTier, str] = {
-    ModelTier.FAST: "claude-haiku-4-5",
+    ModelTier.FAST: "claude-haiku-4-5-20251001",
     ModelTier.STANDARD: "claude-sonnet-4-6",
     ModelTier.POWERFUL: "claude-opus-4-7",
 }
@@ -30,7 +30,8 @@ def _build_kwargs(
     if system:
         kwargs["system"] = system
     if tier in _THINKING_TIERS:
-        kwargs["thinking"] = {"type": "adaptive"}
+        budget = max(1024, min(10000, max_tokens - 1000))
+        kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
     return kwargs
 
 
