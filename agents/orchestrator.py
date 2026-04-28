@@ -82,10 +82,19 @@ class OrchestratorAgent:
     # ------------------------------------------------------------------
 
     async def run_daily_pipeline(self) -> PipelineStats:
-        """Full daily run: collect jobs then match all users."""
+        """Full daily run: collect jobs, match all users, then run evaluation."""
         stats = await self.run_job_collection()
         await self.run_user_matching(stats)
+        await self.run_test_agent()
         return stats
+
+    async def run_test_agent(self) -> None:
+        """Compute daily pipeline evaluation metrics and write to TestAgentMetrics."""
+        try:
+            from agents.test_agent import TestAgent
+            await TestAgent(self.session).run()
+        except Exception:
+            logger.exception("TestAgent run failed")
 
     async def run_job_collection(self) -> PipelineStats:
         """Fetch new jobs from all company ATS pages. No user context, no LLM."""

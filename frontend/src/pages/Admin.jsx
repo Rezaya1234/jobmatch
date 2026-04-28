@@ -15,6 +15,7 @@ import {
   adminWeightEvolution,
   adminGetThresholds,
   adminUpdateThresholds,
+  adminRunTestAgent,
 } from '../api'
 
 // ---------------------------------------------------------------------------
@@ -278,46 +279,84 @@ function MetricRow({ label, snap }) {
   )
 }
 
-function TestAgentSection({ data, loading }) {
-  if (loading) return <div className="h-48 animate-pulse bg-slate-50 rounded-xl" />
+function TestAgentSection({ data, loading, onRun }) {
+  const [running, setRunning] = useState(false)
+  const [runResult, setRunResult] = useState(null)
 
-  if (!data?.has_data) return (
-    <SectionCard title="Test Agent Evaluation" subtitle="Pipeline quality metrics">
-      <EmptyState message="No pipeline runs yet — data will appear after first run" />
-    </SectionCard>
-  )
+  async function handleRun() {
+    setRunning(true)
+    setRunResult(null)
+    try {
+      const res = await adminRunTestAgent()
+      setRunResult({ ok: true, msg: `Done — sample: ${res.sample_size ?? 0}, p@50: ${res.precision_at_50 != null ? (res.precision_at_50 * 100).toFixed(1) + '%' : 'n/a'}` })
+      if (onRun) onRun()
+    } catch {
+      setRunResult({ ok: false, msg: 'Run failed — check logs' })
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  if (loading) return <div className="h-48 animate-pulse bg-slate-50 rounded-xl" />
 
   return (
     <SectionCard
       title="Test Agent Evaluation"
-      subtitle={data.run_date ? `Last run: ${data.run_date}` : undefined}
+      subtitle={data?.run_date ? `Last run: ${data.run_date}` : 'Pipeline quality metrics'}
+      action={
+        <button
+          onClick={handleRun}
+          disabled={running}
+          className="text-xs font-semibold text-violet-600 hover:text-violet-800 disabled:opacity-40 transition-colors"
+        >
+          {running ? 'Running…' : 'Run now'}
+        </button>
+      }
     >
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <MetricRow label="Precision@50" snap={data.precision_at_50} />
-          <MetricRow label="Precision@15" snap={data.precision_at_15} />
-          <MetricRow label="Recall@50 (est.)" snap={data.recall_at_50} />
-          <MetricRow label="NDCG" snap={data.ndcg} />
-          <MetricRow label="Coverage" snap={data.coverage} />
-          <MetricRow label="False Positive Rate" snap={data.false_positive_rate} />
-          {data.sample_size && (
-            <p className="text-xs text-slate-400 mt-3">
-              Sample: {data.sample_size.toLocaleString()} jobs evaluated
-            </p>
-          )}
+      {runResult && (
+        <div className={`text-xs rounded-lg px-3 py-2 mb-4 ${runResult.ok ? 'bg-green-50 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
+          {runResult.msg}
         </div>
-        <div>
-          <p className="text-xs font-semibold text-slate-600 mb-2">Drift Alerts</p>
-          {data.drift_flags?.length > 0
-            ? data.drift_flags.map((msg, i) => (
-                <div key={i} className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mb-2">
-                  {msg}
-                </div>
-              ))
-            : <EmptyState message="No drift detected" />
-          }
+      )}
+      {!data?.has_data ? (
+        <EmptyState message="No evaluation data yet — click Run now to compute metrics" />
+      ) : (
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <MetricRow label="Precision@50" snap={data.precision_at_50} />
+            <MetricRow label="Precision@15" snap={data.precision_at_15} />
+            <MetricRow label="Recall@50 (est.)" snap={data.recall_at_50} />
+            <MetricRow label="NDCG" snap={data.ndcg} />
+            <MetricRow label="Coverage" snap={data.coverage} />
+            <MetricRow label="False Positive Rate" snap={data.false_positive_rate} />
+            {data.sample_size != null && (
+              <p className="text-xs text-slate-400 mt-3">
+                Sample: {data.sample_size.toLocaleString()} labeled jobs
+                {data.confidence_score != null && ` · confidence ${(data.confidence_score * 100).toFixed(0)}%`}
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-600 mb-2">Drift Alerts</p>
+            {data.drift_flags?.length > 0
+              ? data.drift_flags.map((msg, i) => (
+                  <div key={i} className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mb-2">
+                    {msg}
+                  </div>
+                ))
+              : <EmptyState message="No drift detected" />
+            }
+            {data.label_sources && (
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-slate-600 mb-1">Label Sources</p>
+                {Object.entries(data.label_sources).map(([k, v]) => (
+                  <p key={k} className="text-xs text-slate-500">{k.replace(/_/g, ' ')}: <span className="font-medium text-slate-700">{v}</span></p>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </SectionCard>
   )
 }
@@ -877,7 +916,10 @@ export default function Admin() {
         <MetricCards testMetrics={testMetrics} sourceHealth={sourceHealth} userActivity={userActivity} loading={loading} />
 
         {/* Test Agent Evaluation */}
-        <TestAgentSection data={testMetrics} loading={loading} />
+        <TestAgentSection data={testMetrics} loading={loading} onRun={async () => {
+          const tm = await adminTestAgentMetrics().catch(() => null)
+          if (tm) setTestMetrics(tm)
+        }} />
 
         {/* Funnel + Activity Log */}
         <div className="grid md:grid-cols-5 gap-6">

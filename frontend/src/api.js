@@ -50,6 +50,10 @@ export const adminCheck = () => adm('check')
 export const adminPipelineStatus = () => adm('pipeline-status')
 export const adminRecommendedActions = () => adm('recommended-actions')
 export const adminTestAgentMetrics = () => adm('test-agent-metrics')
+export const adminRunTestAgent = () => {
+  const uid = localStorage.getItem('userId')
+  return http.post('/admin/test-agent/run', null, { params: { user_id: uid } }).then(r => r.data)
+}
 export const adminAgentLogs = (params = {}) => adm('agent-logs', { params })
 export const adminPipelineFunnel = () => adm('pipeline-funnel')
 export const adminSourceHealth = () => adm('source-health')

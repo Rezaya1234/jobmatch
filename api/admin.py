@@ -283,6 +283,31 @@ async def get_test_agent_metrics(
 
 
 # ---------------------------------------------------------------------------
+# Test Agent — manual trigger
+# ---------------------------------------------------------------------------
+
+@router.post("/test-agent/run")
+async def run_test_agent(
+    user_id: str = Query(...),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    await _require_admin(user_id, session)
+    from agents.test_agent import TestAgent
+    row = await TestAgent(session).run()
+    if row is None:
+        return {"status": "skipped", "reason": "no users with profiles"}
+    return {
+        "status": "ok",
+        "run_date": str(row.run_date),
+        "sample_size": row.sample_size,
+        "precision_at_50": row.precision_at_50,
+        "ndcg": row.ndcg,
+        "coverage": row.coverage,
+        "drift_flags": list((row.drift_flags or {}).values()),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Agent Activity Log
 # ---------------------------------------------------------------------------
 
