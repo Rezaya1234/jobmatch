@@ -202,6 +202,8 @@ class Job(Base):
     matches: Mapped[list["JobMatch"]] = relationship(back_populates="job")
     feedbacks: Mapped[list["Feedback"]] = relationship(back_populates="job")
     signals: Mapped[list["FeedbackSignal"]] = relationship(back_populates="job")
+    feedback_events: Mapped[list["FeedbackEvent"]] = relationship(back_populates="job")
+    job_states: Mapped[list["JobUserState"]] = relationship(back_populates="job")
 
 
 class JobMatch(Base):
