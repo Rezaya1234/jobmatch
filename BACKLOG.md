@@ -37,9 +37,9 @@
 | 20 | Hard constraint filtering | ✅ Complete | 6 constraints |
 | 21 | Soft constraint filtering | ✅ Complete | Phase B of Filter Agent |
 | 22 | BGE embedding pipeline | ✅ Complete | Phase B of Filter Agent |
-| 23 | Source trust scoring | 🔴 Pending | Phase A of Search Agent |
+| 23 | Source trust scoring | ✅ Complete | Phase A of Search Agent |
 | 24 | Match agent batch scoring Call 1 | ✅ Complete | |
-| 25 | Match agent Call 2 with caching | 🔴 Pending | Active users only |
+| 25 | Match agent Call 2 with caching | ✅ Complete | Active users, 7-day TTL, profile version + weight drift invalidation |
 | 26 | Feedback agent signals | ✅ Complete | |
 | 27 | Weight learning and drift protection | ✅ Complete | |
 | 28 | Orchestration agent | ✅ Complete | |
