@@ -54,6 +54,15 @@ def stop() -> None:
     logger.info("Scheduler stopped")
 
 
+def get_next_run_time(job_id: str = "daily_pipeline"):
+    """Return the next scheduled fire time for a job, or None if scheduler not running."""
+    try:
+        job = _scheduler.get_job(job_id)
+        return job.next_run_time if job else None
+    except Exception:
+        return None
+
+
 async def _run_daily_pipeline() -> None:
     logger.info("Scheduler: starting daily pipeline")
     llm = get_llm()

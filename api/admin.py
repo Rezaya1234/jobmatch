@@ -103,10 +103,16 @@ async def get_pipeline_status(
     if active_alerts > 0:
         pipeline_status = "failed"
 
+    try:
+        from scheduler.scheduler import get_next_run_time
+        next_run_at = get_next_run_time("daily_pipeline")
+    except Exception:
+        next_run_at = None
+
     return PipelineStatusResponse(
         status=pipeline_status,
         last_run_at=recent_log,
-        next_run_at=None,
+        next_run_at=next_run_at,
         users_processed=users_processed,
         avg_match_score=round(float(avg_score) * 100, 1) if avg_score else None,
         total_llm_cost_today=0.0,
