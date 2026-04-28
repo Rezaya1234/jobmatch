@@ -70,6 +70,18 @@ class ProfileResponse(ProfileRequest):
     updated_at: datetime
 
 
+class NotificationPrefsRequest(BaseModel):
+    weekly_recap: bool = True
+    new_matches: bool = True
+    product_updates: bool = False
+
+
+class NotificationPrefsResponse(BaseModel):
+    weekly_recap: bool
+    new_matches: bool
+    product_updates: bool
+
+
 # ------------------------------------------------------------------
 # Routes
 # ------------------------------------------------------------------
@@ -260,6 +272,40 @@ Rules:
             existing_profile is None or not existing_profile.original_role_description
         ) else existing_profile.original_role_description,
     )
+
+
+# ------------------------------------------------------------------
+# Notification preferences
+# ------------------------------------------------------------------
+
+@router.get("/{user_id}/notification-prefs", response_model=NotificationPrefsResponse)
+async def get_notification_prefs(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> NotificationPrefsResponse:
+    user = await _get_user_or_404(user_id, session)
+    prefs = user.notification_prefs or {}
+    return NotificationPrefsResponse(
+        weekly_recap=prefs.get("weekly_recap", True),
+        new_matches=prefs.get("new_matches", True),
+        product_updates=prefs.get("product_updates", False),
+    )
+
+
+@router.patch("/{user_id}/notification-prefs", response_model=NotificationPrefsResponse)
+async def update_notification_prefs(
+    user_id: str,
+    body: NotificationPrefsRequest,
+    session: AsyncSession = Depends(get_session),
+) -> NotificationPrefsResponse:
+    user = await _get_user_or_404(user_id, session)
+    user.notification_prefs = {
+        "weekly_recap": body.weekly_recap,
+        "new_matches": body.new_matches,
+        "product_updates": body.product_updates,
+    }
+    await session.commit()
+    return NotificationPrefsResponse(**user.notification_prefs)
 
 
 # ------------------------------------------------------------------

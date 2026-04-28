@@ -67,6 +67,12 @@ async def send_daily_digest(user_id: str, session: AsyncSession, test: bool = Fa
         logger.warning("User %s not found — skipping email", user_id)
         return 0
 
+    # Respect notification preferences
+    prefs = user.notification_prefs or {}
+    if not test and not prefs.get("new_matches", True):
+        logger.info("Skipping daily digest for user %s (new_matches disabled)", user_id)
+        return 0
+
     profile = await _get_profile(user_id, session)
 
     # Determine whether to send and what kind of email
@@ -126,6 +132,11 @@ async def send_weekly_recap(user_id: str, session: AsyncSession) -> int:
     from datetime import timedelta
     user = await _get_user(user_id, session)
     if user is None:
+        return 0
+
+    prefs = user.notification_prefs or {}
+    if not prefs.get("weekly_recap", True):
+        logger.info("Skipping weekly recap for user %s (weekly_recap disabled)", user_id)
         return 0
 
     uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id

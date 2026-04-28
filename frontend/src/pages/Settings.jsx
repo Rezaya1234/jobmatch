@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { getProfile, upsertProfile } from '../api'
+import { getProfile, upsertProfile, getNotificationPrefs, updateNotificationPrefs } from '../api'
 
 function Section({ title, children }) {
   return (
@@ -57,23 +57,26 @@ export default function Settings() {
   const [saving,       setSaving]       = useState(false)
   const [savedMsg,     setSavedMsg]     = useState('')
 
-  // Notification prefs live in localStorage only (no backend yet)
-  const [notifs, setNotifs] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('stellapath_notifs') || '{}') } catch { return {} }
-  })
-
-  function setNotif(key, val) {
-    const next = { ...notifs, [key]: val }
-    setNotifs(next)
-    localStorage.setItem('stellapath_notifs', JSON.stringify(next))
-  }
+  const [notifs, setNotifs] = useState({ weekly_recap: true, new_matches: true, product_updates: false })
+  const [notifsSaving, setNotifsSaving] = useState(false)
 
   useEffect(() => {
     if (!userId) return
     getProfile(userId).then(p => {
       if (p.linkedin_url) setLinkedinUrl(p.linkedin_url)
     }).catch(() => {})
+    getNotificationPrefs(userId).then(p => setNotifs(p)).catch(() => {})
   }, [userId])
+
+  async function setNotif(key, val) {
+    const next = { ...notifs, [key]: val }
+    setNotifs(next)
+    setNotifsSaving(true)
+    try {
+      await updateNotificationPrefs(userId, next)
+    } catch {}
+    finally { setNotifsSaving(false) }
+  }
 
   async function saveLinkedin(e) {
     e.preventDefault()
@@ -94,7 +97,6 @@ export default function Settings() {
   function signOut() {
     localStorage.removeItem('userId')
     localStorage.removeItem('userEmail')
-    localStorage.removeItem('stellapath_notifs')
     navigate('/')
   }
 
@@ -143,6 +145,7 @@ export default function Settings() {
       <Section title="Notifications">
         <p className="text-xs text-slate-500 mb-4">
           Email preferences. Changes take effect on your next notification cycle.
+          {notifsSaving && <span className="ml-2 text-violet-500">Saving…</span>}
         </p>
         <ToggleRow
           label="Weekly recap"
