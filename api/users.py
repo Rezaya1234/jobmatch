@@ -58,6 +58,7 @@ class ProfileRequest(BaseModel):
     linkedin_url: str | None = None
     avatar_url: str | None = None
     display_name: str | None = None
+    profile_complete: bool | None = None  # only written on explicit "Looks good" confirmation
 
 
 class ProfileResponse(ProfileRequest):
@@ -120,7 +121,10 @@ async def upsert_profile(
     else:
         profile.profile_version = (profile.profile_version or 1) + 1
 
-    for field, value in body.model_dump().items():
+    update_data = body.model_dump()
+    if update_data.get('profile_complete') is None:
+        update_data.pop('profile_complete', None)
+    for field, value in update_data.items():
         setattr(profile, field, value)
 
     await session.commit()

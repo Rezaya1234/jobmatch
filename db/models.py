@@ -94,6 +94,8 @@ class User(Base):
     matches: Mapped[list["JobMatch"]] = relationship(back_populates="user")
     feedbacks: Mapped[list["Feedback"]] = relationship(back_populates="user")
     signals: Mapped[list["FeedbackSignal"]] = relationship(back_populates="user")
+    feedback_events: Mapped[list["FeedbackEvent"]] = relationship(back_populates="user")
+    job_states: Mapped[list["JobUserState"]] = relationship(back_populates="user")
 
 
 class UserProfile(Base):
