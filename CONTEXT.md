@@ -363,14 +363,22 @@ lawyer consultation.
 
 ## Last Working On
 
-UPDATE THIS SECTION AT END OF EVERY 
-CONVERSATION WITH WHAT WAS LAST DISCUSSED.
+Set up VS Code as primary development
+environment with three terminal tabs:
+Tab 1: Backend on port 8080
+Tab 2: Frontend on port 5177
+Tab 3: Claude Code
 
-Example:
-"Company insights page redesign.
-Two column layout designed and approved.
-What to Expect section: traffic light for
-interview difficulty, gradient range bars
-with throttle dot for other metrics.
-Prompt written and ready to run in
-Claude Code."
+App is working locally with results showing.
+Workspace saved as stellapath.code-workspace.
+
+Ready to work on:
+1. Company insights page redesign
+   (two column layout, hiring momentum,
+   What to Expect range bars)
+2. Profile page step enforcement
+3. BGE embedding pipeline Phase B
+4. SendGrid API key configuration
+
+Prompt for company insights redesign
+is written and ready to run.
