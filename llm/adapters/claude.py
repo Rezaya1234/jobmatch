@@ -10,8 +10,10 @@ _MODEL_MAP: dict[ModelTier, str] = {
     ModelTier.POWERFUL: "claude-opus-4-7",
 }
 
-# Tiers that support adaptive thinking
-_THINKING_TIERS = {ModelTier.POWERFUL, ModelTier.STANDARD}
+# Only enable adaptive thinking for complex reasoning tasks.
+# STANDARD calls (call2 scoring, feedback) use small max_tokens budgets
+# that are incompatible with thinking — enabling it there causes hangs.
+_THINKING_TIERS = {ModelTier.POWERFUL}
 
 
 def _build_kwargs(

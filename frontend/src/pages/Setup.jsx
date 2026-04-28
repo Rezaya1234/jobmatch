@@ -16,19 +16,18 @@ const JOB_TYPES = [
   { value: 'internship',  label: 'Internship' },
 ]
 const SENIORITY_LEVELS = [
-  { value: 'junior',    label: 'Junior' },
-  { value: 'mid',       label: 'Mid' },
+  { value: 'entry',     label: 'Entry Level' },
+  { value: 'mid',       label: 'Mid Level' },
   { value: 'senior',    label: 'Senior' },
-  { value: 'lead',      label: 'Lead' },
-  { value: 'principal', label: 'Principal' },
-  { value: 'staff',     label: 'Staff' },
+  { value: 'manager',   label: 'Manager' },
+  { value: 'director',  label: 'Director' },
+  { value: 'executive', label: 'Executive' },
 ]
 const VISA_OPTIONS = [
-  'Authorized to work in the US',
-  'Requires H1B sponsorship',
-  'Requires OPT / CPT',
-  'Authorized to work in EU',
-  'Open to any',
+  { value: 'no_sponsorship', label: 'No sponsorship needed (US citizen, Green Card, EAD)' },
+  { value: 'h1b',            label: 'H-1B sponsorship required' },
+  { value: 'opt_cpt',        label: 'OPT / CPT (F-1 international student)' },
+  { value: 'other_visa',     label: 'Work visa — no H-1B required (TN, E-3, or similar)' },
 ]
 const STEPS = [
   { n: 1, label: 'Basics',         sub: 'Account & resume' },
@@ -338,6 +337,7 @@ export default function Setup() {
     job_types:        ['full_time'],
     seniority_levels: ['senior'],
     locations:        ['United States'],
+    visa_types:       ['no_sponsorship'],
     sectors:          [],
     companies:        [],
     min_salary:       '',
@@ -378,7 +378,7 @@ export default function Setup() {
         max_salary:       p.salary_max        || '',
         title_include:    p.title_include      || [],
         title_exclude:    p.title_exclude      || [],
-        visa:             'Authorized to work in the US',
+        visa_types:       p.visa_types         || ['no_sponsorship'],
       })
       if (p.role_description) {
         setAiProfile(p.role_description)
@@ -421,6 +421,7 @@ export default function Setup() {
         original_role_description: extracted.original_role_description || extracted.role_description || null,
         title_include:        profile.title_include,
         title_exclude:        profile.title_exclude,
+        visa_types:           profile.visa_types,
       })
       setProfile(p => ({
         ...p,
@@ -434,6 +435,7 @@ export default function Setup() {
         max_salary:       saved.salary_max         || p.max_salary,
         title_include:    saved.title_include       || p.title_include,
         title_exclude:    saved.title_exclude       || p.title_exclude,
+        visa_types:       saved.visa_types          || p.visa_types,
       }))
       if (extracted.role_description) setAiProfile(extracted.role_description)
       showStatus('Profile generated!')
@@ -597,7 +599,7 @@ export default function Setup() {
             <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
               <div>
                 <h2 className="text-base font-bold text-slate-900">2. Preferences</h2>
-                <p className="text-sm text-slate-500 mt-0.5">Tell us your must-haves. These will be used as hard filters.</p>
+                <p className="text-sm text-slate-500 mt-0.5">Set your must-haves — work mode, job type, seniority, and work authorization. These filters drive your matches.</p>
               </div>
 
               {/* Work setup + Job type */}
@@ -616,7 +618,7 @@ export default function Setup() {
                   <label className="block text-sm font-medium text-slate-700 mb-2">Job type</label>
                   <div className="flex flex-wrap gap-2">
                     {JOB_TYPES.map(t => (
-                      <Pill key={t.value} label={t.label} variant="fill"
+                      <Pill key={t.value} label={t.label} variant="outline"
                         selected={profile.job_types.includes(t.value)}
                         onClick={() => toggleArr('job_types', t.value)} />
                     ))}
@@ -636,23 +638,22 @@ export default function Setup() {
                 </div>
               </div>
 
-              {/* Locations + Visa */}
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Locations</label>
-                  <TagInput tags={profile.locations} onChange={v => set('locations', v)} placeholder="Add locations" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Visa / Work authorization</label>
-                  <div className="relative">
-                    <select value={profile.visa} onChange={e => set('visa', e.target.value)}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2.5 pr-8 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white appearance-none">
-                      {VISA_OPTIONS.map(o => <option key={o}>{o}</option>)}
-                    </select>
-                    <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
+              {/* Locations */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Locations</label>
+                <TagInput tags={profile.locations} onChange={v => set('locations', v)} placeholder="Add locations" />
+              </div>
+
+              {/* Visa / Work authorization */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Work authorization</label>
+                <p className="text-xs text-slate-400 mb-2">Select all that apply</p>
+                <div className="flex flex-wrap gap-2">
+                  {VISA_OPTIONS.map(o => (
+                    <Pill key={o.value} label={o.label} variant="outline"
+                      selected={profile.visa_types.includes(o.value)}
+                      onClick={() => toggleArr('visa_types', o.value)} />
+                  ))}
                 </div>
               </div>
 

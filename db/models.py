@@ -113,6 +113,7 @@ class UserProfile(Base):
     locations: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     job_types: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     visa_sponsorship_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    visa_types: Mapped[list | None] = mapped_column(JSON, nullable=True)
     excluded_companies: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list, server_default="{}")
 
     # --- Soft preferences ---
@@ -137,6 +138,9 @@ class UserProfile(Base):
     linkedin_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Profile completion gate
+    profile_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     # Cold start + adaptive weight management
     cold_start: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
@@ -277,6 +281,59 @@ class Feedback(Base):
     user: Mapped["User"] = relationship(back_populates="feedbacks")
     job: Mapped["Job"] = relationship(back_populates="feedbacks")
     match: Mapped["JobMatch | None"] = relationship(back_populates="feedback")
+
+
+class FeedbackEvent(Base):
+    """Immutable append-only log of every user feedback signal. Never modified after insert."""
+
+    __tablename__ = "feedback_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feedback_event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False
+    )
+    signal_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    signal_value: Mapped[int] = mapped_column(Integer, nullable=False)
+    interaction_source: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="dashboard", server_default="dashboard"
+    )
+    commentary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timestamp: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+    user: Mapped["User"] = relationship(back_populates="feedback_events")
+    job: Mapped["Job"] = relationship(back_populates="feedback_events")
+
+
+class JobUserState(Base):
+    """Current interaction state for a user-job pair. Updated on each interaction — not immutable."""
+
+    __tablename__ = "job_user_state"
+    __table_args__ = (UniqueConstraint("user_id", "job_id", name="uq_job_user_state"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False
+    )
+    current_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    shown_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_interaction_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    interaction_type: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="job_states")
+    job: Mapped["Job"] = relationship(back_populates="job_states")
 
 
 class FeedbackSignal(Base):

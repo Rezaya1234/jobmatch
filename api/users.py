@@ -39,6 +39,7 @@ class ProfileRequest(BaseModel):
     preferred_companies: list[str] = []  # ["Google", "OpenAI"] — empty = any company
     excluded_companies: list[str] = []   # companies to always skip
     visa_sponsorship_required: bool = False  # skip jobs that explicitly deny sponsorship
+    visa_types: list[str] | None = None     # multi-select visa status
 
     # Soft preferences
     seniority_level: str | None = None
@@ -62,6 +63,7 @@ class ProfileRequest(BaseModel):
 class ProfileResponse(ProfileRequest):
     id: str
     user_id: str
+    profile_complete: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -306,6 +308,7 @@ def _profile_response(profile: UserProfile) -> ProfileResponse:
         preferred_companies=profile.preferred_companies or [],
         excluded_companies=profile.excluded_companies or [],
         visa_sponsorship_required=profile.visa_sponsorship_required or False,
+        visa_types=profile.visa_types,
         role_description=profile.role_description,
         original_role_description=profile.original_role_description,
         title_include=profile.title_include or [],
