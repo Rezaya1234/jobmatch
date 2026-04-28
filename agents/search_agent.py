@@ -9,6 +9,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agents.alert_writer import maybe_insert_alert
 from agents.ats_fetchers import fetch_company_jobs
 from agents.company_sources import COMPANY_SOURCES
 from db.models import (
@@ -160,6 +161,25 @@ class JobSearchAgent:
 
         # Phase C-B: version job descriptions — write history only when content changes
         await self._check_description_changes(sources_to_fetch, all_raw_jobs)
+
+        # Alert: any reachable source returned zero jobs (trigger 4)
+        for slug, stats in fetch_stats.items():
+            if stats["ok"] and stats["returned"] == 0:
+                source_name = next(
+                    (s["name"] for s in sources_to_fetch if s["slug"] == slug), slug
+                )
+                await maybe_insert_alert(
+                    self._session,
+                    severity="WARNING",
+                    title=f"Source returned zero jobs: {source_name}",
+                    description=(
+                        f"{source_name} ({slug}) was reachable but returned no job listings."
+                    ),
+                    metric_name="jobs_returned",
+                    metric_value=0.0,
+                    threshold_value=1.0,
+                    failure_type="data",
+                )
 
         return new_total
 

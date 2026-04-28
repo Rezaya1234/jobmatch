@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from datetime import date
 
+from agents.alert_writer import maybe_insert_alert
 from agents.feedback_agent import FeedbackAgent
 from agents.filter_agent import FilterAgent
 from agents.match_agent import MatchAgent, _COST_PER_BATCH_USD, _COST_PER_CALL2_USD
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 _DELIVERY_TARGET = 3        # guaranteed daily delivery count
 _MIN_CANDIDATES_FOR_LLM = 3  # skip LLM if fewer candidates pass filtering
+_COST_ALERT_THRESHOLD_USD = 1.50  # per-run LLM cost that triggers a WARNING alert
 
 
 @dataclass
@@ -86,6 +88,24 @@ class OrchestratorAgent:
         stats = await self.run_job_collection()
         await self.run_user_matching(stats)
         await self.run_test_agent()
+
+        # Alert: pipeline completed after 09:00 UTC (trigger 3)
+        finish_time = datetime.now(timezone.utc)
+        if finish_time.hour >= 9:
+            await maybe_insert_alert(
+                self._session,
+                severity="CRITICAL",
+                title="Daily pipeline completed after 09:00 UTC",
+                description=(
+                    f"Pipeline finished at {finish_time.strftime('%H:%M UTC')} — "
+                    "expected to complete before 09:00 UTC."
+                ),
+                metric_name="pipeline_finish_hour_utc",
+                metric_value=float(finish_time.hour) + finish_time.minute / 60.0,
+                threshold_value=9.0,
+                failure_type="infra",
+            )
+
         return stats
 
     async def run_test_agent(self) -> None:
@@ -231,6 +251,38 @@ class OrchestratorAgent:
         )
         self._session.add(orch_log)
         await self._session.commit()
+
+        # Alert: LLM cost spike (trigger 1)
+        if llm_cost > _COST_ALERT_THRESHOLD_USD:
+            await maybe_insert_alert(
+                self._session,
+                severity="WARNING",
+                title=f"High LLM cost — user {user_id[:8]}",
+                description=(
+                    f"Per-run LLM cost ${llm_cost:.3f} exceeded threshold "
+                    f"${_COST_ALERT_THRESHOLD_USD:.2f} for user {user_id[:8]}."
+                ),
+                metric_name="llm_cost_usd",
+                metric_value=round(llm_cost, 5),
+                threshold_value=_COST_ALERT_THRESHOLD_USD,
+                failure_type="model",
+            )
+
+        # Alert: delivery shortfall (trigger 2)
+        if len(delivery_matches) < _DELIVERY_TARGET:
+            await maybe_insert_alert(
+                self._session,
+                severity="WARNING",
+                title=f"Delivery shortfall — user {user_id[:8]}",
+                description=(
+                    f"Only {len(delivery_matches)} of {_DELIVERY_TARGET} target jobs delivered "
+                    f"after all fallback steps for user {user_id[:8]}."
+                ),
+                metric_name="jobs_delivered",
+                metric_value=float(len(delivery_matches)),
+                threshold_value=float(_DELIVERY_TARGET),
+                failure_type="data",
+            )
 
         # Step 5: Send email
         emailed = await self._send_email(user_id)
