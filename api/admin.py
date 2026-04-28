@@ -798,3 +798,29 @@ async def admin_check(
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     return AdminCheckResponse(is_admin=bool(user and user.is_admin))
+
+
+# ---------------------------------------------------------------------------
+# Admin seeding — promote/revoke by email, guarded by ADMIN_SEED_SECRET
+# ---------------------------------------------------------------------------
+
+@router.post("/seed")
+async def seed_admin(
+    email: str = Query(...),
+    secret: str = Query(...),
+    revoke: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    import os
+    expected = os.environ.get("ADMIN_SEED_SECRET", "")
+    if not expected or secret != expected:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid seed secret")
+
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No user with email {email}")
+
+    user.is_admin = not revoke
+    await session.commit()
+    return {"ok": True, "email": email, "is_admin": user.is_admin}
