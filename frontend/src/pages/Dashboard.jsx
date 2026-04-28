@@ -810,7 +810,7 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const [data, fb, prof] = await Promise.all([
-        getMatches(userId, 0, 100, true),
+        getMatches(userId, 0, 20, true),
         getFeedback(userId).catch(() => []),
         getProfile(userId).catch(() => null),
       ])

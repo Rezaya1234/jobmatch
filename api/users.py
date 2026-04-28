@@ -263,10 +263,17 @@ async def record_engagement(
     result = await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
     profile = result.scalar_one_or_none()
     if profile is not None:
-        profile.last_engaged_at = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        last = profile.last_engaged_at
+        profile.last_engaged_at = now
         await log_event(session, user_id, "dashboard_visit")
         await session.commit()
-    background_tasks.add_task(_run_on_demand_matching, user_id, llm)
+        # Only run on-demand matching once per hour — prevents freezing the
+        # server by re-loading embedding models and running the full pipeline
+        # on every page visit.
+        from datetime import timedelta
+        if last is None or (now - last) > timedelta(hours=1):
+            background_tasks.add_task(_run_on_demand_matching, user_id, llm)
 
 
 async def _run_on_demand_matching(user_id: str, llm: LLMClient) -> None:
@@ -322,6 +329,7 @@ def _profile_response(profile: UserProfile) -> ProfileResponse:
         linkedin_url=getattr(profile, "linkedin_url", None),
         avatar_url=getattr(profile, "avatar_url", None),
         display_name=getattr(profile, "display_name", None),
+        profile_complete=profile.profile_complete or False,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )
