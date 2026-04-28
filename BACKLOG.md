@@ -61,9 +61,9 @@
 |---|------|--------|-------|
 | 40 | Dashboard UI — Stellapath branded | 🔴 In Progress | |
 | 41 | Profile page — 3 column AI onboarding | 🔴 In Progress | |
-| 42 | Profile step enforcement | 🔴 Pending | Prompt ready |
-| 43 | Visa and work authorization UI update | 🔴 Pending | Prompt ready |
-| 44 | Seniority level options update | 🔴 Pending | Prompt ready |
+| 42 | Profile step enforcement | ✅ Complete | 4-step wizard, RequireProfile route guard on 5 routes |
+| 43 | Visa and work authorization UI update | ✅ Complete | Checkbox list, TN/E-3 split out, clearer labels |
+| 44 | Seniority level options update | ✅ Complete | Values now match filter_agent seniority rank map |
 | 45 | Landing page comparison table | ✅ Complete | Live on site |
 | 46 | Stellapath branding applied | 🔴 In Progress | |
 | 47 | Company insights page redesign | ✅ Complete | Two column layout, SLUG_DOMAINS shared util |
