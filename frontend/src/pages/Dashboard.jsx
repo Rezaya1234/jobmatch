@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getMatches, submitFeedback, deleteFeedback, getFeedback, recordEngagement, getProfile } from '../api'
 import DetailsDrawer from '../components/DetailsDrawer'
 import CompanyLogo from '../components/CompanyLogo'
@@ -784,6 +784,7 @@ function ScoreTrendChart({ matches }) {
 export default function Dashboard() {
   const userId = localStorage.getItem('userId')
   const userEmail = localStorage.getItem('userEmail') || ''
+  const navigate = useNavigate()
 
   const [allMatches, setAllMatches] = useState([])
   const [feedback, setFeedback] = useState([])
@@ -813,6 +814,10 @@ export default function Dashboard() {
         getFeedback(userId).catch(() => []),
         getProfile(userId).catch(() => null),
       ])
+      if (prof && !prof.profile_complete) {
+        navigate('/profile')
+        return
+      }
       setAllMatches(data)
       setFeedback(fb)
       setProfile(prof)

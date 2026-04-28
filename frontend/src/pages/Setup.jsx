@@ -162,20 +162,26 @@ function TagInput({ tags, onChange, placeholder = 'Add…' }) {
   )
 }
 
-function StepNav({ current }) {
+function StepNav({ current, step2done = false, step3done = false, step4done = false }) {
   return (
     <nav className="flex flex-col pt-1">
       {STEPS.map((s, i) => {
         const active = s.n === current
         const done   = s.n < current
+          || (s.n === 2 && step2done)
+          || (s.n === 3 && step3done)
+          || (s.n === 4 && step4done)
         return (
           <div key={s.n} className="flex gap-3">
             <div className="flex flex-col items-center">
-              <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
-                active ? 'bg-violet-600 border-violet-600 text-white'
-                : done  ? 'bg-violet-100 border-violet-400 text-violet-600'
-                : 'bg-white border-slate-200 text-slate-400'
-              }`}>
+              <div
+                className="w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-all"
+                style={
+                  active ? { background: '#7c3aed', borderColor: '#7c3aed', color: '#fff' }
+                  : done  ? { background: '#ede9fe', borderColor: '#7c3aed', color: '#7c3aed' }
+                  : { background: '#fff', borderColor: '#e2e8f0', color: '#94a3b8' }
+                }
+              >
                 {done ? (
                   <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -183,7 +189,7 @@ function StepNav({ current }) {
                 ) : s.n}
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`w-px flex-1 my-1 min-h-[32px] ${active || done ? 'bg-violet-200' : 'bg-slate-100'}`} />
+                <div className="w-px flex-1 my-1 min-h-[32px]" style={{ background: active || done ? '#ddd6fe' : '#f1f5f9' }} />
               )}
             </div>
             <div className="pb-8">
@@ -324,6 +330,8 @@ export default function Setup() {
   const [userId, setUserId]     = useState(() => localStorage.getItem('userId') || '')
   const [status, setStatus]     = useState(null)
   const [generating, setGenerating] = useState(false)
+  const [profileGenerated, setProfileGenerated] = useState(false)
+  const [profileComplete, setProfileComplete] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [titleExpanded, setTitleExpanded] = useState(true)
   const [currentStep, setCurrentStep]     = useState(1)
@@ -382,7 +390,6 @@ export default function Setup() {
       })
       if (p.role_description) {
         setAiProfile(p.role_description)
-        setAiText(p.role_description)
       }
     }).catch(() => {})
   }, [userId])
@@ -397,6 +404,30 @@ export default function Setup() {
       showStatus('Account created!')
     } catch (err) {
       showStatus(err.response?.data?.detail || 'Error creating account', true)
+    }
+  }
+
+  async function handleLooksGood() {
+    try {
+      await upsertProfile(userId, {
+        work_modes:          profile.work_modes,
+        job_types:           profile.job_types,
+        locations:           profile.locations,
+        seniority_level:     profile.seniority_levels[0] || null,
+        preferred_sectors:   profile.sectors,
+        preferred_companies: profile.companies,
+        salary_min:          parseSalary(profile.min_salary) || null,
+        salary_max:          parseSalary(profile.max_salary) || null,
+        role_description:    aiText || null,
+        title_include:       profile.title_include,
+        title_exclude:       profile.title_exclude,
+        visa_types:          profile.visa_types,
+        profile_complete:    true,
+      })
+      setProfileComplete(true)
+      navigate('/dashboard')
+    } catch (err) {
+      showStatus('Error saving profile — please try again', true)
     }
   }
 
@@ -438,6 +469,7 @@ export default function Setup() {
         visa_types:       saved.visa_types          || p.visa_types,
       }))
       if (extracted.role_description) setAiProfile(extracted.role_description)
+      setProfileGenerated(true)
       showStatus('Profile generated!')
     } catch (err) {
       showStatus(err.response?.data?.detail || err.message || 'Error generating profile', true)
@@ -477,7 +509,12 @@ export default function Setup() {
 
         {/* ── LEFT: step nav ───────────────────────────────────────────────── */}
         <div className="shrink-0 hidden lg:block" style={{ width: '160px' }}>
-          <StepNav current={currentStep} />
+          <StepNav
+            current={currentStep}
+            step2done={!!aiText.trim()}
+            step3done={profileGenerated}
+            step4done={profileComplete}
+          />
         </div>
 
         {/* ── CENTER: form ─────────────────────────────────────────────────── */}
@@ -574,8 +611,9 @@ export default function Setup() {
                 </p>
                 <div className="relative">
                   <textarea rows={5} value={aiText} onChange={e => setAiText(e.target.value.slice(0, 1000))}
-                    placeholder="Example: I'm a senior ML engineer with 7 years of experience looking for a remote AI role at a growth-stage startup in the US."
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent" />
+                    placeholder="e.g. Senior ML engineer, 7 years exp, seeking remote AI roles at growth-stage startups in the US."
+                    style={{ color: '#374151' }}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent" />
                   <span className="absolute bottom-3 right-3 text-[11px] text-slate-300">
                     {aiText.length}/1000
                   </span>
@@ -747,7 +785,7 @@ export default function Setup() {
           <RightPanel
             aiProfile={aiProfile}
             generating={generating}
-            onLooksGood={() => navigate('/dashboard')}
+            onLooksGood={handleLooksGood}
           />
         </div>
 
