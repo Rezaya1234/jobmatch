@@ -968,3 +968,305 @@ Data refresh:
 ```
 
 Every section requires a clean empty state, e.g.: "No pipeline runs yet — data will appear after first run"
+
+---
+
+## 12. Company Insights Page — Detail View Architecture
+
+*Covers the CompanyDetail.jsx page redesign. Does not change: LLM generation logic, weekly cron schedule, list page card grid, API endpoint structure, logo resolution logic, upsert logic, database schema (additions only), search and filter functionality.*
+
+---
+
+### Layout — Three Zones
+
+```
+ZONE 1 — Hero (full width)
+  Company logo
+  Company name (large, bold)
+  Status pill: Growing / Stable / Slowing
+  Active job count
+  Company summary paragraph
+  "View open positions →" link → /positions?company={slug}
+
+ZONE 2 — Intelligence (two columns, 32px gap)
+  Left column (45%):
+    Hiring Outlook + reason
+    Hiring Momentum (velocity strip + department breakdown)
+    What to Expect (redesigned metrics)
+    Recent Signals (timeline)
+
+  Right column (55%):
+    Pros section
+    Cons section
+    Risks & Considerations section
+
+  Responsive: stack to single column at ≤768px
+
+ZONE 3 — Footer (full width)
+  Company Snapshot card: Website, HQ, Size, Type, Sector
+  Where Hiring tags
+  "View all open positions →" link → /positions?company={slug}
+  Top 5 open positions list: REMOVED
+```
+
+---
+
+### Change 1 — Hiring Momentum Section
+
+Positioned in left column between Hiring Outlook and What to Expect.
+Data source: CompanyHiringSnapshot table — most recent snapshot for this company.
+
+**New API fields added to GET /companies/{slug} response:**
+
+```
+hiring_velocity: {
+  jobs_today:          int
+  jobs_7_days_ago:     int
+  jobs_30_days_ago:    int
+  week_change:         int      (jobs_today - jobs_7_days_ago)
+  week_change_pct:     float
+  month_change:        int      (jobs_today - jobs_30_days_ago)
+  month_change_pct:    float
+  trend:               "up" | "down" | "flat"
+  data_available:      bool     (false if no snapshot exists)
+}
+
+department_breakdown: [
+  { department: string, count: int, pct: float }
+]
+(top 6 departments by count + "Other" catch-all for the rest)
+```
+
+Both fields read from CompanyHiringSnapshot. If no snapshot exists:
+`data_available: false` — frontend renders empty state.
+
+**Frontend — A. Velocity strip:**
+
+```
+"655 active roles"            large, bold
+"↑ +47 this week (+7%)"       green if trend up, red if down, gray if flat
+"↑ +180 this month (+38%)"    same color logic
+
+Arrow icons: ↑ green (#22C55E), ↓ red (#EF4444), → gray (flat)
+```
+
+**Frontend — B. Department breakdown:**
+
+```
+Title: "Where they are hiring"
+
+Horizontal bar chart — top 6 departments + Other
+
+Each row:
+  Department name   left aligned, gray, 14px
+  Purple bar        proportional to count, height 24px,
+                    color Stellapath purple (#5B4FE8),
+                    fully rounded ends, 8px gap between bars
+  Percentage        right of bar, purple, bold
+  Count             far right, gray, 13px
+```
+
+**Frontend — C. Link:**
+
+```
+Below department breakdown:
+"View open positions →"
+Links to: /positions?company={slug}
+```
+
+**Frontend — D. Empty state (data_available: false):**
+
+```
+Light gray dashed border box
+Clock icon
+Text: "Hiring momentum data will appear after our next
+      pipeline run — check back tomorrow."
+```
+
+**Frontend — E. Last updated:**
+
+```
+Small gray text below chart
+"Last updated: {snapshot_date}"
+```
+
+---
+
+### Change 2 — What to Expect Redesign
+
+**A. Interview Difficulty — traffic light pill (replaces 1–5 dots):**
+
+```
+Score 1–2:  🟢 green pill   "Easy"
+Score 3:    🟡 amber pill   "Moderate"
+Score 4:    🔴 red pill     "Hard"
+Score 5:    🔴 red pill     "Very Hard"
+
+Pill style: rounded, colored background, white text, bold, 14px
+```
+
+**B. Response Rate / Time to Hire / Employee Sentiment — gradient range bar:**
+
+Each metric shows:
+- Label (left aligned, gray, 14px)
+- Full-width gradient track (height 6px, fully rounded ends)
+- Throttle dot on track at calculated position
+- Value label centered below dot (small gray, 12px)
+
+```
+Track gradient (left → right):
+  #EF4444 (red) → #F59E0B (amber) → #22C55E (green)
+
+Throttle dot:
+  8px diameter circle, white border 2px
+  Color matches zone:
+    0–33% position:  red dot  (#EF4444)
+    33–66% position: amber dot (#F59E0B)
+    66–100% position: green dot (#22C55E)
+```
+
+Throttle position calculation per metric:
+
+```
+Response Rate:
+  Parse percentage from string e.g. "~25%"
+  Position = parsed percentage (0–100%)
+  Label shows raw value e.g. "~25%"
+
+Time to Hire:
+  Parse weeks from string e.g. "6-10 weeks"
+  Scale: 1 week = 100% (rightmost/green), 12+ weeks = 0% (leftmost/red)
+  Faster = further right (green side)
+  Label shows raw value e.g. "6-10 weeks"
+
+Employee Sentiment:
+  Scale: 0/5 = 0%, 5/5 = 100%
+  Position = (rating / 5) * 100
+  Label shows e.g. "4.1 / 5"
+```
+
+**C. Section title tooltip:**
+
+```
+ⓘ icon — right of "What to Expect" title, small, gray
+On hover tooltip:
+  "These metrics are estimated from industry data and job
+  posting signals. They will be updated with real figures
+  as Stellapath users report their experiences."
+```
+
+**D. Footnote:**
+
+```
+When data is estimated (default — fewer than 10 user inputs):
+  Small italic gray text: "ⓘ Estimated from industry data"
+
+When real data exists (≥10 user inputs):
+  Replace with: "Based on {count} Stellapath users"
+  Only show when count ≥ 10
+```
+
+**New API field added to GET /companies/{slug} response:**
+
+```
+user_feedback_count: int
+  Count of users who applied to this company and reported outcomes.
+  Used by frontend to switch between estimated and real footnote.
+```
+
+---
+
+### Change 3 — Two Column Layout
+
+See Zone 2 in the Layout section above.
+
+```
+Desktop: two columns, 45% left / 55% right, 32px gap
+Tablet (≤768px): stack to single column
+Mobile: single column
+```
+
+---
+
+### Change 4 — Open Positions Removed from Detail Page
+
+```
+Removed:
+  Top 5 open positions list
+  GET /companies/{slug}/jobs API call on this page
+
+Replaced with two links:
+  1. Below hiring momentum section
+  2. In footer zone (Zone 3)
+
+Link text: "View open positions →"
+Link destination: /positions?company={slug}
+```
+
+---
+
+### Change 5 — Recent Signals Timeline
+
+Replaces bullet list with vertical timeline.
+
+```
+Each signal entry:
+  Date          left, small gray
+  Vertical line connecting signals
+  Colored dot   by signal type:
+    hiring_surge:  green
+    expansion:     blue
+    tech_stack:    purple
+    culture:       amber
+    leadership:    gray
+  Signal type badge  colored pill
+  Signal title       bold
+```
+
+---
+
+### Change 6 — SLUG_DOMAINS Deduplication
+
+```
+Problem:
+  SLUG_DOMAINS constant duplicated in:
+    CompanyInsights.jsx
+    CompanyDetail.jsx
+
+Solution:
+  Move to single shared file:
+    src/utils/companyDomains.js
+
+  Import from there in both components:
+    import { SLUG_DOMAINS } from '../utils/companyDomains'
+```
+
+---
+
+### Files Changed (when implemented)
+
+```
+Frontend:
+  frontend/src/pages/CompanyDetail.jsx      layout, all 5 UI changes
+  frontend/src/pages/CompanyInsights.jsx    import SLUG_DOMAINS from util
+  frontend/src/utils/companyDomains.js      NEW — shared constant
+
+Backend:
+  api/companies.py (or equivalent)          add hiring_velocity,
+                                            department_breakdown,
+                                            user_feedback_count to
+                                            GET /companies/{slug} response
+```
+
+### Not Changed
+
+```
+agents/company_insight_agent.py   LLM generation logic untouched
+scheduler config                  weekly cron schedule untouched
+CompanyInsights.jsx               list page card grid and filters untouched
+API endpoint structure            no new routes, only new fields on existing route
+Logo resolution logic             untouched
+Upsert logic                      untouched
+Database schema                   additions only — no modifications to existing fields
+Search and filter functionality   untouched
+```
