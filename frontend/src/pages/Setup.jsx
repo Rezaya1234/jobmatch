@@ -18,22 +18,19 @@ const JOB_TYPES = [
 
 // Values match filter_agent._PROFILE_SENIORITY_RANK keys
 const SENIORITY_LEVELS = [
-  { value: 'junior',    label: 'Entry / Junior' },
+  { value: 'junior',    label: 'Entry Level' },
   { value: 'mid',       label: 'Mid Level' },
   { value: 'senior',    label: 'Senior' },
-  { value: 'staff',     label: 'Staff' },
-  { value: 'principal', label: 'Principal / Lead' },
   { value: 'manager',   label: 'Manager' },
   { value: 'director',  label: 'Director' },
-  { value: 'executive', label: 'VP / Executive' },
+  { value: 'executive', label: 'Executive' },
 ]
 
 const VISA_OPTIONS = [
-  { value: 'no_sponsorship', label: 'No sponsorship needed (US citizen, Green Card, EAD)' },
-  { value: 'h1b',            label: 'H-1B transfer or new cap sponsorship' },
-  { value: 'opt_cpt',        label: 'OPT / CPT (F-1 student, EAD in progress)' },
-  { value: 'tn_e3',          label: 'TN or E-3 (Canadian or Australian citizen)' },
-  { value: 'other_visa',     label: 'Other work visa — no H-1B required' },
+  { value: 'no_sponsorship', label: 'Authorized to work',  sub: 'US Citizen, Green Card, or EAD' },
+  { value: 'h1b',            label: 'H-1B Visa',           sub: 'Transfer or new cap sponsorship' },
+  { value: 'opt_cpt',        label: 'OPT / CPT',           sub: 'F-1 student or recent grad' },
+  { value: 'tn_e3',          label: 'TN / E-3',            sub: 'Canadian or Australian citizen' },
 ]
 
 const STEPS = [
@@ -122,6 +119,32 @@ function Pill({ label, selected, onClick }) {
         </svg>
       )}
       {label}
+    </button>
+  )
+}
+
+function PillWithSub({ label, sub, selected, onClick }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`flex items-start gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border transition-all text-left ${
+        selected
+          ? 'border-violet-500 text-violet-700 bg-violet-50'
+          : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-slate-700'
+      }`}
+    >
+      <span className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
+        selected ? 'border-violet-500 bg-violet-500' : 'border-slate-300'
+      }`}>
+        {selected && (
+          <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        )}
+      </span>
+      <span>
+        <span className="block leading-snug">{label}</span>
+        {sub && <span className="block text-xs font-normal text-slate-400 mt-0.5">{sub}</span>}
+      </span>
     </button>
   )
 }
@@ -774,19 +797,16 @@ export default function Setup() {
                 {/* Work authorization */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Work authorization</label>
-                  <p className="text-xs text-slate-400 mb-2">Select all that apply — determines sponsorship filtering.</p>
-                  <div className="flex flex-col gap-2">
+                  <p className="text-xs text-slate-400 mb-2">Select all that apply — we use this to filter sponsorship requirements.</p>
+                  <div className="grid grid-cols-2 gap-2">
                     {VISA_OPTIONS.map(o => (
-                      <label key={o.value} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                        profile.visa_types.includes(o.value)
-                          ? 'border-violet-300 bg-violet-50'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
-                      }`}>
-                        <input type="checkbox" className="mt-0.5 accent-violet-600 shrink-0"
-                          checked={profile.visa_types.includes(o.value)}
-                          onChange={() => toggleArr('visa_types', o.value)} />
-                        <span className="text-sm text-slate-700">{o.label}</span>
-                      </label>
+                      <PillWithSub
+                        key={o.value}
+                        label={o.label}
+                        sub={o.sub}
+                        selected={profile.visa_types.includes(o.value)}
+                        onClick={() => toggleArr('visa_types', o.value)}
+                      />
                     ))}
                   </div>
                 </div>
