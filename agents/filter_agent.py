@@ -3,10 +3,11 @@ import re
 import uuid
 from dataclasses import dataclass
 
+import numpy as np
 from sqlalchemy import func, not_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agents.embeddings import embed_and_score
+from agents.embeddings import embed_single
 from agents.profile_agent import build_intent_query
 from db.models import Job, JobMatch, UserProfile
 
@@ -50,16 +51,42 @@ _PROFILE_SENIORITY_RANK: dict[str, int] = {
 _MANAGER_KW = {'manager', 'director', 'head of', 'vp', 'vice president'}
 _EXEC_KW = {'cto', 'ceo', 'coo', 'cpo', 'chief', 'president', 'founder'}
 
-# Heuristic scoring: top 50 candidates before embedding stage
-_HEURISTIC_TOP_N = 50
 # Final output size to Matching Agent
 _CANDIDATES_MAX = 15
 _CANDIDATES_MIN = 3  # below this → orchestrator should trigger fallback
 
-# Embedding thresholds
-_STAGE1_THRESHOLD = 0.60
-_STAGE1_THRESHOLD_COLD = 0.50  # relaxed for users with < 10 feedback signals
-_STAGE2_THRESHOLD = 0.70
+# ANN search pool before soft-constraint post-filter
+_ANN_POOL = 50
+
+# Sector diversification — cap any single sector at this fraction of results
+_SECTOR_CAP_FRACTION = 0.60
+# Skip diversification if fewer than this fraction of jobs have sector data
+_SECTOR_DATA_MIN_FRACTION = 0.20
+
+
+def _diversify(jobs: list[Job], max_count: int) -> list[Job]:
+    """Cap any single sector at 60% of returned jobs. Skip if <20% have sector data."""
+    with_sector = sum(1 for j in jobs if j.sector)
+    if with_sector / max(len(jobs), 1) < _SECTOR_DATA_MIN_FRACTION:
+        return jobs[:max_count]
+
+    cap = max(1, int(max_count * _SECTOR_CAP_FRACTION))
+    sector_counts: dict[str, int] = {}
+    result: list[Job] = []
+
+    for job in jobs:
+        sector = job.sector
+        if sector is None:
+            result.append(job)
+        else:
+            count = sector_counts.get(sector, 0)
+            if count < cap:
+                result.append(job)
+                sector_counts[sector] = count + 1
+        if len(result) >= max_count:
+            break
+
+    return result
 
 
 def _keywords(text: str) -> set[str]:
@@ -89,30 +116,6 @@ def _detect_role_type(title: str) -> str | None:
         if kw in lower:
             return 'manager'
     return 'ic'
-
-
-def _heuristic_score(profile: UserProfile, job: Job) -> float:
-    profile_text = ' '.join(filter(None, [
-        profile.role_description or '',
-        ' '.join(profile.title_include or []),
-    ]))
-    profile_kws = _keywords(profile_text)
-    if not profile_kws:
-        return 0.5  # neutral when no profile data
-
-    job_text = f"{job.title} {(job.description or '')[:2000]}"
-    job_kws = _keywords(job_text)
-    if not job_kws:
-        return 0.0
-
-    title_kws = _keywords(job.title)
-    title_hits = len(profile_kws & title_kws)
-    desc_hits = len(profile_kws & job_kws)
-
-    union = len(profile_kws | job_kws)
-    jaccard = desc_hits / union if union else 0.0
-    title_boost = min(title_hits / max(len(profile_kws), 1), 0.3)
-    return min(round(jaccard + title_boost, 4), 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -199,70 +202,93 @@ class FilterAgent:
 
     async def get_candidates(self, user_id: str, pool_limit: int | None = None) -> list[Job]:
         """
-        Returns top 10-15 candidate jobs for the Matching Agent.
-        Returns fewer than _CANDIDATES_MIN when orchestrator should trigger fallback.
-        pool_limit: cap the initial hard-passed pool (for step testing endpoints only).
+        ANN search: cosine similarity against user's profile embedding.
+        Returns top 10-15 jobs for the Matching Agent.
+        pool_limit: cap the ANN pool (for step testing endpoints only).
         """
         profile = await self._get_profile(user_id)
         if not profile:
             return []
 
-        # Jobs that passed hard filter and haven't been shown yet
-        jobs = await self._get_hard_passed_unseen(user_id, limit=pool_limit)
-        if not jobs:
-            logger.info("User %s — no hard-passed unseen jobs for candidate selection", user_id)
+        query_vector = await self._build_query_vector(profile)
+        if query_vector is None:
+            logger.warning("User %s — no query vector available, returning empty candidates", user_id)
             return []
 
-        # Soft constraints (benefit of doubt when data missing)
-        soft_passed = [j for j in jobs if self._passes_soft(j, profile)]
-        if not soft_passed:
-            logger.info("User %s — no jobs survived soft constraints, using hard-passed set", user_id)
-            soft_passed = jobs  # fall through with full set
+        try:
+            uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        except ValueError:
+            return []
 
-        # Heuristic scoring → top 50
-        scored = sorted(
-            [(j, _heuristic_score(profile, j)) for j in soft_passed],
-            key=lambda x: x[1],
-            reverse=True,
+        # ANN search on hard-passed unseen jobs ordered by cosine distance
+        ann_limit = pool_limit or _ANN_POOL
+        dist_col = Job.embedding_vector.cosine_distance(query_vector).label("ann_dist")
+        stmt = (
+            select(Job, dist_col)
+            .join(JobMatch, JobMatch.job_id == Job.id)
+            .where(
+                JobMatch.user_id == uid,
+                JobMatch.passed_hard_filter.is_(True),
+                JobMatch.shown_at.is_(None),
+                Job.is_active.is_(True),
+                Job.embedding_vector.is_not(None),
+            )
+            .order_by(dist_col)
+            .limit(ann_limit)
         )
-        top50 = scored[:_HEURISTIC_TOP_N]
-        top50_jobs = [j for j, _ in top50]
+        result = await self._session.execute(stmt)
+        rows = result.all()
 
-        # Persist heuristic scores
-        await self._write_scores(
-            user_id,
-            {j.id: s for j, s in top50},
-            field="heuristic_score",
-        )
+        if not rows:
+            logger.info("User %s — no hard-passed unseen jobs with embeddings", user_id)
+            return []
 
-        # Stage 1: BGE-small
-        threshold1 = _STAGE1_THRESHOLD_COLD if (profile.feedback_signal_count or 0) < 10 else _STAGE1_THRESHOLD
-        stage1 = await self._embedding_filter(profile, top50_jobs, "small", threshold1)
-        if not stage1:
-            logger.info("User %s — BGE-small unavailable or no jobs passed threshold, using heuristic top-15", user_id)
-            stage1 = [(j, 0.0) for j in top50_jobs[:_CANDIDATES_MAX]]
+        jobs = [row[0] for row in rows]
+        distances = [float(row[1]) for row in rows]
 
-        # Stage 2: BGE-large
-        stage1_jobs = [j for j, _ in stage1]
-        stage2 = await self._embedding_filter(profile, stage1_jobs, "large", _STAGE2_THRESHOLD)
-        if not stage2:
-            logger.info("User %s — BGE-large unavailable or no jobs passed threshold, using stage1 results", user_id)
-            stage2 = stage1
+        # Soft constraints as post-filter (applied AFTER ANN, never as pre-filter)
+        soft_pairs = [(j, d) for j, d in zip(jobs, distances) if self._passes_soft(j, profile)]
+        if not soft_pairs:
+            logger.info("User %s — soft constraints eliminated all jobs, using ANN top results", user_id)
+            soft_pairs = list(zip(jobs, distances))
 
-        # Persist final embedding scores
-        await self._write_scores(
-            user_id,
-            {j.id: s for j, s in stage2},
-            field="embedding_score",
-        )
+        # Persist cosine similarity scores (1 - cosine_distance for pgvector cosine op)
+        sim_scores = {j.id: round(1.0 - d, 4) for j, d in soft_pairs}
+        await self._write_scores(user_id, sim_scores, field="embedding_score")
 
-        final = [j for j, _ in stage2[:_CANDIDATES_MAX]]
+        # Industry diversification
+        soft_jobs = [j for j, _ in soft_pairs]
+        final = _diversify(soft_jobs, _CANDIDATES_MAX)
+
         logger.info(
-            "User %s — %d hard-passed → %d soft → %d heuristic → %d stage1 → %d stage2 → %d final",
-            user_id, len(jobs), len(soft_passed), len(top50_jobs),
-            len(stage1), len(stage2), len(final),
+            "User %s — ANN pool %d → %d soft-passed → %d final",
+            user_id, len(rows), len(soft_pairs), len(final),
         )
         return final
+
+    async def _build_query_vector(self, profile: UserProfile) -> list[float] | None:
+        """Aspiration blend: 0.7 × profile_embedding + 0.3 × goals_embedding (normalized)."""
+        profile_vec = profile.profile_embedding
+
+        if profile_vec is None:
+            text = build_intent_query(profile)
+            profile_vec = await embed_single(text)
+
+        if profile_vec is None:
+            return None
+
+        if profile.goals_text:
+            goals_vec = await embed_single(profile.goals_text)
+            if goals_vec is not None:
+                p = np.array(profile_vec, dtype=np.float32)
+                g = np.array(goals_vec, dtype=np.float32)
+                blended = 0.7 * p + 0.3 * g
+                norm = np.linalg.norm(blended)
+                if norm > 0:
+                    blended = blended / norm
+                return blended.tolist()
+
+        return profile_vec
 
     # ------------------------------------------------------------------
     # Soft constraint logic
@@ -294,31 +320,6 @@ class FilterAgent:
                 return False
 
         return True
-
-    # ------------------------------------------------------------------
-    # Embedding filter
-    # ------------------------------------------------------------------
-
-    async def _embedding_filter(
-        self,
-        profile: UserProfile,
-        jobs: list[Job],
-        model_size: str,
-        threshold: float,
-    ) -> list[tuple[Job, float]]:
-        if not jobs:
-            return []
-
-        profile_text = build_intent_query(profile)
-        job_texts = [f"{j.title}. {(j.description or '')[:1500]}" for j in jobs]
-
-        scores = await embed_and_score(profile_text, job_texts, model_size)
-        if scores is None:
-            return []
-
-        result = [(j, s) for j, s in zip(jobs, scores) if s >= threshold]
-        result.sort(key=lambda x: x[1], reverse=True)
-        return result
 
     # ------------------------------------------------------------------
     # DB helpers
