@@ -15,4 +15,5 @@ httpx
 pypdf
 python-multipart
 playwright
+openai
 sentence-transformers

@@ -270,13 +270,38 @@ hired:            +5   (immediate weight update)
 ### Embedding Models
 
 ```
+Backend strategy — controlled by EMBEDDING_BACKEND env var:
+  "openai"  — API call to OpenAI (current default on Render)
+  "local"   — local BGE models (for high-volume future use)
+
+──────────────────────────────────────────────────────────
+CURRENT: openai backend
+──────────────────────────────────────────────────────────
+Model:       text-embedding-3-large (OpenAI API)
+Dimensions:  3072
+MTEB score:  ~64.6 (slightly better than bge-large)
+Cost:        ~$0.13 per million tokens
+             ~$2/month at current volume (1 user, daily)
+             At 100+ users: ~$200/month → switch to local
+Threshold:   same as bge-large (0.70)
+Purpose:     Single API call replaces both BGE stages
+
+Rationale for single call (not two API calls):
+  BGE two-stage design was a cost optimization for local
+  models (run cheap small model first, expensive large
+  model only on survivors). With API pricing, two calls
+  cost more than one — use large directly on full set.
+
+──────────────────────────────────────────────────────────
+FUTURE (local backend — when volume justifies Render Pro)
+──────────────────────────────────────────────────────────
 Stage 1 — Fast filter:
   Model:       BAAI/bge-small-en-v1.5
   Dimensions:  384
   Speed:       ~8ms per document on CPU
   Cost:        $0 — open source, runs locally
   Threshold:   0.60 (relaxed to 0.50 for cold start)
-  Purpose:     Reduce 100K jobs to ~40-60 candidates
+  Purpose:     Reduce pool to ~40-60 candidates
 
 Stage 2 — Quality filter:
   Model:       BAAI/bge-large-en-v1.5
@@ -286,22 +311,19 @@ Stage 2 — Quality filter:
   Threshold:   0.70
   Purpose:     Reduce 40-60 to 15-20 for LLM
 
+Memory requirement: ~2.1GB (app + both models loaded)
+Render tier needed: Pro ($85/mo) — Standard (2GB) is borderline
+Switch trigger:     API cost (~$0.065/run × users × 30 days)
+                    exceeds Render Pro cost ($85/mo)
+                    ≈ at 100+ daily active users
+
 Note:        Bi-encoder embedding similarity filter —
              not a cross-encoder reranker.
              Cross-encoder evaluation deferred
              to Phase 3 if quality gap identified.
 
-Required embedding prefix (BGE models):
+Required embedding prefix (BGE models only):
   "Represent this for job matching: {text}"
-
-Model loading:
-  Load both models at application startup
-  Keep in memory — never reload per request
-
-Future upgrade path:
-  Voyage AI voyage-large-2-instruct
-  Trigger: Only if post-beta quality benchmarks
-  show embedding as primary bottleneck
 ```
 
 ---
@@ -410,14 +432,25 @@ Data handling:
                parsing only. Not stored by Anthropic
                beyond API call. Not shared with any
                other third party.
-  Embeddings:  Computed locally using open source
-               models. No resume or profile data
-               sent to third parties for embedding.
+  Embeddings:  Depends on EMBEDDING_BACKEND setting:
+    "local":   Computed locally — no data leaves server.
+    "openai":  Profile summary (role description, skills,
+               sectors) and job descriptions sent to
+               OpenAI API for embedding. Not stored or
+               used for training by OpenAI (API policy).
   User data:   Used only for job matching.
                Never sold or shared.
                Deletable on request.
 
-Privacy statement (accurate):
+Privacy statement (openai backend — current):
+  "Resume content is processed by Anthropic for profile
+  parsing only. A summary of your job preferences
+  (not your full resume) is sent to OpenAI for
+  embedding-based matching. Neither provider stores
+  or trains on this data. You are in control of your
+  data and can request deletion at any time."
+
+Privacy statement (local backend — future):
   "Resume content is processed by our LLM provider
   (Anthropic) for profile parsing only. It is not
   stored, sold, or shared with any other third party.
@@ -462,17 +495,22 @@ Release:
 ```
 Per user per month (includes 25% buffer):
   LLM:              ~$0.24
+  Embeddings:        $0.07  (OpenAI text-embedding-3-large)
+                            drops to ~$0.00 when switching
+                            to local BGE at 100+ users
   Database:          $0.03
   Vector search:     $0.00 (beta) → $0.01 (scale)
   Email:             $0.01
   Infrastructure:    $0.05
   ──────────────────────────────────────────
-  Total:             ~$0.33/month
+  Total:             ~$0.40/month
   Revenue:           $10.00/month
-  Gross margin:      96.7%
+  Gross margin:      96.0%
 
 Note: 25% buffer applied to LLM costs to account
 for retries, token count variance, and usage spikes.
+Embedding cost drops to near zero when switching to
+local BGE models at scale (Render Pro tier).
 ```
 
 ---
@@ -498,6 +536,9 @@ Before beta (immediate):
   ✅ Visa authorization UI with PillWithSub selectors
   ✅ Seniority options (6 clean levels)
   ✅ Applications page (applied/interview history)
+  🔲 Switch embedding backend to OpenAI text-embedding-3-large
+       (EMBEDDING_BACKEND=openai env var, agents/embeddings.py)
+       BGE local models kept in codebase for future volume switch
   🔲 SendGrid API key configured on Render
 
 Phase 2 (post beta):
