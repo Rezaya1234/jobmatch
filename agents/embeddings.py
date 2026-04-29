@@ -2,7 +2,7 @@
 Embedding backend for candidate filtering.
 
 Backend controlled by EMBEDDING_BACKEND env var:
-  "openai" — OpenAI text-embedding-3-large API (default)
+  "openai" — OpenAI text-embedding-3-small API (default)
   "local"  — Local BGE models via sentence-transformers
 
 Switch to "local" at ~100+ daily active users when Render Pro
@@ -18,6 +18,8 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 _BACKEND = os.getenv("EMBEDDING_BACKEND", "openai").lower()
+_OPENAI_MODEL = "text-embedding-3-small"
+_OPENAI_DIMS = 1536
 _PREFIX = "Represent this for job matching: "
 
 
@@ -75,8 +77,38 @@ async def _embed_local(
 
 
 # ---------------------------------------------------------------------------
-# OpenAI backend (text-embedding-3-large)
+# OpenAI backend (text-embedding-3-small)
 # ---------------------------------------------------------------------------
+
+def _openai_client():
+    from openai import AsyncOpenAI
+    return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+async def embed_single(text: str) -> list[float] | None:
+    """
+    Embed a single text string using OpenAI text-embedding-3-small.
+    Returns a unit-normalized vector as list[float], or None on failure.
+    Used for storing job and profile embeddings in pgvector.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or not text:
+        return None
+    try:
+        client = _openai_client()
+        response = await client.embeddings.create(
+            model=_OPENAI_MODEL,
+            input=text,
+        )
+        arr = np.array(response.data[0].embedding, dtype=np.float32)
+        norm = np.linalg.norm(arr)
+        if norm > 0:
+            arr = arr / norm
+        return arr.tolist()
+    except Exception as exc:
+        logger.warning("embed_single failed: %s — returning None", exc)
+        return None
+
 
 async def _embed_openai(
     profile_text: str,
@@ -87,11 +119,10 @@ async def _embed_openai(
         return None
 
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=api_key)
+        client = _openai_client()
         texts = [profile_text] + job_texts
         response = await client.embeddings.create(
-            model="text-embedding-3-large",
+            model=_OPENAI_MODEL,
             input=texts,
         )
         vectors = [np.array(item.embedding) for item in response.data]
@@ -116,7 +147,7 @@ async def embed_and_score(
     Returns None if the configured backend is unavailable.
 
     model_size is only used by the local backend ("small" / "large").
-    The OpenAI backend always uses text-embedding-3-large regardless.
+    The OpenAI backend always uses text-embedding-3-small regardless.
     """
     if not job_texts:
         return None
