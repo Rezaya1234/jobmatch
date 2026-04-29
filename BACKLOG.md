@@ -4,6 +4,25 @@
 
 ---
 
+## Beta Readiness Checklist
+
+| # | Item | Status | Blocker |
+|---|------|--------|---------|
+| B1 | Profile step enforcement + dashboard gate | ✅ Done | — |
+| B2 | Visa authorization as pills with sublabels | ✅ Done | — |
+| B3 | Seniority trimmed to 6 clean options | ✅ Done | — |
+| B4 | Goals text auto-save (debounced, 500ms) | ✅ Done | — |
+| B5 | Applications page (applied / interview table) | ✅ Done | — |
+| B6 | Company insights page fully redesigned | ✅ Done | — |
+| B7 | All tests passing (55/55) | ✅ Done | — |
+| B8 | SendGrid API key configured | 🔴 Pending | Infra |
+| B9 | Email agent live (daily digest + weekly recap) | 🔴 Pending | Needs B8 |
+| B10 | End-to-end QA with real users | 🔴 Pending | Needs B9 |
+| B11 | Domain registered (stellapath.app) | 🔴 Pending | Business |
+| B12 | Beta user recruitment (10 active job seekers) | 🔴 Pending | Needs B10 |
+
+---
+
 ## Phase 1 — Beta Launch (Target: July 2026)
 
 ### Infrastructure and DevOps
@@ -65,14 +84,15 @@
 |---|------|--------|-------|
 | 40 | Dashboard UI — Stellapath branded | 🔴 In Progress | |
 | 41 | Profile page — 3 column AI onboarding | 🔴 In Progress | |
-| 42 | Profile step enforcement | ✅ Complete | 4-step wizard, RequireProfile route guard on 5 routes |
-| 43 | Visa and work authorization UI update | ✅ Complete | Checkbox list, TN/E-3 split out, clearer labels |
-| 44 | Seniority level options update | ✅ Complete | Values now match filter_agent seniority rank map |
+| 42 | Profile step enforcement | ✅ Complete | Green step circles, progress bar, debounce auto-save, soft banners, mid default |
+| 43 | Visa and work authorization UI update | ✅ Complete | 4 PillWithSub pills in 2-col grid, sublabels, consistent violet styling |
+| 44 | Seniority level options update | ✅ Complete | 6 options: Entry Level, Mid Level, Senior, Manager, Director, Executive |
 | 45 | Landing page comparison table | ✅ Complete | Live on site |
 | 46 | Stellapath branding applied | 🔴 In Progress | |
 | 47 | Company insights page redesign | ✅ Complete | Two column layout, SLUG_DOMAINS shared util |
 | 48 | Hiring momentum section on insights | ✅ Complete | Velocity strip + department bar chart |
 | 49 | What to Expect redesign | ✅ Complete | Traffic light pill + gradient range bars |
+| 54 | Applications page | ✅ Complete | Table of applied/interview FeedbackSignal rows; replaces ComingSoon stub |
 
 ### Quality and Legal
 
