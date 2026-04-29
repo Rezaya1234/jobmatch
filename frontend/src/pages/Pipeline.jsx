@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   triggerCollect, triggerResetFilters, triggerTestEmail,
   triggerCompanyInsights, backfillLogos, getJobCount, getMatchCount,
-  getPipelineStatus, triggerStepFilter, triggerStepCandidates,
+  getPipelineStatus, triggerStepReset, triggerStepFilter, triggerStepCandidates,
   triggerStepScore, triggerStepDeliver,
 } from '../api'
 
@@ -87,6 +87,7 @@ export default function Pipeline() {
     5: { status: 'idle', detail: '' },
   })
   const [runAllActive, setRunAllActive] = useState(false)
+  const [resetState, setResetState] = useState({ status: 'idle', detail: '' })
   const pollRef = useRef(null)
 
   function uid() { return localStorage.getItem('userId') }
@@ -140,6 +141,28 @@ export default function Pipeline() {
     fetchTotals()
     return () => stopPolling()
   }, [])
+
+  // ---- Reset handler ----
+
+  async function handleReset() {
+    const id = uid()
+    if (!id) return
+    setResetState({ status: 'running', detail: '' })
+    setStepState({
+      1: { status: 'idle', detail: '' },
+      2: { status: 'idle', detail: '' },
+      3: { status: 'idle', detail: '' },
+      4: { status: 'idle', detail: '' },
+      5: { status: 'idle', detail: '' },
+    })
+    try {
+      const res = await triggerStepReset(id)
+      setResetState({ status: res.status === 'error' ? 'error' : 'done', detail: res.detail })
+      fetchTotals()
+    } catch {
+      setResetState({ status: 'error', detail: 'Failed' })
+    }
+  }
 
   // ---- Individual step handlers ----
 
@@ -308,6 +331,20 @@ export default function Pipeline() {
         <p className="text-xs text-slate-400 mb-4">
           Click each step in order, or run all at once. Completed steps stay green.
         </p>
+
+        {/* Reset button */}
+        <div className="flex items-center gap-3 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <button
+            onClick={handleReset}
+            disabled={anyStepRunning || resetState.status === 'running'}
+            className="shrink-0 bg-red-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+          >
+            {resetState.status === 'running' ? <><Spinner size={3} /> Clearing…</> : '↺ Clear Matches'}
+          </button>
+          <span className={`text-xs ${resetState.status === 'done' ? 'text-green-600 font-medium' : resetState.status === 'error' ? 'text-red-600' : 'text-slate-400'}`}>
+            {resetState.detail || 'Clear all match rows before running steps — required if you have existing matches'}
+          </span>
+        </div>
 
         <div className="grid grid-cols-5 gap-2 mb-3">
           {STEP_META.map(meta => (

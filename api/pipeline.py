@@ -275,6 +275,27 @@ async def trigger_feedback_pipeline(
 # Step-by-step testing endpoints (synchronous — return result directly)
 # ------------------------------------------------------------------
 
+@router.post("/step/reset/{user_id}", response_model=StepResult, status_code=200)
+async def trigger_step_reset(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> StepResult:
+    """Clear all job_match rows for a user — no background tasks triggered."""
+    import uuid as _uuid
+    from sqlalchemy import delete, func, select
+    from db.models import JobMatch
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        return StepResult(status="error", detail=f"Invalid user_id: {user_id}")
+    before = await session.scalar(
+        select(func.count()).select_from(JobMatch).where(JobMatch.user_id == uid)
+    )
+    await session.execute(delete(JobMatch).where(JobMatch.user_id == uid))
+    await session.commit()
+    return StepResult(status="done", detail=f"{before or 0} match rows cleared", count=int(before or 0))
+
+
 @router.post("/step/filter/{user_id}", response_model=StepResult, status_code=200)
 async def trigger_step_filter(
     user_id: str,
