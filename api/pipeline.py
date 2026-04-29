@@ -342,14 +342,30 @@ async def trigger_step_candidates(
     user_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> StepResult:
-    """Step 3: Soft filter + heuristic + BGE embedding candidate selection."""
-    from agents.filter_agent import FilterAgent
+    """Step 3: Count hard-passed unseen jobs available for scoring."""
+    import uuid as _uuid
+    from sqlalchemy import func, select
+    from db.models import Job, JobMatch
     try:
-        candidates = await FilterAgent(session).get_candidates(user_id, pool_limit=200)
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        return StepResult(status="error", detail=f"Invalid user_id: {user_id}")
+    try:
+        count = await session.scalar(
+            select(func.count())
+            .select_from(JobMatch)
+            .join(Job, JobMatch.job_id == Job.id)
+            .where(
+                JobMatch.user_id == uid,
+                JobMatch.passed_hard_filter.is_(True),
+                JobMatch.shown_at.is_(None),
+                Job.is_active.is_(True),
+            )
+        )
         return StepResult(
             status="done",
-            detail=f"{len(candidates)} candidates selected (pool capped at 200 for testing)",
-            count=len(candidates),
+            detail=f"{count or 0} hard-passed unseen jobs ready for scoring",
+            count=int(count or 0),
         )
     except Exception as exc:
         return StepResult(status="error", detail=str(exc))
