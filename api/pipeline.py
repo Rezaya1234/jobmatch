@@ -44,6 +44,11 @@ class PipelineResponse(BaseModel):
 class TestEmailRequest(BaseModel):
     email: str
 
+class TestEmailResponse(BaseModel):
+    status: str
+    to: str | None = None
+    error: str | None = None
+
 class PipelineStatusResponse(BaseModel):
     status: str
     step: str
@@ -157,12 +162,12 @@ async def trigger_rescore(
     return PipelineResponse(status="accepted", detail="Re-scoring started.")
 
 
-@router.post("/test-email", response_model=dict, status_code=200)
-async def send_test_email(body: TestEmailRequest) -> dict:
+@router.post("/test-email", response_model=TestEmailResponse, status_code=200)
+async def send_test_email(body: TestEmailRequest) -> TestEmailResponse:
     """Send a plain test email to verify SendGrid is configured. No auth required."""
     import asyncio
     from mailer.sender import _send_via_sendgrid
-    subject = "Stellapath — test email"
+    subject = "Stellapath - test email"
     plain = (
         "If you receive this email, SendGrid is configured correctly "
         "and Stellapath email delivery is working."
@@ -170,9 +175,9 @@ async def send_test_email(body: TestEmailRequest) -> dict:
     html = f"<p>{plain}</p>"
     try:
         await asyncio.to_thread(_send_via_sendgrid, body.email, subject, html, plain)
-        return {"status": "sent", "to": body.email}
+        return TestEmailResponse(status="sent", to=body.email)
     except Exception as exc:
-        return {"status": "failed", "error": str(exc)}
+        return TestEmailResponse(status="failed", error=str(exc))
 
 
 @router.post("/test-email/{user_id}", response_model=PipelineResponse, status_code=200)
