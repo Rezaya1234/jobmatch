@@ -365,6 +365,21 @@ export default function Pipeline() {
           ))}
         </div>
 
+        {/* Results row */}
+        {Object.values(stepState).some(s => s.status === 'done' || s.status === 'error') && (
+          <div className="grid grid-cols-5 gap-2 mb-3">
+            {STEP_META.map(meta => {
+              const s = stepState[meta.id]
+              if (s.status === 'idle' || s.status === 'running') return <div key={meta.id} />
+              return (
+                <div key={meta.id} className={`rounded-lg p-2 text-center text-xs ${s.status === 'done' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                  {s.detail || '—'}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <button
           onClick={handleRunAll}
           disabled={anyStepRunning}
