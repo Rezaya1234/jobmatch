@@ -5,6 +5,7 @@ Weight updates are rule-based (no LLM cost). Profile text updates use LLM.
 import json
 import logging
 
+import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -138,7 +139,56 @@ class FeedbackAgent:
         if changed:
             await self._session.commit()
 
+        # Outcome-anchored embedding: pull profile toward the job the user interviewed at
+        if signal_type in ("interview", "applied"):
+            await self._outcome_anchor_update(user_id, profile, signal_type)
+
         return changed
+
+    # ------------------------------------------------------------------
+    # Outcome-anchored embedding update
+    # ------------------------------------------------------------------
+
+    async def _outcome_anchor_update(
+        self, user_id: str, profile: UserProfile, signal_type: str
+    ) -> None:
+        """Blend profile_embedding 0.8/0.2 toward the job the user interviewed/applied at."""
+        if profile.profile_embedding is None:
+            return
+
+        result = await self._session.execute(
+            select(FeedbackSignal)
+            .where(
+                FeedbackSignal.user_id == profile.user_id,
+                FeedbackSignal.signal_type == signal_type,
+            )
+            .order_by(FeedbackSignal.created_at.desc())
+            .limit(1)
+        )
+        signal = result.scalar_one_or_none()
+        if signal is None:
+            return
+
+        job_result = await self._session.execute(
+            select(Job.embedding_vector).where(Job.id == signal.job_id)
+        )
+        job_row = job_result.first()
+        if job_row is None or job_row[0] is None:
+            return
+
+        p = np.array(profile.profile_embedding, dtype=np.float32)
+        j = np.array(job_row[0], dtype=np.float32)
+        blended = 0.8 * p + 0.2 * j
+        norm = np.linalg.norm(blended)
+        if norm > 0:
+            blended = blended / norm
+
+        profile.profile_embedding = blended.tolist()
+        await self._session.commit()
+        logger.info(
+            "Outcome-anchored embedding update for user %s (signal=%s, job=%s)",
+            user_id, signal_type, signal.job_id,
+        )
 
     # ------------------------------------------------------------------
     # LLM profile text update (keeps existing behavior)
