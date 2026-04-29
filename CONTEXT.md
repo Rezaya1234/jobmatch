@@ -272,11 +272,29 @@ SESSION_STARTER.txt  Paste to Claude Code
 ✅ Frontend deployed (pages live)
 ✅ Database migrations applied
 ✅ Dev and prod environments live
-✅ Admin dashboard /admin 11 sections
+✅ Admin dashboard /admin 11 sections complete
+✅ Test Agent fully implemented
+   precision@50, @15, recall, NDCG, coverage, FPR
+   7-day baselines and drift detection
 ✅ CompanyHiringSnapshot daily collection
 ✅ Job description MD5 hash versioning
-✅ Company insights one-pagers live
+✅ Company insights page redesigned
+   Two column layout, hiring momentum, velocity strip
+   Department bar chart, gradient range bars,
+   traffic light pill, timeline signals
 ✅ Landing page with comparison table
+✅ Profile step enforcement with dashboard gate
+   StepNav green checkmarks, 4px progress bar
+   Debounce auto-save to goals_text, soft banners
+   RequireProfile route guard on 5 routes
+✅ Applications page live
+   Applied/interview FeedbackSignal table
+   Status badges, job links, empty state
+✅ Visa authorization UI updated
+   4 PillWithSub selectors with sublabels
+✅ Seniority options updated
+   6 clean levels Entry Level → Executive
+✅ All 55 tests passing (0 failures)
 ✅ All documentation files created
 ✅ SESSION_STARTER.txt created
 
@@ -284,31 +302,11 @@ SESSION_STARTER.txt  Paste to Claude Code
 
 ## What Is Pending Before Beta
 
-🔴 SendGrid API key — unblocks email
-🔴 BGE embedding pipeline Phase B
-🔴 Source trust scoring Phase A
-🔴 Match Agent Call 2 with caching
-🔴 Email daily digest and weekly recap
-🔴 3-job delivery guarantee
-🔴 Fallback delivery with labels
-🔴 End-to-end QA full user flow
-🔴 Domain name registration
-🔴 Company registration after legal
-🔴 Beta user recruitment 10 users
+🔴 SendGrid API key — unblocks email delivery
+🔴 E2E QA full user flow
+🔴 Domain name registration (stellapath.app)
 🔴 C3.ai legal review June 30 2026
-🔴 Fix 2 failing tests
-🔴 Prompts directory
-
-## In Progress
-
-🔄 Dashboard UI Stellapath branded
-🔄 Profile page step enforcement
-🔄 Visa and seniority UI updates
-🔄 Company insights page redesign
-   Two column layout
-   Hiring momentum section
-   What to Expect range bars
-   Traffic light interview difficulty
+🔴 Beta user recruitment 10 users
 
 ---
 
@@ -363,22 +361,24 @@ lawyer consultation.
 
 ## Last Working On
 
-Set up VS Code as primary development
-environment with three terminal tabs:
-Tab 1: Backend on port 8080
-Tab 2: Frontend on port 5177
-Tab 3: Claude Code
+Beta prep complete. All 6 items done.
+55 tests passing.
 
-App is working locally with results showing.
-Workspace saved as stellapath.code-workspace.
+Changes made this session:
+- Profile step enforcement with
+  dashboard gate
+- 4px progress bar and StepNav
+- Goals text auto-save to database
+- Seniority updated to 6 options
+- Visa updated to pill selectors
+- Applications page replacing stub
+- BACKLOG updated with beta checklist
 
-Ready to work on:
-1. Company insights page redesign
-   (two column layout, hiring momentum,
-   What to Expect range bars)
-2. Profile page step enforcement
-3. BGE embedding pipeline Phase B
-4. SendGrid API key configuration
+Remaining before beta:
+1. SendGrid API key on Render
+2. E2E QA full user flow
+3. Domain name registration
+4. C3.ai legal review June 30 2026
 
-Prompt for company insights redesign
-is written and ready to run.
+Next session: configure SendGrid
+then run E2E QA.

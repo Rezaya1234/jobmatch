@@ -84,7 +84,9 @@ Pages:
                       insights, missed opportunities
   Open Positions      Generic job search
   Saved Jobs          User-saved listings
-  Applications        Application tracking
+  Applications        Application history — applied/interview
+                      status badges, table with job links,
+                      reads FeedbackSignal table
   Feedback            Feedback history
   Company Insights    Company behavior and scores
   Profile Setup       3-column AI-assisted onboarding
@@ -110,6 +112,66 @@ Key components:
   MissedOpportunities Weekly high-score unreviewed jobs
   ScoreChart          14-day match score trend line
   ProfileSetup        Steps, form, AI preview panel
+  StepNav             4-step progress nav — active purple,
+                      completed green checkmark, clickable
+                      to go back to previous steps
+  ProgressBar         4px violet bar at top of setup wizard
+                      advances 25% per step (25/50/75/100%)
+  PillWithSub         Pill selector with main label +
+                      sublabel — used for visa auth options,
+                      2-col grid layout
+  GradientRangeBar    What to Expect metric display —
+                      red→amber→green gradient track with
+                      14px throttle dot at calculated position
+  DifficultyPill      Interview difficulty traffic-light pill
+                      Easy (green) / Moderate (amber) /
+                      Hard / Very Hard (red)
+  HiringMomentum      Velocity strip (week/month deltas) +
+                      department breakdown bar chart in
+                      CompanyDetail page
+  SignalTimeline      Vertical timeline for recent company
+                      signals — colored dots + type badges
+```
+
+### New API endpoints — April 2026
+
+```
+GET /users/{user_id}/applications
+  Returns applied and interview FeedbackSignal rows
+  for the user, joined with Job for title/company/url.
+  Deduplicated by job_id + signal_type, newest first.
+  Response: list[ApplicationItem]
+    job_id, title, company, url, signal_type, applied_at
+```
+
+### New database fields — April 2026
+
+```
+UserProfile model (alembic migration applied):
+  goals_text          text, nullable
+                      Raw text from Step 2 textarea.
+                      Debounce-saved every 500ms on keypress.
+                      Preserved across sessions.
+
+  profile_complete    boolean, default false
+                      Set true only on "Looks good" click
+                      in Step 4. Gates dashboard access via
+                      RequireProfile route guard.
+```
+
+### New API response fields — April 2026
+
+```
+GET /companies/{slug}:
+  hiring_velocity     object — computed from CompanyHiringSnapshot
+    jobs_today, jobs_7_days_ago, jobs_30_days_ago,
+    week_change, week_change_pct, month_change,
+    month_change_pct, trend (up/down/flat),
+    data_available, snapshot_date
+  department_breakdown  array — top 6 departments + Other
+    department, count, pct
+  user_feedback_count   int — distinct users with
+    FeedbackEvents for this company's jobs
 ```
 
 ---
@@ -428,10 +490,15 @@ Before beta (immediate):
   ✅ Add dimension confidence levels
   ✅ Phase C: CompanyHiringSnapshot daily snapshots
   ✅ Phase C: JobDescriptionHistory versioning
-  🔲 Admin dashboard — /admin ML control center
+  ✅ Admin dashboard — /admin ML control center
        (pipeline status, metric cards, Test Agent
         evaluation, job scoring explorer, alerts,
         source health, weight evolution, replay mode)
+  ✅ Profile step enforcement with dashboard gate
+  ✅ Visa authorization UI with PillWithSub selectors
+  ✅ Seniority options (6 clean levels)
+  ✅ Applications page (applied/interview history)
+  🔲 SendGrid API key configured on Render
 
 Phase 2 (post beta):
   Qdrant self-hosted for vector search

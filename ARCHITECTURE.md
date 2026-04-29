@@ -217,6 +217,7 @@ Relaxation:  One additional level in fallback
 | Model | Key Fields | Purpose | Version Tracking |
 |-------|-----------|---------|-----------------|
 | User | id, email, resume_text, preferences, cold_start, profile_version, weights_version, **is_admin** (boolean, default false) | Core user identity and preferences. is_admin gates the /admin route — redirect to main dashboard if false. | profile_version increments on any profile save; weights_version increments on every weight update |
+| UserProfile (new fields — April 2026) | **profile_complete** (boolean, default false), **goals_text** (text, nullable); wizard step state tracked in frontend only | profile_complete set true on "Looks good" — gates dashboard via RequireProfile. goals_text stores raw Step 2 text, debounce-saved 500ms. Step 1–4 completion flags drive StepNav visual state (green = done, violet = active). | profile_complete written only on explicit user confirmation in Step 4 |
 | Job | id, url, title, company, description, active_status, job_source, job_last_seen_at, job_inactive_reason, embedding_vector, **description_hash** (MD5 varchar), **description_version** (integer, default 1), **description_last_changed_at** (timestamp) | Scraped job data. description exposed in JobResponse API model and rendered as 150-200 char truncated snippet on Open Positions job cards. Full description available in detail drawer. description_hash enables zero-cost deduplication — new JobDescriptionHistory row written only when hash changes. | job_updated_at tracked for Call 2 cache invalidation. description_version increments only on content change. |
 | JobMatch | id, user_id, job_id, match_run_id, per_dimension_scores, dimension_data_available (bool per dimension), dimension_score_confidence (high/medium/low per dimension), weighted_score, normalized_score, low_confidence_flag | Match result per user per job per run | Tied to match_run_id and profile_version |
 | FeedbackEvent | id, feedback_event_id, user_id, job_id, signal_type, signal_value, timestamp, interaction_source, commentary | Immutable event log — append only, never modified | feedback_event_id unique per event |
@@ -348,8 +349,12 @@ Action:                         Review pipeline logs
 | Company Insights detail page redesign — hiring momentum, velocity strip, department bar chart, gradient range bars, traffic light pill, timeline signals, SLUG_DOMAINS shared util | ✅ | - | - |
 | Post-application feedback (in-app only) | ✅ | - | - |
 | Personalized dashboard | ✅ | - | - |
-| Application tracking | ✅ | - | - |
+| Application tracking — Applications page, FeedbackSignal table query, status badges | ✅ | - | - |
 | Generic job search tab | ✅ | - | - |
+| Profile step enforcement with dashboard gate (StepNav green checkmarks, 4px progress bar, debounce auto-save, soft banners, mid default seniority) | ✅ | - | - |
+| Visa authorization UI — 4 PillWithSub selectors with sublabels in 2-col grid | ✅ | - | - |
+| Seniority options updated — 6 clean levels: Entry Level, Mid Level, Senior, Manager, Director, Executive | ✅ | - | - |
+| All 55 unit and integration tests passing (0 failures) | ✅ | - | - |
 | Job description snippets on Open Positions cards (150-200 chars, truncated from stored description — no extra scraping or compute) | ✅ | - | - |
 | Post-hire engagement | ~~cancelled~~ | - | - |
 | Fallback job labeling | ✅ | - | - |

@@ -140,16 +140,33 @@ Then open http://localhost:5173
 
 ---
 
+## What Is Complete
+
+| Item | Notes |
+|---|---|
+| ✅ Full agent pipeline | 9 agents — scrape, filter, embed, match, feedback, insights, orchestrate, email, vector |
+| ✅ 41 company scrapers | Tech, upstream oil and gas, oilfield services |
+| ✅ Dev and prod environments | Both live on Render with auto-deploy from GitHub |
+| ✅ Admin dashboard | 11 sections — pipeline status, Test Agent metrics, alerts, scoring explorer, weight evolution |
+| ✅ Test Agent implemented | precision@50, @15, recall, NDCG, coverage, FPR with 7-day baselines and drift detection |
+| ✅ Company insights page redesigned | Hiring momentum, velocity strip, department bar chart, gradient range bars, traffic light, timeline |
+| ✅ Profile step enforcement with gate | StepNav green checkmarks, 4px progress bar, debounce auto-save, dashboard RequireProfile guard |
+| ✅ Applications page live | Table of applied/interview signals — status badges, job links, date |
+| ✅ Visa authorization UI updated | 4 PillWithSub selectors with sublabels replacing checkboxes |
+| ✅ Seniority options updated | 6 clean levels: Entry Level, Mid Level, Senior, Manager, Director, Executive |
+| ✅ All 55 tests passing | 0 failures across test_api, test_filter_agent, test_templates |
+
+---
+
 ## What Still Needs to Be Done
 
 | Item | Notes |
 |---|---|
-| SendGrid email | Need a valid SENDGRID_API_KEY — get at sendgrid.com |
-| Personalized search queries | Search currently pulls all jobs; could filter by your sectors at API level |
-| Auth/login | No password protection — anyone with the URL can access |
-| Production deployment | Currently local only — needs a server (Railway, Render, etc.) |
-| More job sources | Wellfound, LinkedIn, Greenhouse public APIs |
-| Rate limit handling | Add retry + backoff in match agent for Anthropic rate limits |
+| 🔴 SendGrid API key | Configure on Render — unblocks all email delivery |
+| 🔴 E2E QA full user flow | Sign-up → profile → matches → feedback → email |
+| 🔴 Domain name registration | stellapath.app or similar |
+| 🔴 C3.ai legal review | June 30 2026 deadline — book California Section 2870 lawyer |
+| 🔴 Beta user recruitment | 10 active job seekers |
 
 ---
 
