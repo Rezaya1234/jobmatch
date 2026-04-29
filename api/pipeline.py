@@ -185,12 +185,34 @@ async def trigger_test_email(
     user_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> PipelineResponse:
-    """Send a digest email immediately using current top matches."""
-    from mailer.sender import send_daily_digest
+    """Send a test email — digest if matches exist, confirmation email if not."""
+    import asyncio
+    from sqlalchemy import select
+    from db.models import User
+    from mailer.sender import send_daily_digest, _send_via_sendgrid, FROM_EMAIL, FROM_NAME
+
     sent = await send_daily_digest(user_id, session, test=True)
     if sent:
-        return PipelineResponse(status="sent", detail="Test email sent!")
-    return PipelineResponse(status="nothing_to_send", detail="No scored matches to email yet.")
+        return PipelineResponse(status="sent", detail="Test digest email sent!")
+
+    # No matches yet — send a simple delivery confirmation instead
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        return PipelineResponse(status="error", detail="User not found.")
+
+    subject = "Stellapath — email delivery test"
+    plain = (
+        "Your Stellapath email delivery is working correctly. "
+        "You will receive your first job matches after completing "
+        "your profile and our next pipeline run."
+    )
+    html = f"<p>{plain}</p>"
+    try:
+        await asyncio.to_thread(_send_via_sendgrid, user.email, subject, html, plain)
+        return PipelineResponse(status="sent", detail=f"Confirmation email sent to {user.email}.")
+    except Exception as exc:
+        return PipelineResponse(status="error", detail=str(exc))
 
 
 @router.post("/company-insights", response_model=PipelineResponse, status_code=202)
