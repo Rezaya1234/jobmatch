@@ -7,6 +7,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agents.embeddings import embed_single
 from db.models import UserProfile
 
 
@@ -37,6 +38,16 @@ def build_intent_query(profile: UserProfile) -> str:
         parts.append(f"Work mode: {', '.join(profile.work_modes)}")
 
     return " ".join(parts) or "software engineer"
+
+
+async def update_profile_embedding(profile: UserProfile, session: AsyncSession) -> None:
+    """Embed the profile's intent query and persist to profile_embedding."""
+    text = build_intent_query(profile)
+    vector = await embed_single(text)
+    if vector is not None:
+        profile.profile_embedding = vector
+        await session.commit()
+        logger.info("Profile embedding updated for user %s", profile.user_id)
 
 logger = logging.getLogger(__name__)
 

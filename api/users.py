@@ -134,6 +134,7 @@ async def get_user(
 async def upsert_profile(
     user_id: str,
     body: ProfileRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> ProfileResponse:
     await _get_user_or_404(user_id, session)
@@ -157,6 +158,7 @@ async def upsert_profile(
 
     await session.commit()
     await session.refresh(profile)
+    background_tasks.add_task(_update_embedding_bg, user_id)
     return _profile_response(profile)
 
 
@@ -334,6 +336,17 @@ async def record_engagement(
         from datetime import timedelta
         if last is None or (now - last) > timedelta(hours=24):
             background_tasks.add_task(_run_on_demand_matching, user_id, llm)
+
+
+async def _update_embedding_bg(user_id: str) -> None:
+    from db.database import AsyncSessionLocal
+    from agents.profile_agent import update_profile_embedding
+    async with AsyncSessionLocal() as session:
+        from sqlalchemy import select as _select
+        result = await session.execute(_select(UserProfile).where(UserProfile.user_id == user_id))
+        profile = result.scalar_one_or_none()
+        if profile:
+            await update_profile_embedding(profile, session)
 
 
 async def _run_on_demand_matching(user_id: str, llm: LLMClient) -> None:

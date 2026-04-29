@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.match_agent import ALLOWED_DIMENSIONS
-from agents.profile_agent import DEFAULT_WEIGHTS
+from agents.profile_agent import DEFAULT_WEIGHTS, update_profile_embedding
 from db.models import Feedback, FeedbackSignal, Job, JobMatch, UserProfile
 from llm.client import LLMClient, Message, ModelTier
 
@@ -121,6 +121,8 @@ class FeedbackAgent:
                     reasoning=profile_updates.get("reasoning", ""),
                     snapshot=_format_profile(profile),
                 )
+                if "role_description" in changes:
+                    await update_profile_embedding(profile, self._session)
 
         # Update signal count and graduate from cold start
         profile.feedback_signal_count = total_signals
