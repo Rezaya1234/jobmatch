@@ -14,6 +14,7 @@ import CompanyInsights from './pages/CompanyInsights'
 import CompanyDetail from './pages/CompanyDetail'
 import Feedback from './pages/Feedback'
 import Settings from './pages/Settings'
+import Applications from './pages/Applications'
 import Sidebar from './components/Sidebar'
 
 // Public pages
@@ -201,12 +202,7 @@ function AppShell() {
               <Route path="/insights/:slug" element={<RequireProfile><CompanyDetail /></RequireProfile>} />
               <Route path="/feedback"     element={<RequireProfile><Feedback /></RequireProfile>} />
               <Route path="/settings"     element={<Settings />} />
-              <Route path="/applications" element={
-                <ComingSoon
-                  title="Applications"
-                  description="Track your active applications, interview stages, and outcomes in one place."
-                />
-              } />
+              <Route path="/applications" element={<RequireProfile><Applications /></RequireProfile>} />
               <Route path="/resources"    element={
                 <ComingSoon
                   title="Resources"

@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid as _uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_llm, get_session
 from db.activity import log_event
-from db.models import User, UserProfile
+from db.models import FeedbackSignal, Job, User, UserProfile
 from llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -343,6 +344,55 @@ async def _run_on_demand_matching(user_id: str, llm: LLMClient) -> None:
             await OrchestratorAgent(session, llm).run_user_on_demand(user_id)
         except Exception:
             logger.exception("On-demand matching failed for user %s", user_id)
+
+
+# ------------------------------------------------------------------
+# Applications
+# ------------------------------------------------------------------
+
+class ApplicationItem(BaseModel):
+    job_id: str
+    title: str
+    company: str
+    url: str
+    signal_type: str   # "applied" | "interview"
+    applied_at: datetime
+
+
+@router.get("/{user_id}/applications", response_model=list[ApplicationItem])
+async def get_applications(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> list[ApplicationItem]:
+    """Return all applied/interview signals for the user, newest first."""
+    await _get_user_or_404(user_id, session)
+    uid = _uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    result = await session.execute(
+        select(FeedbackSignal, Job)
+        .join(Job, FeedbackSignal.job_id == Job.id)
+        .where(
+            FeedbackSignal.user_id == uid,
+            FeedbackSignal.signal_type.in_(["applied", "interview"]),
+        )
+        .order_by(FeedbackSignal.created_at.desc())
+    )
+    rows = result.all()
+    seen: set[str] = set()
+    items: list[ApplicationItem] = []
+    for sig, job in rows:
+        key = f"{sig.job_id}:{sig.signal_type}"
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(ApplicationItem(
+            job_id=str(sig.job_id),
+            title=job.title,
+            company=job.company,
+            url=job.url,
+            signal_type=sig.signal_type,
+            applied_at=sig.created_at,
+        ))
+    return items
 
 
 # ------------------------------------------------------------------
