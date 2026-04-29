@@ -207,17 +207,18 @@ class FilterAgent:
     # Phase 2: soft constraints + heuristic + embeddings → top 10-15
     # ------------------------------------------------------------------
 
-    async def get_candidates(self, user_id: str) -> list[Job]:
+    async def get_candidates(self, user_id: str, pool_limit: int | None = None) -> list[Job]:
         """
         Returns top 10-15 candidate jobs for the Matching Agent.
         Returns fewer than _CANDIDATES_MIN when orchestrator should trigger fallback.
+        pool_limit: cap the initial hard-passed pool (for step testing endpoints only).
         """
         profile = await self._get_profile(user_id)
         if not profile:
             return []
 
         # Jobs that passed hard filter and haven't been shown yet
-        jobs = await self._get_hard_passed_unseen(user_id)
+        jobs = await self._get_hard_passed_unseen(user_id, limit=pool_limit)
         if not jobs:
             logger.info("User %s — no hard-passed unseen jobs for candidate selection", user_id)
             return []
@@ -351,13 +352,13 @@ class FilterAgent:
             )
         await self._session.commit()
 
-    async def _get_hard_passed_unseen(self, user_id: str) -> list[Job]:
+    async def _get_hard_passed_unseen(self, user_id: str, limit: int | None = None) -> list[Job]:
         try:
             uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         except ValueError:
             return []
 
-        result = await self._session.execute(
+        stmt = (
             select(Job)
             .join(JobMatch, JobMatch.job_id == Job.id)
             .where(
@@ -367,6 +368,9 @@ class FilterAgent:
                 Job.is_active.is_(True),
             )
         )
+        if limit:
+            stmt = stmt.limit(limit)
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def _get_profile(self, user_id: str) -> UserProfile | None:

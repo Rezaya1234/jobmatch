@@ -345,10 +345,10 @@ async def trigger_step_candidates(
     """Step 3: Soft filter + heuristic + BGE embedding candidate selection."""
     from agents.filter_agent import FilterAgent
     try:
-        candidates = await FilterAgent(session).get_candidates(user_id)
+        candidates = await FilterAgent(session).get_candidates(user_id, pool_limit=200)
         return StepResult(
             status="done",
-            detail=f"{len(candidates)} candidates selected",
+            detail=f"{len(candidates)} candidates selected (pool capped at 200 for testing)",
             count=len(candidates),
         )
     except Exception as exc:
