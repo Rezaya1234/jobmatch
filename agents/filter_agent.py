@@ -7,6 +7,7 @@ from sqlalchemy import func, not_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.embeddings import embed_and_score
+from agents.profile_agent import build_intent_query
 from db.models import Job, JobMatch, UserProfile
 
 logger = logging.getLogger(__name__)
@@ -112,17 +113,6 @@ def _heuristic_score(profile: UserProfile, job: Job) -> float:
     jaccard = desc_hits / union if union else 0.0
     title_boost = min(title_hits / max(len(profile_kws), 1), 0.3)
     return min(round(jaccard + title_boost, 4), 1.0)
-
-
-def _build_profile_text(profile: UserProfile) -> str:
-    parts = []
-    if profile.role_description:
-        parts.append(profile.role_description)
-    if profile.title_include:
-        parts.append('Skills: ' + ', '.join(profile.title_include))
-    if profile.preferred_sectors:
-        parts.append('Sectors: ' + ', '.join(profile.preferred_sectors))
-    return ' '.join(parts) or 'software engineer'
 
 
 # ---------------------------------------------------------------------------
@@ -319,7 +309,7 @@ class FilterAgent:
         if not jobs:
             return []
 
-        profile_text = _build_profile_text(profile)
+        profile_text = build_intent_query(profile)
         job_texts = [f"{j.title}. {(j.description or '')[:1500]}" for j in jobs]
 
         scores = await embed_and_score(profile_text, job_texts, model_size)

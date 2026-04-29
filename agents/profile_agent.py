@@ -9,6 +9,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import UserProfile
 
+
+def build_intent_query(profile: UserProfile) -> str:
+    """
+    Build an intent-weighted text query for embedding.
+
+    HIGH:    role_description, title_include (repeated for semantic weight)
+    MEDIUM:  seniority_level, work_modes
+    EXCLUDED: preferred_sectors, preferred_companies — industry history and
+              employer names skew the embedding toward past experience rather
+              than future intent.
+    """
+    parts = []
+
+    if profile.role_description:
+        parts.append(profile.role_description)
+
+    if profile.title_include:
+        skill_text = ", ".join(profile.title_include)
+        parts.append(f"Skills and roles: {skill_text}")
+        parts.append(f"Looking for: {skill_text}")
+
+    if profile.seniority_level and profile.seniority_level != "unknown":
+        parts.append(f"{profile.seniority_level} level position")
+
+    if profile.work_modes:
+        parts.append(f"Work mode: {', '.join(profile.work_modes)}")
+
+    return " ".join(parts) or "software engineer"
+
 logger = logging.getLogger(__name__)
 
 # Default weights for cold start users (fewer than 5 feedback signals)
