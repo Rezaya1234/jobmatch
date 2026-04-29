@@ -208,7 +208,38 @@ class TestAgent:
                 select(func.count()).select_from(EvaluatedJob).where(EvaluatedJob.label_source == "user")
             )
         ).scalar() or 0
-        label_sources = {"user_feedback": fb_total, "evaluated_jobs_user": ej_total}
+
+        # 8b. Embedding health
+        active_jobs_total = (
+            await session.execute(select(func.count()).select_from(Job).where(Job.is_active.is_(True)))
+        ).scalar() or 0
+        jobs_with_emb = (
+            await session.execute(
+                select(func.count()).select_from(Job).where(
+                    Job.is_active.is_(True), Job.embedding_vector.is_not(None)
+                )
+            )
+        ).scalar() or 0
+        profiles_total = (await session.execute(select(func.count()).select_from(UserProfile))).scalar() or 0
+        profiles_with_emb = (
+            await session.execute(
+                select(func.count()).select_from(UserProfile).where(UserProfile.profile_embedding.is_not(None))
+            )
+        ).scalar() or 0
+
+        job_emb_pct = round(jobs_with_emb / active_jobs_total, 4) if active_jobs_total else 0.0
+        profile_emb_pct = round(profiles_with_emb / profiles_total, 4) if profiles_total else 0.0
+
+        label_sources = {
+            "user_feedback": fb_total,
+            "evaluated_jobs_user": ej_total,
+            "jobs_with_embedding": jobs_with_emb,
+            "jobs_missing_embedding": active_jobs_total - jobs_with_emb,
+            "job_embedding_coverage": job_emb_pct,
+            "profiles_with_embedding": profiles_with_emb,
+            "profiles_missing_embedding": profiles_total - profiles_with_emb,
+            "profile_embedding_coverage": profile_emb_pct,
+        }
 
         # 9. Upsert
         existing = await session.execute(
@@ -234,7 +265,8 @@ class TestAgent:
         await session.commit()
 
         logger.info(
-            "TestAgent: date=%s p50=%s p15=%s recall=%s ndcg=%s cov=%.2f fpr=%s n=%d",
+            "TestAgent: date=%s p50=%s p15=%s recall=%s ndcg=%s cov=%.2f fpr=%s n=%d | "
+            "job_emb=%.1f%% profile_emb=%.1f%%",
             today,
             f"{p50:.3f}" if p50 is not None else "n/a",
             f"{p15:.3f}" if p15 is not None else "n/a",
@@ -243,5 +275,7 @@ class TestAgent:
             coverage,
             f"{fpr:.3f}" if fpr is not None else "n/a",
             sample_size,
+            job_emb_pct * 100,
+            profile_emb_pct * 100,
         )
         return row

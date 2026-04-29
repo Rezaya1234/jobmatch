@@ -314,6 +314,67 @@ async def run_test_agent(
 
 
 # ---------------------------------------------------------------------------
+# Embedding Health
+# ---------------------------------------------------------------------------
+
+class EmbeddingHealthResponse(BaseModel):
+    active_jobs: int
+    jobs_with_embedding: int
+    jobs_missing_embedding: int
+    job_embedding_coverage: float        # 0.0–1.0
+    total_profiles: int
+    profiles_with_embedding: int
+    profiles_missing_embedding: int
+    profile_embedding_coverage: float    # 0.0–1.0
+    job_coverage_color: str              # green / amber / red
+    profile_coverage_color: str
+
+
+@router.get("/embedding-health", response_model=EmbeddingHealthResponse)
+async def get_embedding_health(
+    user_id: str = Query(...),
+    session: AsyncSession = Depends(get_session),
+) -> EmbeddingHealthResponse:
+    await _require_admin(user_id, session)
+
+    active_jobs = await session.scalar(
+        select(func.count(Job.id)).where(Job.is_active.is_(True))
+    ) or 0
+    jobs_with_emb = await session.scalar(
+        select(func.count(Job.id)).where(
+            Job.is_active.is_(True), Job.embedding_vector.is_not(None)
+        )
+    ) or 0
+    profiles_total = await session.scalar(select(func.count(UserProfile.id))) or 0
+    profiles_with_emb = await session.scalar(
+        select(func.count(UserProfile.id)).where(UserProfile.profile_embedding.is_not(None))
+    ) or 0
+
+    job_cov = jobs_with_emb / active_jobs if active_jobs else 0.0
+    profile_cov = profiles_with_emb / profiles_total if profiles_total else 0.0
+
+    def _cov_color(pct: float) -> str:
+        if pct >= 0.95:
+            return "green"
+        if pct >= 0.80:
+            return "amber"
+        return "red"
+
+    return EmbeddingHealthResponse(
+        active_jobs=active_jobs,
+        jobs_with_embedding=jobs_with_emb,
+        jobs_missing_embedding=active_jobs - jobs_with_emb,
+        job_embedding_coverage=round(job_cov, 4),
+        total_profiles=profiles_total,
+        profiles_with_embedding=profiles_with_emb,
+        profiles_missing_embedding=profiles_total - profiles_with_emb,
+        profile_embedding_coverage=round(profile_cov, 4),
+        job_coverage_color=_cov_color(job_cov),
+        profile_coverage_color=_cov_color(profile_cov),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Agent Activity Log
 # ---------------------------------------------------------------------------
 
