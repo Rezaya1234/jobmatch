@@ -130,6 +130,7 @@ class UserProfile(Base):
     preferred_companies: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     role_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     original_role_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    goals_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     years_experience: Mapped[int | None] = mapped_column(Integer, nullable=True)
     role_type: Mapped[str | None] = mapped_column(String(20), nullable=True)  # ic/manager/executive/either
 

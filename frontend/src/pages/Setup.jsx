@@ -158,7 +158,7 @@ function TagInput({ tags, onChange, placeholder = 'Add…' }) {
   )
 }
 
-function StepNav({ current, step2done = false, step3done = false, step4done = false }) {
+function StepNav({ current, step2done = false, step3done = false, step4done = false, onStepClick }) {
   return (
     <nav className="flex flex-col pt-1">
       {STEPS.map((s, i) => {
@@ -167,14 +167,19 @@ function StepNav({ current, step2done = false, step3done = false, step4done = fa
           || (s.n === 2 && step2done)
           || (s.n === 3 && step3done)
           || (s.n === 4 && step4done)
+        const clickable = done && !active && onStepClick
         return (
-          <div key={s.n} className="flex gap-3">
+          <div
+            key={s.n}
+            className={`flex gap-3 ${clickable ? 'cursor-pointer' : ''}`}
+            onClick={() => clickable && onStepClick(s.n)}
+          >
             <div className="flex flex-col items-center">
               <div
                 className="w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-all"
                 style={
                   active ? { background: '#7c3aed', borderColor: '#7c3aed', color: '#fff' }
-                  : done  ? { background: '#ede9fe', borderColor: '#7c3aed', color: '#7c3aed' }
+                  : done  ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' }
                   : { background: '#fff', borderColor: '#e2e8f0', color: '#94a3b8' }
                 }
               >
@@ -319,6 +324,8 @@ export default function Setup() {
   const fileRef = useRef(null)
   const statusTimer = useRef(null)
 
+  const saveDebounce = useRef(null)
+
   const [email, setEmail]           = useState('')
   const [userId, setUserId]         = useState(() => localStorage.getItem('userId') || '')
   const [status, setStatus]         = useState(null)
@@ -326,6 +333,7 @@ export default function Setup() {
   const [profileGenerated, setProfileGenerated] = useState(false)
   const [dragOver, setDragOver]     = useState(false)
   const [titleExpanded, setTitleExpanded] = useState(false)
+  const [autoSaved, setAutoSaved]   = useState(false)
 
   // Start at step 2 if already logged in (skip account creation)
   const [currentStep, setCurrentStep] = useState(() =>
@@ -339,7 +347,7 @@ export default function Setup() {
   const [profile, setProfile] = useState({
     work_modes:       ['remote'],
     job_types:        ['full_time'],
-    seniority_levels: ['senior'],
+    seniority_levels: ['mid'],
     locations:        ['United States'],
     visa_types:       ['no_sponsorship'],
     sectors:          [],
@@ -370,7 +378,7 @@ export default function Setup() {
       setProfile({
         work_modes:       p.work_modes          || ['remote'],
         job_types:        p.job_types           || ['full_time'],
-        seniority_levels: p.seniority_level     ? [p.seniority_level] : ['senior'],
+        seniority_levels: p.seniority_level     ? [p.seniority_level] : ['mid'],
         locations:        p.locations           || ['United States'],
         sectors:          p.preferred_sectors   || [],
         companies:        p.preferred_companies || [],
@@ -380,8 +388,12 @@ export default function Setup() {
         title_exclude:    p.title_exclude        || [],
         visa_types:       p.visa_types           || ['no_sponsorship'],
       })
-      if (p.role_description) {
+      if (p.goals_text) {
+        setAiText(p.goals_text)
+      } else if (p.role_description) {
         setAiText(p.role_description)
+      }
+      if (p.role_description) {
         setAiProfile(p.role_description)
         setProfileGenerated(true)
       }
@@ -431,6 +443,7 @@ export default function Setup() {
         preferred_companies:         profile.companies,
         salary_min:                  parseSalary(profile.min_salary) || null,
         salary_max:                  parseSalary(profile.max_salary) || null,
+        goals_text:                  aiText || null,
         role_description:            extracted.role_description || null,
         original_role_description:   extracted.original_role_description || extracted.role_description || null,
         title_include:               profile.title_include,
@@ -484,6 +497,7 @@ export default function Setup() {
         preferred_companies:         profile.companies,
         salary_min:                  parseSalary(profile.min_salary) || null,
         salary_max:                  parseSalary(profile.max_salary) || null,
+        goals_text:                  aiText || null,
         role_description:            aiProfile || aiText || null,
         title_include:               profile.title_include,
         title_exclude:               profile.title_exclude,
@@ -542,11 +556,20 @@ export default function Setup() {
             step2done={!!aiText.trim() || !!resumeFile}
             step3done={profileGenerated}
             step4done={false}
+            onStepClick={n => n < currentStep && setCurrentStep(n)}
           />
         </div>
 
         {/* CENTER: step content */}
         <div className="flex-1 min-w-0 space-y-5">
+
+          {/* Progress bar */}
+          <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-1 bg-violet-500 rounded-full transition-all duration-300"
+              style={{ width: `${currentStep * 25}%` }}
+            />
+          </div>
 
           {/* ── STEP 1: Account ──────────────────────────────────────────── */}
           {currentStep === 1 && (
@@ -643,11 +666,30 @@ export default function Setup() {
                     Roles, problems you want to solve, companies you like, work style. Your own words.
                   </p>
                   <div className="relative">
-                    <textarea rows={5} value={aiText} onChange={e => setAiText(e.target.value.slice(0, 1000))}
+                    <textarea rows={5} value={aiText}
+                      onChange={e => {
+                        const val = e.target.value.slice(0, 1000)
+                        setAiText(val)
+                        setAutoSaved(false)
+                        if (userId) {
+                          clearTimeout(saveDebounce.current)
+                          saveDebounce.current = setTimeout(() => {
+                            upsertProfile(userId, {
+                              goals_text: val,
+                              work_modes: profile.work_modes,
+                              job_types: profile.job_types,
+                              locations: profile.locations,
+                            }).then(() => setAutoSaved(true)).catch(() => {})
+                          }, 500)
+                        }
+                      }}
                       placeholder="e.g. Senior ML engineer, 7 years exp, seeking remote AI roles at growth-stage startups in the US."
                       style={{ color: '#374151' }}
                       className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent" />
-                    <span className="absolute bottom-3 right-3 text-[11px] text-slate-300">{aiText.length}/1000</span>
+                    <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                      {autoSaved && <span className="text-[11px] text-green-500">Saved</span>}
+                      <span className="text-[11px] text-slate-300">{aiText.length}/1000</span>
+                    </div>
                   </div>
                   <p className="text-xs text-slate-400 mt-2 mb-2">Or try an example</p>
                   <div className="flex flex-wrap gap-2">
@@ -661,11 +703,18 @@ export default function Setup() {
                 </div>
               </div>
 
+              {!aiText.trim() && !resumeFile && (
+                <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-sm text-amber-700">Adding a description or resume helps StellaPath find better matches for you.</p>
+                </div>
+              )}
               <StepFooter
                 onBack={() => setCurrentStep(1)}
                 onNext={() => setCurrentStep(3)}
                 nextLabel="Next →"
-                nextDisabled={!aiText.trim() && !resumeFile}
               />
             </>
           )}
