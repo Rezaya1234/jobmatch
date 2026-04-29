@@ -1,7 +1,9 @@
 import enum
 import uuid
 from datetime import date
+from typing import Optional
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     Date,
@@ -153,6 +155,9 @@ class UserProfile(Base):
     profile_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     weights_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
+    # Profile embedding for pgvector ANN search (text-embedding-3-small, 1536 dims)
+    profile_embedding: Mapped[Optional[list]] = mapped_column(Vector(1536), nullable=True)
+
     # Engagement tracking
     last_engaged_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_emailed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -200,6 +205,9 @@ class Job(Base):
     description_hash: Mapped[str | None] = mapped_column(String(32), nullable=True)
     description_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     description_last_changed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Embedding vector for pgvector ANN search (text-embedding-3-small, 1536 dims)
+    embedding_vector: Mapped[Optional[list]] = mapped_column(Vector(1536), nullable=True)
 
     matches: Mapped[list["JobMatch"]] = relationship(back_populates="job")
     feedbacks: Mapped[list["Feedback"]] = relationship(back_populates="job")
