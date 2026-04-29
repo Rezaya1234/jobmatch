@@ -281,12 +281,35 @@ async def trigger_step_filter(
     session: AsyncSession = Depends(get_session),
 ) -> StepResult:
     """Step 2: Hard constraint filtering for a single user."""
+    import uuid as _uuid
+    from sqlalchemy import func, select
+    from db.models import Job, JobMatch, UserProfile
     from agents.filter_agent import FilterAgent
+
+    # Diagnose before running
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        return StepResult(status="error", detail=f"Invalid user_id: {user_id}")
+
+    profile = await session.scalar(
+        select(func.count()).select_from(UserProfile).where(UserProfile.user_id == uid)
+    )
+    if not profile:
+        return StepResult(status="error", detail="No profile found for this user — complete your profile first")
+
+    active_jobs = await session.scalar(
+        select(func.count()).select_from(Job).where(Job.is_active.is_(True))
+    )
+    already_matched = await session.scalar(
+        select(func.count()).select_from(JobMatch).where(JobMatch.user_id == uid)
+    )
+
     try:
         result = await FilterAgent(session).run(user_id)
         return StepResult(
             status="done",
-            detail=f"{result['passed']} passed, {result['failed']} failed",
+            detail=f"{result['passed']} passed, {result['failed']} failed (active jobs: {active_jobs}, already matched: {already_matched})",
             count=result["passed"],
         )
     except Exception as exc:
