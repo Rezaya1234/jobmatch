@@ -34,6 +34,10 @@ export const getCompany = (slug) => http.get(`/companies/${slug}`).then(r => r.d
 export const getCompanyJobs = (slug, params = {}) => http.get(`/companies/${slug}/jobs`, { params }).then(r => r.data)
 export const triggerCompanyInsights = () => http.post('/pipeline/company-insights').then(r => r.data)
 export const backfillLogos = () => http.post('/pipeline/backfill-logos').then(r => r.data)
+export const triggerStepFilter = (id) => http.post(`/pipeline/step/filter/${id}`).then(r => r.data)
+export const triggerStepCandidates = (id) => http.post(`/pipeline/step/candidates/${id}`).then(r => r.data)
+export const triggerStepScore = (id) => http.post(`/pipeline/step/score/${id}`).then(r => r.data)
+export const triggerStepDeliver = (id) => http.post(`/pipeline/step/deliver/${id}`).then(r => r.data)
 export const getFeedbackSummary = (id, days = 30) =>
   http.get(`/users/${id}/feedback/summary`, { params: { days } }).then(r => r.data)
 export const getNotificationPrefs = (id) => http.get(`/users/${id}/notification-prefs`).then(r => r.data)

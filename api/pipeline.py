@@ -60,6 +60,11 @@ class PipelineStatusResponse(BaseModel):
     finished_at: str
     filter_warning: str
 
+class StepResult(BaseModel):
+    status: str
+    detail: str
+    count: int = 0
+
 
 # ------------------------------------------------------------------
 # Routes
@@ -264,6 +269,127 @@ async def trigger_feedback_pipeline(
 ) -> PipelineResponse:
     background_tasks.add_task(_run_feedback_pipeline, user_id, llm)
     return PipelineResponse(status="accepted", detail=f"Feedback pipeline started for user {user_id}.")
+
+
+# ------------------------------------------------------------------
+# Step-by-step testing endpoints (synchronous — return result directly)
+# ------------------------------------------------------------------
+
+@router.post("/step/filter/{user_id}", response_model=StepResult, status_code=200)
+async def trigger_step_filter(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> StepResult:
+    """Step 2: Hard constraint filtering for a single user."""
+    from agents.filter_agent import FilterAgent
+    try:
+        result = await FilterAgent(session).run(user_id)
+        return StepResult(
+            status="done",
+            detail=f"{result['passed']} passed, {result['failed']} failed",
+            count=result["passed"],
+        )
+    except Exception as exc:
+        return StepResult(status="error", detail=str(exc))
+
+
+@router.post("/step/candidates/{user_id}", response_model=StepResult, status_code=200)
+async def trigger_step_candidates(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> StepResult:
+    """Step 3: Soft filter + heuristic + BGE embedding candidate selection."""
+    from agents.filter_agent import FilterAgent
+    try:
+        candidates = await FilterAgent(session).get_candidates(user_id)
+        return StepResult(
+            status="done",
+            detail=f"{len(candidates)} candidates selected",
+            count=len(candidates),
+        )
+    except Exception as exc:
+        return StepResult(status="error", detail=str(exc))
+
+
+@router.post("/step/score/{user_id}", response_model=StepResult, status_code=200)
+async def trigger_step_score(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+    llm: LLMClient = Depends(get_llm),
+) -> StepResult:
+    """Step 4: LLM scoring (Claude Haiku batch)."""
+    from agents.match_agent import MatchAgent
+    try:
+        result = await MatchAgent(session, llm).run(user_id)
+        return StepResult(
+            status="done",
+            detail=f"{result.scored} jobs scored",
+            count=result.scored,
+        )
+    except Exception as exc:
+        return StepResult(status="error", detail=str(exc))
+
+
+@router.post("/step/deliver/{user_id}", response_model=StepResult, status_code=200)
+async def trigger_step_deliver(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> StepResult:
+    """Step 5: Select top 3 scored jobs and mark as delivered."""
+    import uuid as _uuid
+    from sqlalchemy import select
+    from db.models import Job, JobMatch
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        return StepResult(status="error", detail=f"Invalid user_id: {user_id}")
+    try:
+        # Primary: LLM-scored jobs ordered by score
+        stmt = (
+            select(JobMatch)
+            .join(Job, JobMatch.job_id == Job.id)
+            .where(
+                JobMatch.user_id == uid,
+                JobMatch.passed_hard_filter.is_(True),
+                JobMatch.shown_at.is_(None),
+                Job.is_active.is_(True),
+                JobMatch.score.isnot(None),
+            )
+            .order_by(JobMatch.score.desc())
+            .limit(3)
+        )
+        result = await session.execute(stmt)
+        matches = list(result.scalars().all())
+        # Fallback: heuristic-scored if not enough LLM-scored
+        if len(matches) < 3:
+            stmt2 = (
+                select(JobMatch)
+                .join(Job, JobMatch.job_id == Job.id)
+                .where(
+                    JobMatch.user_id == uid,
+                    JobMatch.passed_hard_filter.is_(True),
+                    JobMatch.shown_at.is_(None),
+                    Job.is_active.is_(True),
+                    JobMatch.score.is_(None),
+                    JobMatch.heuristic_score.isnot(None),
+                )
+                .order_by(JobMatch.heuristic_score.desc())
+                .limit(3 - len(matches))
+            )
+            result2 = await session.execute(stmt2)
+            matches += list(result2.scalars().all())
+        now = datetime.now(timezone.utc)
+        for m in matches:
+            m.shown_at = now
+            m.delivered_at = now
+        await session.commit()
+        return StepResult(
+            status="done",
+            detail=f"{len(matches)} jobs delivered",
+            count=len(matches),
+        )
+    except Exception as exc:
+        return StepResult(status="error", detail=str(exc))
 
 
 # ------------------------------------------------------------------
