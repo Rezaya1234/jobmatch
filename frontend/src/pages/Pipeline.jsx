@@ -183,17 +183,11 @@ export default function Pipeline() {
       const res = await apiFn()
       setStepState(s => ({
         ...s,
-        [num]: { status: res.status === 'error' ? 'error' : 'done', detail: res.detail },
+        [num]: { status: res.status === 'error' ? 'error' : 'done', detail: res.detail || '(no detail)' },
       }))
-      if (res.status === 'error') throw new Error(res.detail)
     } catch (err) {
-      setStepState(s => ({
-        ...s,
-        [num]: prev => prev[num].status === 'running'
-          ? { status: 'error', detail: err.message || 'Failed' }
-          : prev[num],
-      }))
-      throw err
+      const msg = err?.response?.data?.detail || err.message || 'Request failed'
+      setStepState(s => ({ ...s, [num]: { status: 'error', detail: msg } }))
     }
   }
 
