@@ -17,4 +17,3 @@ python-multipart
 playwright
 openai
 pgvector
-sentence-transformers
