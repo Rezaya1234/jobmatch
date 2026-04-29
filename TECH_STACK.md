@@ -272,25 +272,45 @@ hired:            +5   (immediate weight update)
 ```
 Backend strategy — controlled by EMBEDDING_BACKEND env var:
   "openai"  — API call to OpenAI (current default on Render)
-  "local"   — local BGE models (for high-volume future use)
+  "local"   — local BGE models (code kept, not installed)
 
 ──────────────────────────────────────────────────────────
-CURRENT: openai backend
+CURRENT: openai backend (pgvector ANN pipeline)
 ──────────────────────────────────────────────────────────
-Model:       text-embedding-3-large (OpenAI API)
-Dimensions:  3072
-MTEB score:  ~64.6 (slightly better than bge-large)
-Cost:        ~$0.13 per million tokens
-             ~$2/month at current volume (1 user, daily)
-             At 100+ users: ~$200/month → switch to local
-Threshold:   same as bge-large (0.70)
-Purpose:     Single API call replaces both BGE stages
+Model:       text-embedding-3-small (OpenAI API)
+Dimensions:  1536
+Cost:        $0.02 per million tokens
+             ~$0.04 total for 6,667-job backfill
+             ~$0.40/user/month at current volume
+Storage:     jobs.embedding_vector   vector(1536)
+             user_profiles.profile_embedding  vector(1536)
+Index:       HNSW on jobs (vector_cosine_ops)
+Query time:  ~2ms ANN via pgvector cosine distance (<=>)
 
-Rationale for single call (not two API calls):
-  BGE two-stage design was a cost optimization for local
-  models (run cheap small model first, expensive large
-  model only on survivors). With API pricing, two calls
-  cost more than one — use large directly on full set.
+Job embeddings:
+  Built at:   ingestion (search_agent._embed_new_jobs)
+  Text:       f"{title}. {description[:500]}"
+  Backfill:   scripts/backfill_embeddings.py (one-time)
+
+Profile embeddings:
+  Built by:   update_profile_embedding() in profile_agent.py
+  Text:       build_intent_query(profile) — HIGH weight on
+              skills/title_include (repeated), MEDIUM on
+              seniority/work_mode, EXCLUDE industry history
+  Triggers:   1. upsert_profile (background task)
+              2. feedback_agent when role_description changes
+  Updated by: outcome-anchor blend on interview/applied:
+              0.8 × profile + 0.2 × job_embedding (normalized)
+
+Query vector (at match time):
+  Aspiration blend:  0.7 × profile_embedding
+                   + 0.3 × goals_embedding (if goals_text set)
+  Normalized:        yes (unit vector)
+  Fallback:          embed_single(build_intent_query()) on the fly
+
+Post-ANN post-filter:
+  Soft constraints → sector diversification (60% cap)
+  → top 15 → Matching Agent
 
 ──────────────────────────────────────────────────────────
 FUTURE (local backend — when volume justifies Render Pro)
@@ -298,32 +318,21 @@ FUTURE (local backend — when volume justifies Render Pro)
 Stage 1 — Fast filter:
   Model:       BAAI/bge-small-en-v1.5
   Dimensions:  384
-  Speed:       ~8ms per document on CPU
   Cost:        $0 — open source, runs locally
-  Threshold:   0.60 (relaxed to 0.50 for cold start)
-  Purpose:     Reduce pool to ~40-60 candidates
 
 Stage 2 — Quality filter:
   Model:       BAAI/bge-large-en-v1.5
   Dimensions:  1024
-  Speed:       ~45ms per document on CPU
   Cost:        $0 — open source, runs locally
-  Threshold:   0.70
-  Purpose:     Reduce 40-60 to 15-20 for LLM
 
 Memory requirement: ~2.1GB (app + both models loaded)
-Render tier needed: Pro ($85/mo) — Standard (2GB) is borderline
-Switch trigger:     API cost (~$0.065/run × users × 30 days)
-                    exceeds Render Pro cost ($85/mo)
+Render tier needed: Pro ($85/mo)
+Switch trigger:     API cost exceeds Render Pro cost
                     ≈ at 100+ daily active users
-
-Note:        Bi-encoder embedding similarity filter —
-             not a cross-encoder reranker.
-             Cross-encoder evaluation deferred
-             to Phase 3 if quality gap identified.
-
-Required embedding prefix (BGE models only):
-  "Represent this for job matching: {text}"
+Code location:      agents/embeddings.py (_embed_local,
+                    _model_small, _model_large — preserved)
+Activation:         pip install sentence-transformers
+                    EMBEDDING_BACKEND=local
 ```
 
 ---
@@ -495,17 +504,18 @@ Release:
 ```
 Per user per month (includes 25% buffer):
   LLM:              ~$0.24
-  Embeddings:        $0.07  (OpenAI text-embedding-3-large)
+  Embeddings:        $0.03  (OpenAI text-embedding-3-small,
+                             6× cheaper than -3-large)
                             drops to ~$0.00 when switching
                             to local BGE at 100+ users
   Database:          $0.03
-  Vector search:     $0.00 (beta) → $0.01 (scale)
+  Vector search:     $0.00 (pgvector) → $0.01 (Qdrant)
   Email:             $0.01
   Infrastructure:    $0.05
   ──────────────────────────────────────────
-  Total:             ~$0.40/month
+  Total:             ~$0.36/month
   Revenue:           $10.00/month
-  Gross margin:      96.0%
+  Gross margin:      96.4%
 
 Note: 25% buffer applied to LLM costs to account
 for retries, token count variance, and usage spikes.
@@ -536,9 +546,14 @@ Before beta (immediate):
   ✅ Visa authorization UI with PillWithSub selectors
   ✅ Seniority options (6 clean levels)
   ✅ Applications page (applied/interview history)
-  🔲 Switch embedding backend to OpenAI text-embedding-3-large
-       (EMBEDDING_BACKEND=openai env var, agents/embeddings.py)
-       BGE local models kept in codebase for future volume switch
+  ✅ pgvector ANN embedding pipeline (text-embedding-3-small,
+       1536 dims, HNSW cosine, $0.02/1M tokens)
+       — job backfill complete (6,667 jobs, $0.04)
+       — new jobs embedded at ingestion
+       — profile embedding with aspiration blend
+       — outcome-anchored embedding on interview/applied
+       — sector diversification in ANN results
+       — /admin/embedding-health endpoint
   🔲 SendGrid API key configured on Render
 
 Phase 2 (post beta):
