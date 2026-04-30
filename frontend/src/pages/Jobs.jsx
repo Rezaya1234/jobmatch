@@ -20,6 +20,26 @@ const SLUG_DOMAIN = {
   newpark: 'newpark.com', pattersonuti: 'patenergy.com',
 }
 
+const SOURCE_SECTOR = {
+  anthropic: 'Technology', scaleai: 'Technology', togetherai: 'Technology',
+  gleanwork: 'Technology', gongio: 'Technology', intercom: 'Technology',
+  databricks: 'Technology', mistral: 'Technology', palantir: 'Technology',
+  openai: 'Technology', cohere: 'Technology', writer: 'Technology',
+  runway: 'Technology', pinecone: 'Technology', perplexity: 'Technology',
+  elevenlabs: 'Technology', cursor: 'Technology', harvey: 'Technology',
+  sierra: 'Technology', google: 'Technology', amazon: 'Technology',
+  exxonmobil: 'Upstream Oil and Gas', chevron: 'Upstream Oil and Gas',
+  conocophillips: 'Upstream Oil and Gas', eogresources: 'Upstream Oil and Gas',
+  devonenergy: 'Upstream Oil and Gas', diamondbackenergy: 'Upstream Oil and Gas',
+  apacorp: 'Upstream Oil and Gas', coterra: 'Upstream Oil and Gas',
+  occidental: 'Upstream Oil and Gas', expandenergy: 'Upstream Oil and Gas',
+  slb: 'Oilfield Services', halliburton: 'Oilfield Services',
+  bakerhughes: 'Oilfield Services', technipfmc: 'Oilfield Services',
+  novinc: 'Oilfield Services', weatherford: 'Oilfield Services',
+  tenaris: 'Oilfield Services', archrock: 'Oilfield Services',
+  newpark: 'Oilfield Services', pattersonuti: 'Oilfield Services',
+}
+
 function CompanyLogo({ slug, company }) {
   const [failed, setFailed] = useState(false)
   const domain = SLUG_DOMAIN[slug]
@@ -206,7 +226,9 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
             {job.location_raw && <span className="text-xs text-slate-500">{formatLocation(job.location_raw)}</span>}
             {salary && <span className="text-xs text-emerald-600 font-semibold">{salary}</span>}
-            {job.sector && <span className="text-xs text-purple-500">{job.sector}</span>}
+            {(job.sector || SOURCE_SECTOR[job.source]) && (
+              <span className="text-xs text-purple-500">{job.sector || SOURCE_SECTOR[job.source]}</span>
+            )}
           </div>
         </div>
 
