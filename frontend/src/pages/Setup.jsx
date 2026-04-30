@@ -411,11 +411,6 @@ export default function Setup() {
         title_exclude:    p.title_exclude        || [],
         visa_types:       p.visa_types           || ['no_sponsorship'],
       })
-      if (p.goals_text) {
-        setAiText(p.goals_text)
-      } else if (p.role_description) {
-        setAiText(p.role_description)
-      }
       if (p.role_description) {
         setAiProfile(p.role_description)
         setProfileGenerated(true)
@@ -706,7 +701,7 @@ export default function Setup() {
                           }, 500)
                         }
                       }}
-                      placeholder="e.g. Senior ML engineer, 7 years exp, seeking remote AI roles at growth-stage startups in the US."
+                      placeholder="I'm a senior ML engineer with 5 years of experience looking for a remote role at a growth-stage startup focused on AI infrastructure..."
                       style={{ color: '#374151' }}
                       className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent" />
                     <div className="absolute bottom-3 right-3 flex items-center gap-2">
