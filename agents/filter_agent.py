@@ -484,7 +484,7 @@ class FilterAgent:
 
         if accepts_us:
             for alias in _US_ALIASES:
-                if alias in job_location:
+                if _alias_in_location(alias, job_location):
                     return FilterResult(passed=True)
             if _contains_us_state(job.location_raw):
                 return FilterResult(passed=True)
@@ -567,6 +567,16 @@ _US_STATES = {
     "NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN",
     "TX","UT","VT","VA","WA","WV","WI","WY","DC",
 }
+
+
+def _alias_in_location(alias: str, job_location_lower: str) -> bool:
+    """
+    Check whether alias appears as a standalone token in job_location.
+    Splits on whitespace/comma/semicolon/slash so "us" matches "New York, NY, US"
+    but not "Brussels" or "Cyprus".
+    """
+    tokens = {t.strip('()').lower() for t in re.split(r'[,;\s/]+', job_location_lower) if t.strip()}
+    return alias.lower() in tokens
 
 
 def _contains_us_state(location: str) -> bool:
