@@ -1,0 +1,51 @@
+Intent-weighted query builder and profile embedding for Profile Agent.
+
+Used by: agents/profile_agent.py::build_intent_query + update_profile_embedding
+         agents/filter_agent.py::_build_query_vector (imports build_intent_query)
+         agents/feedback_agent.py::run (imports update_profile_embedding)
+Model:   No LLM — OpenAI embedding API only
+Cost:    ~$0.000003 per profile update (text-embedding-3-small)
+
+── INTENT QUERY BUILDER ─────────────────────────────────────────────────────────
+
+def build_intent_query(profile: UserProfile) -> str:
+    """
+    Builds intent-weighted text for embedding.
+    HIGH weight: skills/title_include (repeated for emphasis)
+    MEDIUM weight: seniority, work_modes
+    EXCLUDE: industry history (sectors intentionally omitted)
+    """
+    parts = []
+    if profile.role_description:
+        parts.append(profile.role_description)
+    if profile.title_include:
+        skill_text = ", ".join(profile.title_include)
+        parts.append(f"Skills and roles: {skill_text}")
+        parts.append(f"Looking for: {skill_text}")   # repeated for emphasis
+    if profile.seniority_level and profile.seniority_level != "unknown":
+        parts.append(f"{profile.seniority_level} level position")
+    if profile.work_modes:
+        parts.append(f"Work mode: {', '.join(profile.work_modes)}")
+    return " ".join(parts) or "software engineer"
+
+Why sectors are excluded: embedding toward past industry experience reinforces
+existing career path rather than matching aspiration. Sector filtering is
+handled separately as a hard/soft constraint.
+
+── PROFILE EMBEDDING ────────────────────────────────────────────────────────────
+
+async def update_profile_embedding(profile: UserProfile, session: AsyncSession) -> None:
+    text = build_intent_query(profile)
+    vector = await embed_single(text)
+    if vector is not None:
+        profile.profile_embedding = vector
+        await session.commit()
+
+Triggered by:
+  1. upsert_profile (api/users.py) — via FastAPI BackgroundTasks, non-blocking
+  2. feedback_agent.run() — when role_description changes in profile_updates
+  3. outcome-anchored update — see feedback_agent_embedding.txt (blends in-place,
+     does not call update_profile_embedding)
+
+Storage: user_profiles.profile_embedding  vector(1536)
+Index:   none on profile_embedding (queried infrequently — 1 per user per run)

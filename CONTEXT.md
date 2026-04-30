@@ -81,9 +81,9 @@ Database:   PostgreSQL, pgvector (beta)
             → Qdrant at scale
 LLM:        Claude Haiku (Call 1 batch)
             Claude Sonnet (Call 2 reasoning)
-Embedding:  BAAI/bge-small-en-v1.5 Stage 1
-            BAAI/bge-large-en-v1.5 Stage 2
-            Both free open source local
+Embedding:  text-embedding-3-small (OpenAI API)
+            pgvector HNSW cosine ANN 1536 dims
+            BGE models preserved for future local
 Email:      SendGrid (API key pending)
 Scheduler:  APScheduler (beta)
             → Redis + Celery at scale
@@ -107,12 +107,11 @@ Brand:      Stellapath purple #5B4FE8
    Hard constraint filtering (6 constraints)
 
 3. Filter Agent
-   Soft constraint filtering (4 constraints)
-   Heuristic scoring keyword overlap
-   Stage 1 BGE-small threshold 0.60
-   Stage 2 BGE-large threshold 0.70
-   Remove shown job IDs
-   Top 10-15 to Matching Agent
+   Hard + soft constraint filtering
+   pgvector ANN cosine distance LIMIT 50
+   Aspiration blend 0.7 profile + 0.3 goals
+   Sector diversification 60% cap
+   Top 15 to Matching Agent
 
 4. Matching Agent
    Single batch LLM Call 1 all jobs
@@ -148,9 +147,10 @@ Brand:      Stellapath purple #5B4FE8
    feedback+{user_id}@stellapath.app
 
 9. Vector Index
-   BGE-small rebuilds daily 4AM UTC
-   HNSW algorithm
-   pgvector (beta) → Qdrant (scale)
+   HNSW on jobs.embedding_vector (1536d)
+   text-embedding-3-small via OpenAI API
+   New jobs embedded at ingestion
+   pgvector cosine distance <=> operator
    ANN query ~2ms per user
 
 ---
@@ -297,6 +297,12 @@ SESSION_STARTER.txt  Paste to Claude Code
 ✅ All 55 tests passing (0 failures)
 ✅ All documentation files created
 ✅ SESSION_STARTER.txt created
+✅ pgvector ANN embedding pipeline complete
+   text-embedding-3-small 1536 dims
+   6667 jobs backfilled ($0.04)
+   Profile embedding + aspiration blend
+   Outcome-anchored on interview/applied
+   /admin/embedding-health endpoint
 
 ---
 
@@ -361,18 +367,20 @@ lawyer consultation.
 
 ## Last Working On
 
-Beta prep complete. All 6 items done.
-55 tests passing.
+pgvector ANN embedding pipeline complete.
+Shipped to dev branch.
 
 Changes made this session:
-- Profile step enforcement with
-  dashboard gate
-- 4px progress bar and StepNav
-- Goals text auto-save to database
-- Seniority updated to 6 options
-- Visa updated to pill selectors
-- Applications page replacing stub
-- BACKLOG updated with beta checklist
+- Backfill 6667 jobs with embeddings ($0.04)
+- New jobs embedded at ingestion
+- build_intent_query() intent-weighted text
+- Profile embedding on save (background task)
+- Aspiration blend 0.7 profile + 0.3 goals
+- ANN replaces BGE in Filter Agent
+- Outcome-anchored 0.8/0.2 on interview/applied
+- Embedding health in TestAgent +
+  /admin/embedding-health endpoint
+- All documentation updated
 
 Remaining before beta:
 1. SendGrid API key on Render

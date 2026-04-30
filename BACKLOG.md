@@ -55,7 +55,7 @@
 | 19 | Job scraper — 10 oilfield services | ✅ Complete | |
 | 20 | Hard constraint filtering | ✅ Complete | 6 constraints |
 | 21 | Soft constraint filtering | ✅ Complete | Phase B of Filter Agent |
-| 22 | BGE embedding pipeline | ✅ Complete | Phase B of Filter Agent |
+| 22 | BGE embedding pipeline | ✅ Complete | Replaced by pgvector ANN pipeline (item 38e) — BGE code preserved in agents/embeddings.py for future local backend |
 | 23 | Source trust scoring | ✅ Complete | Phase A of Search Agent |
 | 24 | Match agent batch scoring Call 1 | ✅ Complete | |
 | 25 | Match agent Call 2 with caching | ✅ Complete | Active users, 7-day TTL, profile version + weight drift invalidation |
@@ -76,7 +76,10 @@
 | 38b | EvaluatedJob table | ✅ Complete | db/models.py — ground truth labels (LLM / user / human sources) |
 | 38c | Match Quality Charts | ✅ Complete | Admin Section 6 — 30-day trend line + score distribution bar (recharts) |
 | 38d | All 6 Test Agent metrics wired | ✅ Complete | Admin Section 4 — precision@50, @15, recall@50, NDCG, coverage, FPR with 7d baseline |
-| 39 | Prompts directory created | ✅ Complete | All 5 prompts in prompts/ directory |
+| 38e | pgvector ANN embedding pipeline (text-embedding-3-small, 1536d, HNSW cosine) | ✅ Complete | Replaces BGE — backfill 6667 jobs ($0.04), new jobs embedded at ingestion, profile embedding via build_intent_query, aspiration blend 0.7/0.3 |
+| 38f | Outcome-anchored profile embedding | ✅ Complete | 0.8 × profile_embedding + 0.2 × job_embedding normalized on interview/applied signal |
+| 38g | Embedding health metrics + /admin/embedding-health | ✅ Complete | Job + profile coverage in TestAgentMetrics.label_sources, dedicated admin endpoint |
+| 39 | Prompts directory created | ✅ Complete | All 5 prompts in prompts/ + 3 agent implementation prompts in prompts/agents/ |
 
 ### Frontend and UX
 

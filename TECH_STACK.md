@@ -385,8 +385,10 @@ Description versioning (Phase C):
 
 Vector index rebuild:
   Schedule:    4:00 AM UTC daily
-  Model:       BGE-small (Stage 1 only in index)
-  Algorithm:   HNSW
+  Model:       text-embedding-3-small (1536d via embed_single)
+               New jobs embedded at ingestion, not at rebuild
+  Algorithm:   HNSW cosine (pgvector vector_cosine_ops)
+  Index:       jobs.embedding_vector vector(1536)
 
 Matching pipeline:
   Schedule:    5:00 AM UTC daily

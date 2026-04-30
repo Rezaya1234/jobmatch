@@ -1,0 +1,61 @@
+Outcome-anchored profile embedding update for Feedback Agent.
+
+Used by: agents/feedback_agent.py::_outcome_anchor_update
+Triggered: when signal_type is "interview" or "applied"
+Model:   No LLM — numpy vector blend only
+Cost:    $0 (no new embedding generated — blends existing vectors)
+
+── OUTCOME ANCHOR UPDATE ────────────────────────────────────────────────────────
+
+async def _outcome_anchor_update(self, user_id, profile, signal_type):
+    """
+    Pulls profile_embedding 20% toward the job embedding the user
+    interviewed at or applied to. Normalized to unit vector.
+
+    Rationale: a real-world outcome signal (interview, applied) is
+    stronger evidence of fit than any thumbs up. Blending 0.2 toward
+    the job vector nudges future ANN results toward similar roles
+    without discarding existing profile intent.
+    """
+    if profile.profile_embedding is None:
+        return
+
+    # Most recent signal of this type
+    result = await session.execute(
+        select(FeedbackSignal)
+        .where(FeedbackSignal.user_id == profile.user_id,
+               FeedbackSignal.signal_type == signal_type)
+        .order_by(FeedbackSignal.created_at.desc()).limit(1)
+    )
+    signal = result.scalar_one_or_none()
+    if signal is None:
+        return
+
+    job_result = await session.execute(
+        select(Job.embedding_vector).where(Job.id == signal.job_id)
+    )
+    job_row = job_result.first()
+    if job_row is None or job_row[0] is None:
+        return
+
+    p = np.array(profile.profile_embedding, dtype=np.float32)
+    j = np.array(job_row[0], dtype=np.float32)
+    blended = 0.8 * p + 0.2 * j
+    norm = np.linalg.norm(blended)
+    if norm > 0:
+        blended = blended / norm
+
+    profile.profile_embedding = blended.tolist()
+    await session.commit()
+
+── BLEND PARAMETERS ─────────────────────────────────────────────────────────────
+
+Blend formula:  0.8 × profile_embedding + 0.2 × job_embedding
+Normalization:  unit vector (L2 norm = 1.0)
+Trigger:        signal_type in ("interview", "applied")
+Job selected:   most recent FeedbackSignal of that type for this user
+
+0.2 blend weight rationale: small enough to preserve existing intent,
+large enough to shift the ANN neighborhood meaningfully (~2-3 rank positions).
+Over many interview signals the profile drifts toward that role cluster.
+Not cumulative in one run — only the most recent signal is used per trigger.

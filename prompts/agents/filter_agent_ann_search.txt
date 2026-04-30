@@ -1,0 +1,84 @@
+ANN candidate search implementation for Filter Agent.
+Replaces the two-stage BGE embedding pipeline.
+
+Used by: agents/filter_agent.py::get_candidates + _build_query_vector
+Model:   No LLM — pgvector cosine distance only
+Cost:    $0 per query (index already built at ingestion)
+
+── QUERY VECTOR ────────────────────────────────────────────────────────────────
+
+async def _build_query_vector(self, profile):
+    if profile.profile_embedding is None:
+        text = build_intent_query(profile)
+        return await embed_single(text)
+    query = np.array(profile.profile_embedding, dtype=np.float32)
+    if profile.goals_text:
+        goals_vec = await embed_single(profile.goals_text)
+        if goals_vec is not None:
+            goals = np.array(goals_vec, dtype=np.float32)
+            query = 0.7 * query + 0.3 * goals
+            norm = np.linalg.norm(query)
+            if norm > 0:
+                query = query / norm
+    return query.tolist()
+
+Aspiration blend: 0.7 × profile_embedding + 0.3 × goals_embedding
+Applied only at query time — profile_embedding stored as-is.
+Fallback: if profile_embedding IS NULL → embed build_intent_query() on the fly.
+
+── ANN SEARCH ──────────────────────────────────────────────────────────────────
+
+async def get_candidates(self, user_id, pool_limit=None):
+    profile = await self._get_profile(user_id)
+    query_vector = await self._build_query_vector(profile)
+    ann_limit = pool_limit or _ANN_POOL   # default 50
+
+    dist_col = Job.embedding_vector.cosine_distance(query_vector).label("ann_dist")
+    stmt = (
+        select(Job, dist_col)
+        .join(JobMatch, JobMatch.job_id == Job.id)
+        .where(
+            JobMatch.user_id == uid,
+            JobMatch.passed_hard_filter.is_(True),
+            JobMatch.shown_at.is_(None),
+            Job.is_active.is_(True),
+            Job.embedding_vector.is_not(None),
+        )
+        .order_by(dist_col)
+        .limit(ann_limit)
+    )
+    rows = result.all()
+    jobs = [row[0] for row in rows]
+    distances = [float(row[1]) for row in rows]
+
+    soft_pairs = [(j, d) for j, d in zip(jobs, distances) if self._passes_soft(j, profile)]
+    if not soft_pairs:
+        soft_pairs = list(zip(jobs, distances))   # fallback: skip soft filter
+
+    sim_scores = {j.id: round(1.0 - d, 4) for j, d in soft_pairs}
+    await self._write_scores(user_id, sim_scores, field="embedding_score")
+
+    soft_jobs = [j for j, _ in soft_pairs]
+    return _diversify(soft_jobs, _CANDIDATES_MAX)
+
+── SECTOR DIVERSIFICATION ──────────────────────────────────────────────────────
+
+_ANN_POOL = 50
+_SECTOR_CAP_FRACTION = 0.60
+_SECTOR_DATA_MIN_FRACTION = 0.20   # skip diversification if <20% have sector data
+
+def _diversify(jobs, max_count):
+    jobs_with_sector = [j for j in jobs if j.sector]
+    if len(jobs_with_sector) / max(len(jobs), 1) < _SECTOR_DATA_MIN_FRACTION:
+        return jobs[:max_count]
+    sector_cap = max(1, int(max_count * _SECTOR_CAP_FRACTION))
+    sector_counts = {}
+    result = []
+    for job in jobs:
+        s = job.sector or "__none__"
+        if sector_counts.get(s, 0) < sector_cap:
+            result.append(job)
+            sector_counts[s] = sector_counts.get(s, 0) + 1
+        if len(result) >= max_count:
+            break
+    return result
