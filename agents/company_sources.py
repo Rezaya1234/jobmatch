@@ -225,3 +225,6 @@ COMPANY_SOURCES: list[dict] = [
 
 # Fast lookup: company display name → domain
 COMPANY_DOMAIN: dict[str, str] = {s["name"]: s["domain"] for s in COMPANY_SOURCES}
+
+# Fast lookup: company display name → ATS slug (matches CompanyHiringSnapshot.source_slug)
+COMPANY_SOURCE_SLUG: dict[str, str] = {s["name"]: s["slug"] for s in COMPANY_SOURCES}

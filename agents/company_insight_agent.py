@@ -123,7 +123,7 @@ class CompanyInsightAgent:
             messages=[Message(role='user', content=prompt)],
             system=_SYSTEM,
             tier=ModelTier.STANDARD,
-            max_tokens=1500,
+            max_tokens=2500,
         )
         insight = self._parse(raw)
         await self._upsert(_slugify(data['company_name']), data, insight)

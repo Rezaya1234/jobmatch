@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agents.company_sources import COMPANY_SOURCE_SLUG
 from api.deps import get_session
 from db.models import CompanyHiringSnapshot, CompanyInsight, FeedbackEvent, Job
 
@@ -98,14 +99,23 @@ async def list_companies(
     offset: int = Query(0),
     session: AsyncSession = Depends(get_session),
 ) -> list[CompanySummary]:
-    stmt = select(CompanyInsight).order_by(CompanyInsight.active_job_count.desc())
+    live_counts = (
+        select(Job.company, func.count(Job.id).label("cnt"))
+        .where(Job.is_active.is_(True))
+        .group_by(Job.company)
+        .subquery()
+    )
+    stmt = (
+        select(CompanyInsight, func.coalesce(live_counts.c.cnt, 0).label("live_count"))
+        .outerjoin(live_counts, CompanyInsight.company_name == live_counts.c.company)
+        .order_by(func.coalesce(live_counts.c.cnt, 0).desc())
+    )
     if q:
         stmt = stmt.where(CompanyInsight.company_name.ilike(f"%{q}%"))
     if outlook:
         stmt = stmt.where(CompanyInsight.hiring_outlook == outlook)
     stmt = stmt.offset(offset).limit(limit)
     result = await session.execute(stmt)
-    rows = result.scalars().all()
     return [
         CompanySummary(
             slug=r.slug,
@@ -114,14 +124,14 @@ async def list_companies(
             company_size=r.company_size,
             hiring_outlook=r.hiring_outlook,
             hiring_trend=r.hiring_trend,
-            active_job_count=r.active_job_count,
+            active_job_count=live_count,
             overall_rating=r.overall_rating,
             summary=r.summary,
             logo_url=r.logo_url,
             website=r.website,
             hiring_areas=r.hiring_areas,
         )
-        for r in rows
+        for r, live_count in result.all()
     ]
 
 
@@ -137,10 +147,21 @@ async def get_company(
     if row is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
+    # ---- Live job count ----
+    live_count_result = await session.execute(
+        select(func.count(Job.id)).where(
+            Job.company == row.company_name,
+            Job.is_active.is_(True),
+        )
+    )
+    live_active_count = int(live_count_result.scalar() or 0)
+
     # ---- Hiring velocity from CompanyHiringSnapshot ----
+    # Use the ATS source slug (may differ from _slugify slug stored on CompanyInsight)
+    source_slug = COMPANY_SOURCE_SLUG.get(row.company_name, slug)
     snap_result = await session.execute(
         select(CompanyHiringSnapshot)
-        .where(CompanyHiringSnapshot.source_slug == slug)
+        .where(CompanyHiringSnapshot.source_slug == source_slug)
         .order_by(CompanyHiringSnapshot.snapshot_date.desc())
         .limit(1)
     )
@@ -153,7 +174,7 @@ async def get_company(
         snap_7_result = await session.execute(
             select(CompanyHiringSnapshot)
             .where(
-                CompanyHiringSnapshot.source_slug == slug,
+                CompanyHiringSnapshot.source_slug == source_slug,
                 CompanyHiringSnapshot.snapshot_date <= snap_date - timedelta(days=7),
             )
             .order_by(CompanyHiringSnapshot.snapshot_date.desc())
@@ -164,7 +185,7 @@ async def get_company(
         snap_30_result = await session.execute(
             select(CompanyHiringSnapshot)
             .where(
-                CompanyHiringSnapshot.source_slug == slug,
+                CompanyHiringSnapshot.source_slug == source_slug,
                 CompanyHiringSnapshot.snapshot_date <= snap_date - timedelta(days=30),
             )
             .order_by(CompanyHiringSnapshot.snapshot_date.desc())
@@ -251,7 +272,7 @@ async def get_company(
         signals=row.signals,
         hiring_areas=row.hiring_areas,
         risks=row.risks,
-        active_job_count=row.active_job_count,
+        active_job_count=live_active_count,
         generated_at=row.generated_at.isoformat() if row.generated_at else None,
         hiring_velocity=hiring_velocity,
         department_breakdown=department_breakdown,
