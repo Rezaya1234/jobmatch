@@ -201,8 +201,8 @@ function StepNav({ current, step2done = false, step3done = false, step4done = fa
               <div
                 className="w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-all"
                 style={
-                  done   ? { background: '#5B4FE8', borderColor: '#5B4FE8', color: '#fff' }
-                  : active ? { background: '#fff', borderColor: '#5B4FE8', color: '#5B4FE8' }
+                  done   ? { background: '#7c3aed', borderColor: '#7c3aed', color: '#fff' }
+                  : active ? { background: '#fff', borderColor: '#7c3aed', color: '#7c3aed' }
                   : { background: '#fff', borderColor: '#e2e8f0', color: '#94a3b8' }
                 }
               >
@@ -563,8 +563,8 @@ export default function Setup() {
               className="w-2 h-2 rounded-full transition-all"
               style={{
                 width: s.n === currentStep ? '16px' : '8px',
-                background: s.n < currentStep ? '#5B4FE8' : s.n === currentStep ? 'transparent' : '#e2e8f0',
-                border: s.n === currentStep ? '2px solid #5B4FE8' : 'none',
+                background: s.n < currentStep ? '#7c3aed' : s.n === currentStep ? 'transparent' : '#e2e8f0',
+                border: s.n === currentStep ? '2px solid #7c3aed' : 'none',
               }}
             />
           ))}
@@ -591,7 +591,7 @@ export default function Setup() {
           {/* Progress bar */}
           <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className="h-1 rounded-full transition-all duration-300" style={{ background: '#5B4FE8' }}
+              className="h-1 rounded-full transition-all duration-300" style={{ background: '#7c3aed' }}
               style={{ width: `${currentStep * 25}%` }}
             />
           </div>
