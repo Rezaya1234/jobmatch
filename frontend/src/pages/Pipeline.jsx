@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   triggerCollect, triggerResetFilters, triggerTestEmail,
-  triggerCompanyInsights, backfillLogos, getJobCount, getMatchCount,
+  triggerCompanyInsights, getInsightsStatus, backfillLogos, getJobCount, getMatchCount,
   getPipelineStatus, triggerStepReset, triggerStepFilter, triggerStepCandidates,
   triggerStepScore, triggerStepDeliver,
 } from '../api'
@@ -76,7 +76,8 @@ export default function Pipeline() {
   })
   const [totals, setTotals]           = useState({ jobs: 0, matches: 0 })
   const [emailStatus, setEmailStatus] = useState('')
-  const [insightsStatus, setInsightsStatus] = useState('')
+  const [insightsState, setInsightsState] = useState({ status: 'idle', processed: 0, total: 0, error: '' })
+  const insightsPollRef = useRef(null)
   const [logoStatus, setLogoStatus]   = useState('')
 
   const [stepState, setStepState] = useState({
@@ -139,7 +140,8 @@ export default function Pipeline() {
   useEffect(() => {
     fetchPipeStatus()
     fetchTotals()
-    return () => stopPolling()
+    pollInsightsStatus()
+    return () => { stopPolling(); stopInsightsPoll() }
   }, [])
 
   // ---- Reset handler ----
@@ -266,13 +268,31 @@ export default function Pipeline() {
     finally { setTimeout(() => setEmailStatus(''), 5000) }
   }
 
-  async function handleCompanyInsights() {
-    setInsightsStatus('running')
+  function stopInsightsPoll() {
+    if (insightsPollRef.current) { clearInterval(insightsPollRef.current); insightsPollRef.current = null }
+  }
+
+  async function pollInsightsStatus() {
     try {
-      await triggerCompanyInsights()
-      setInsightsStatus('accepted')
-    } catch { setInsightsStatus('error') }
-    finally { setTimeout(() => setInsightsStatus(''), 5000) }
+      const s = await getInsightsStatus()
+      setInsightsState(s)
+      if (s.status !== 'running') stopInsightsPoll()
+    } catch {}
+  }
+
+  async function handleCompanyInsights() {
+    try {
+      const res = await triggerCompanyInsights()
+      if (res.status === 'already_running') {
+        setInsightsState(s => ({ ...s, status: 'running' }))
+      }
+    } catch {
+      setInsightsState(s => ({ ...s, status: 'error', error: 'Failed to start' }))
+      return
+    }
+    stopInsightsPoll()
+    insightsPollRef.current = setInterval(pollInsightsStatus, 3000)
+    pollInsightsStatus()
   }
 
   async function handleResetFilters() {
@@ -437,10 +457,18 @@ export default function Pipeline() {
           </button>
           <button
             onClick={handleCompanyInsights}
-            disabled={insightsStatus === 'running'}
+            disabled={insightsState.status === 'running'}
             className="bg-violet-600 text-white py-2 rounded-lg font-medium text-sm hover:bg-violet-700 disabled:opacity-50 transition-colors"
           >
-            {insightsStatus === 'running' ? 'Starting…' : insightsStatus === 'accepted' ? '✓ Started' : insightsStatus === 'error' ? 'Failed' : 'Refresh Insights'}
+            {insightsState.status === 'running'
+              ? insightsState.total > 0
+                ? `Updating… ${insightsState.processed}/${insightsState.total}`
+                : 'Starting…'
+              : insightsState.status === 'complete'
+                ? `✓ Done — ${insightsState.processed} companies`
+                : insightsState.status === 'error'
+                  ? 'Failed'
+                  : 'Refresh Insights'}
           </button>
           <button
             onClick={handleResetFilters}

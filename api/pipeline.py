@@ -33,6 +33,17 @@ class _State:
 _state = _State()
 
 
+class _InsightState:
+    status: str = "idle"   # idle | running | complete | error
+    processed: int = 0
+    total: int = 0
+    error: str = ""
+    started_at: str = ""
+    finished_at: str = ""
+
+_insight_state = _InsightState()
+
+
 # ------------------------------------------------------------------
 # Schemas
 # ------------------------------------------------------------------
@@ -64,6 +75,14 @@ class StepResult(BaseModel):
     status: str
     detail: str
     count: int = 0
+
+class InsightStatusResponse(BaseModel):
+    status: str
+    processed: int
+    total: int
+    error: str
+    started_at: str
+    finished_at: str
 
 
 # ------------------------------------------------------------------
@@ -226,8 +245,22 @@ async def trigger_company_insights(
     llm: LLMClient = Depends(get_llm),
 ) -> PipelineResponse:
     """Generate/refresh company insights for all qualifying companies."""
+    if _insight_state.status == "running":
+        return PipelineResponse(status="already_running", detail="Insights generation is already running.")
     background_tasks.add_task(_run_company_insights, llm)
     return PipelineResponse(status="accepted", detail="Company insights generation started.")
+
+
+@router.get("/insights-status", response_model=InsightStatusResponse)
+async def get_insights_status() -> InsightStatusResponse:
+    return InsightStatusResponse(
+        status=_insight_state.status,
+        processed=_insight_state.processed,
+        total=_insight_state.total,
+        error=_insight_state.error,
+        started_at=_insight_state.started_at,
+        finished_at=_insight_state.finished_at,
+    )
 
 
 @router.post("/backfill-logos", response_model=PipelineResponse, status_code=200)
@@ -583,11 +616,26 @@ async def _run_feedback_pipeline(user_id: str, llm: LLMClient) -> None:
 
 async def _run_company_insights(llm: LLMClient) -> None:
     from agents.company_insight_agent import CompanyInsightAgent
+    _insight_state.status = "running"
+    _insight_state.processed = 0
+    _insight_state.total = 0
+    _insight_state.error = ""
+    _insight_state.started_at = datetime.now(timezone.utc).isoformat()
+    _insight_state.finished_at = ""
     logger.info("Company insights pipeline started")
     async with AsyncSessionLocal() as session:
         agent = CompanyInsightAgent(session, llm)
         try:
-            count = await agent.run()
+            def on_progress(processed: int, total: int) -> None:
+                _insight_state.processed = processed
+                _insight_state.total = total
+            count = await agent.run(on_progress=on_progress)
+            _insight_state.status = "complete"
+            _insight_state.processed = count
             logger.info("Company insights pipeline complete — %d companies processed", count)
-        except Exception:
+        except Exception as e:
+            _insight_state.status = "error"
+            _insight_state.error = str(e)
             logger.exception("Company insights pipeline crashed")
+        finally:
+            _insight_state.finished_at = datetime.now(timezone.utc).isoformat()

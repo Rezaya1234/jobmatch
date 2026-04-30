@@ -67,15 +67,18 @@ class CompanyInsightAgent:
         self._session = session
         self._llm = llm
 
-    async def run(self) -> int:
+    async def run(self, on_progress=None) -> int:
         """Generate/refresh insights for all qualifying companies. Returns count processed."""
         companies = await self._gather_companies()
-        logger.info("CompanyInsightAgent: %d companies to process", len(companies))
+        total = len(companies)
+        logger.info("CompanyInsightAgent: %d companies to process", total)
         processed = 0
         for data in companies:
             try:
                 await self._process(data)
                 processed += 1
+                if on_progress:
+                    on_progress(processed, total)
             except Exception:
                 logger.exception("CompanyInsightAgent: failed for %s", data['company_name'])
         return processed
