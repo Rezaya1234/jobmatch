@@ -44,6 +44,7 @@ export const getFeedbackSummary = (id, days = 30) =>
 export const getNotificationPrefs = (id) => http.get(`/users/${id}/notification-prefs`).then(r => r.data)
 export const updateNotificationPrefs = (id, prefs) => http.patch(`/users/${id}/notification-prefs`, prefs).then(r => r.data)
 export const getApplications = (id) => http.get(`/users/${id}/applications`).then(r => r.data)
+export const getNotifications = (id) => http.get(`/users/${id}/notifications`).then(r => r.data)
 export const parseProfile = (id, text, resumeFile) => {
   const form = new FormData()
   if (text) form.append('text', text)

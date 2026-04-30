@@ -1,16 +1,16 @@
 import json
 import logging
 import uuid as _uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_llm, get_session
 from db.activity import log_event
-from db.models import FeedbackSignal, Job, User, UserProfile
+from db.models import FeedbackSignal, Job, JobMatch, User, UserProfile
 from llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -358,6 +358,122 @@ async def _run_on_demand_matching(user_id: str, llm: LLMClient) -> None:
             await OrchestratorAgent(session, llm).run_user_on_demand(user_id)
         except Exception:
             logger.exception("On-demand matching failed for user %s", user_id)
+
+
+# ------------------------------------------------------------------
+# Notifications
+# ------------------------------------------------------------------
+
+class NotificationItem(BaseModel):
+    id: str
+    type: str
+    title: str
+    message: str
+    href: str = ""
+
+
+@router.get("/{user_id}/notifications", response_model=list[NotificationItem])
+async def get_notifications(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> list[NotificationItem]:
+    """Derive contextual notifications from current user state."""
+    await _get_user_or_404(user_id, session)
+    uid = _uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    now = datetime.now(timezone.utc)
+    items: list[NotificationItem] = []
+
+    profile_result = await session.execute(
+        select(UserProfile).where(UserProfile.user_id == uid)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    # 1. Complete profile
+    if profile is None or not profile.profile_complete:
+        items.append(NotificationItem(
+            id="complete_profile",
+            type="action",
+            title="Complete your profile",
+            message="Finish your profile to start receiving personalised job matches.",
+            href="/profile",
+        ))
+
+    if profile is not None:
+        # 2. New matches delivered in the last 7 days
+        new_match_count = await session.scalar(
+            select(func.count()).select_from(JobMatch)
+            .join(Job, JobMatch.job_id == Job.id)
+            .where(
+                JobMatch.user_id == uid,
+                JobMatch.passed_hard_filter.is_(True),
+                Job.is_active.is_(True),
+                JobMatch.delivered_at >= now - timedelta(days=7),
+            )
+        ) or 0
+        if new_match_count > 0:
+            items.append(NotificationItem(
+                id=f"new_matches_{(now - timedelta(days=now.weekday())).strftime('%Y_%W')}",
+                type="match",
+                title=f"{new_match_count} new match{'es' if new_match_count != 1 else ''} this week",
+                message="Your latest job matches are ready to review.",
+                href="/matches",
+            ))
+
+        # 3. Give feedback — encourage after a few matches
+        if profile.feedback_signal_count is not None and profile.feedback_signal_count < 3:
+            total_matches = await session.scalar(
+                select(func.count()).select_from(JobMatch)
+                .where(JobMatch.user_id == uid, JobMatch.passed_hard_filter.is_(True))
+            ) or 0
+            if total_matches >= 5:
+                items.append(NotificationItem(
+                    id="give_feedback",
+                    type="tip",
+                    title="Rate your matches",
+                    message="Thumbs up or down on jobs you've seen — it makes your recommendations smarter.",
+                    href="/feedback",
+                ))
+
+        # 4. Applications to follow up on (applied > 7 days ago, no interview signal)
+        applied_old_result = await session.execute(
+            select(FeedbackSignal)
+            .where(
+                FeedbackSignal.user_id == uid,
+                FeedbackSignal.signal_type == "applied",
+                FeedbackSignal.created_at <= now - timedelta(days=7),
+            )
+            .limit(1)
+        )
+        if applied_old_result.scalar_one_or_none() is not None:
+            items.append(NotificationItem(
+                id=f"followup_applications_{now.strftime('%Y_%W')}",
+                type="reminder",
+                title="Follow up on your applications",
+                message="You have applications from over a week ago — check in with recruiters.",
+                href="/applications",
+            ))
+
+        # 5. Profile stale (not updated in 30+ days)
+        if profile.updated_at and (now - profile.updated_at.replace(tzinfo=timezone.utc)).days > 30:
+            items.append(NotificationItem(
+                id=f"profile_stale_{now.strftime('%Y_%m')}",
+                type="tip",
+                title="Refresh your profile",
+                message="Your profile hasn't been updated in a while. Keep it fresh for better matches.",
+                href="/profile",
+            ))
+
+        # 6. Explore company insights
+        if profile.profile_complete:
+            items.append(NotificationItem(
+                id="explore_insights",
+                type="info",
+                title="Explore company insights",
+                message="Hiring outlooks, interview difficulty, and more for companies you might apply to.",
+                href="/insights",
+            ))
+
+    return items
 
 
 # ------------------------------------------------------------------
