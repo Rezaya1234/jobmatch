@@ -453,40 +453,36 @@ function MatchFunnel({ matches, feedback }) {
 
   return (
     <div>
-      {/* Circles row — line lives here so top-1/2 hits circle centers */}
-      <div className="relative flex justify-between items-center">
-        {/* Line passes through circle centers: offset by half circle width (16px = w-8/2) */}
-        <div className="absolute top-1/2 -translate-y-1/2 h-0.5 bg-violet-200" style={{ left: 16, right: 16 }} />
+      {/* Equal-thirds columns — line at top:16px (circle center), labels unrestricted below */}
+      <div className="relative flex">
+        {/* Line from center of col-1 to center of col-3 */}
+        <div className="absolute h-0.5 bg-violet-200" style={{ top: 16, left: 'calc(100% / 6)', right: 'calc(100% / 6)' }} />
         {nodes.map((node, i) => (
-          <div key={i} className={`w-8 h-8 rounded-full ${node.bg} ${node.iconColor} ring-2 ${node.ring} flex items-center justify-center shadow-sm z-10 shrink-0`}>
-            {node.icon}
-          </div>
-        ))}
-      </div>
-
-      {/* Labels row — strictly below circles, no influence on line */}
-      <div className="flex justify-between mt-2">
-        {nodes.map((node, i) => (
-          <div key={i} className="flex flex-col items-center" style={{ width: 32 }}>
-            <p className="text-lg font-bold text-slate-800 leading-none">{node.value}</p>
-            <p className="text-[10px] font-medium text-slate-600 mt-0.5 whitespace-nowrap">{node.label}</p>
-            {node.sub && <p className="text-[9px] text-slate-400 mt-0.5">{node.sub}</p>}
-            {i === 2 && (liked + disliked > 0) && (
-              <div className="mt-1 flex items-center gap-1.5 justify-center">
-                <div className="flex items-center gap-0.5">
-                  <svg className="w-3 h-3 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                  </svg>
-                  <span className="text-[10px] text-slate-600 font-medium">{liked}</span>
+          <div key={i} className="flex-1 flex flex-col items-center">
+            <div className={`w-8 h-8 rounded-full ${node.bg} ${node.iconColor} ring-2 ${node.ring} flex items-center justify-center shadow-sm z-10 shrink-0`}>
+              {node.icon}
+            </div>
+            <div className="mt-2 flex flex-col items-center">
+              <p className="text-lg font-bold text-slate-800 leading-none">{node.value}</p>
+              <p className="text-[10px] font-medium text-slate-600 mt-0.5 whitespace-nowrap">{node.label}</p>
+              {node.sub && <p className="text-[9px] text-slate-400 mt-0.5 whitespace-nowrap">{node.sub}</p>}
+              {i === 2 && (liked + disliked > 0) && (
+                <div className="mt-1 flex items-center gap-1.5 justify-center">
+                  <div className="flex items-center gap-0.5">
+                    <svg className="w-3 h-3 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                    </svg>
+                    <span className="text-[10px] text-slate-600 font-medium">{liked}</span>
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    <svg className="w-3 h-3 text-rose-500" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                    </svg>
+                    <span className="text-[10px] text-slate-600 font-medium">{disliked}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-0.5">
-                  <svg className="w-3 h-3 text-rose-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                  </svg>
-                  <span className="text-[10px] text-slate-600 font-medium">{disliked}</span>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ))}
       </div>
