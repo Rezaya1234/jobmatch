@@ -63,6 +63,7 @@ function CompanyLogo({ slug, company }) {
 const PAGE_SIZE = 25
 
 const SORT_OPTIONS = [
+  { value: 'relevance',   label: 'Relevance' },
   { value: 'date_desc',   label: 'Newest first' },
   { value: 'date_asc',    label: 'Oldest first' },
   { value: 'company_asc', label: 'Company A–Z' },
@@ -282,7 +283,7 @@ export default function Jobs() {
   const [workMode, setWorkMode] = useState('')
   const [jobType, setJobType] = useState('')
   const [sector, setSector] = useState('')
-  const [sortBy, setSortBy] = useState('date_desc')
+  const [sortBy, setSortBy] = useState('relevance')
   const [feedbackMap, setFeedbackMap] = useState({})
 
   const searchTimer = useRef(null)
@@ -302,9 +303,10 @@ export default function Jobs() {
     job_type: jobType,
     sector,
     sort_by: sortBy,
+    user_id: sortBy === 'relevance' ? (userId || '') : '',
     limit: PAGE_SIZE,
     offset: (p - 1) * PAGE_SIZE,
-  }), [debouncedSearch, workMode, jobType, sector, sortBy])
+  }), [debouncedSearch, workMode, jobType, sector, sortBy, userId])
 
   async function load(p) {
     setLoading(true)
@@ -350,7 +352,7 @@ export default function Jobs() {
     setWorkMode('')
     setJobType('')
     setSector('')
-    setSortBy('date_desc')
+    setSortBy('relevance')
     setPage(1)
   }
 

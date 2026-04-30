@@ -2,11 +2,11 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, null
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_session
-from db.models import Job
+from db.models import Job, JobMatch
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -59,12 +59,22 @@ async def list_jobs(
     job_type: str = Query(default=""),
     sector: str = Query(default=""),
     sort_by: str = Query(default="date_desc"),
+    user_id: str = Query(default=""),
     session: AsyncSession = Depends(get_session),
 ) -> list[JobResponse]:
-    order = _SORT_MAP.get(sort_by, Job.created_at.desc())
-    stmt = select(Job).where(Job.is_active.is_(True))
-    stmt = _apply_filters(stmt, search, work_mode, job_type, sector)
-    stmt = stmt.order_by(order).limit(limit).offset(offset)
+    if sort_by == "relevance" and user_id:
+        stmt = (
+            select(Job)
+            .outerjoin(JobMatch, (JobMatch.job_id == Job.id) & (JobMatch.user_id == user_id))
+            .where(Job.is_active.is_(True))
+        )
+        stmt = _apply_filters(stmt, search, work_mode, job_type, sector)
+        stmt = stmt.order_by(JobMatch.embedding_score.desc().nullslast()).limit(limit).offset(offset)
+    else:
+        order = _SORT_MAP.get(sort_by, Job.created_at.desc())
+        stmt = select(Job).where(Job.is_active.is_(True))
+        stmt = _apply_filters(stmt, search, work_mode, job_type, sector)
+        stmt = stmt.order_by(order).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return [
         JobResponse(
