@@ -202,7 +202,7 @@ function StepNav({ current, step2done = false, step3done = false, step4done = fa
                 className="w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-all"
                 style={
                   active ? { background: '#7c3aed', borderColor: '#7c3aed', color: '#fff' }
-                  : done  ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' }
+                  : done  ? { background: '#5B4FE8', borderColor: '#5B4FE8', color: '#fff' }
                   : { background: '#fff', borderColor: '#e2e8f0', color: '#94a3b8' }
                 }
               >
