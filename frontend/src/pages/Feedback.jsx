@@ -72,16 +72,10 @@ function SectionLabel({ children }) {
   )
 }
 
-function MetricCard({ icon, label, value, color }) {
-  const styles = {
-    green:  'bg-green-50 border-green-200',
-    red:    'bg-red-50 border-red-200',
-    blue:   'bg-blue-50 border-blue-200',
-    violet: 'bg-violet-50 border-violet-200',
-  }
+function MetricCard({ icon, label, value }) {
   return (
-    <div className={`rounded-xl border shadow-sm p-4 flex flex-col gap-2 ${styles[color]}`}>
-      <span className="text-xl leading-none">{icon}</span>
+    <div className="rounded-xl border border-violet-200 shadow-sm p-4 flex flex-col gap-2 bg-violet-50">
+      <div className="w-5 h-5 text-violet-500">{icon}</div>
       <span className="text-2xl font-bold text-slate-900">{value}</span>
       <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</span>
     </div>
@@ -620,10 +614,22 @@ export default function Feedback() {
         <>
           {/* ── Metric cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <MetricCard icon="👍" label="Liked"          value={data.liked_count}    color="green"  />
-            <MetricCard icon="👎" label="Disliked"        value={data.disliked_count} color="red"    />
-            <MetricCard icon="🔗" label="Clicked"         value={data.viewed_count}   color="blue"   />
-            <MetricCard icon="💬" label="Feedback given"  value={data.feedback_count} color="violet" />
+            <MetricCard
+              icon={<svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>}
+              label="Liked" value={data.liked_count}
+            />
+            <MetricCard
+              icon={<svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" /></svg>}
+              label="Disliked" value={data.disliked_count}
+            />
+            <MetricCard
+              icon={<svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M6.672 1.911a1 1 0 10-1.932.518l.259.966a1 1 0 001.932-.518l-.26-.966zM2.429 4.74a1 1 0 10-.517 1.932l.966.259a1 1 0 00.517-1.932l-.966-.26zm8.814-.569a1 1 0 00-1.415-1.414l-.707.707a1 1 0 101.415 1.415l.707-.708zm-7.071 7.072l.707-.707A1 1 0 003.465 9.12l-.708.707a1 1 0 101.415 1.415zm3.2-5.171a1 1 0 00-1.3 1.3l4 10a1 1 0 001.823.075l1.38-2.759 3.018 3.02a1 1 0 001.414-1.415l-3.019-3.02 2.76-1.379a1 1 0 00-.076-1.822l-10-4z" clipRule="evenodd" /></svg>}
+              label="Clicked" value={data.viewed_count}
+            />
+            <MetricCard
+              icon={<svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" /></svg>}
+              label="Feedback given" value={data.feedback_count}
+            />
           </div>
 
           {/* ── Learning status ── */}
