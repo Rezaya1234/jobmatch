@@ -201,8 +201,8 @@ function StepNav({ current, step2done = false, step3done = false, step4done = fa
               <div
                 className="w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-all"
                 style={
-                  active ? { background: '#7c3aed', borderColor: '#7c3aed', color: '#fff' }
-                  : done  ? { background: '#5B4FE8', borderColor: '#5B4FE8', color: '#fff' }
+                  done   ? { background: '#5B4FE8', borderColor: '#5B4FE8', color: '#fff' }
+                  : active ? { background: '#fff', borderColor: '#5B4FE8', color: '#5B4FE8' }
                   : { background: '#fff', borderColor: '#e2e8f0', color: '#94a3b8' }
                 }
               >
@@ -213,14 +213,14 @@ function StepNav({ current, step2done = false, step3done = false, step4done = fa
                 ) : s.n}
               </div>
               {i < STEPS.length - 1 && (
-                <div className="w-px flex-1 my-1 min-h-[32px]" style={{ background: active || done ? '#ddd6fe' : '#f1f5f9' }} />
+                <div className="w-px flex-1 my-1 min-h-[32px]" style={{ background: done ? '#c4b5fd' : '#f1f5f9' }} />
               )}
             </div>
             <div className="pb-8">
-              <p className={`text-sm font-semibold leading-snug ${active ? 'text-violet-700' : done ? 'text-slate-600' : 'text-slate-400'}`}>
+              <p className={`text-sm font-semibold leading-snug ${done ? 'text-slate-700' : active ? 'text-slate-700' : 'text-slate-400'}`}>
                 {s.label}
               </p>
-              <p className={`text-xs mt-0.5 ${active ? 'text-violet-500' : 'text-slate-400'}`}>{s.sub}</p>
+              <p className={`text-xs mt-0.5 ${active ? 'text-slate-500' : 'text-slate-400'}`}>{s.sub}</p>
             </div>
           </div>
         )
@@ -560,9 +560,12 @@ export default function Setup() {
           {STEPS.map(s => (
             <div
               key={s.n}
-              className={`w-2 h-2 rounded-full transition-all ${
-                s.n === currentStep ? 'bg-violet-600 w-4' : s.n < currentStep ? 'bg-violet-300' : 'bg-slate-200'
-              }`}
+              className="w-2 h-2 rounded-full transition-all"
+              style={{
+                width: s.n === currentStep ? '16px' : '8px',
+                background: s.n < currentStep ? '#5B4FE8' : s.n === currentStep ? 'transparent' : '#e2e8f0',
+                border: s.n === currentStep ? '2px solid #5B4FE8' : 'none',
+              }}
             />
           ))}
         </div>
@@ -588,7 +591,7 @@ export default function Setup() {
           {/* Progress bar */}
           <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className="h-1 bg-violet-500 rounded-full transition-all duration-300"
+              className="h-1 rounded-full transition-all duration-300" style={{ background: '#5B4FE8' }}
               style={{ width: `${currentStep * 25}%` }}
             />
           </div>
