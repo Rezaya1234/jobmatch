@@ -77,6 +77,13 @@ export const adminJobScoring = (params = {}) => adm('job-scoring', { params })
 export const adminWeightEvolution = (params = {}) => adm('weight-evolution', { params })
 export const adminGetThresholds = () => adm('thresholds')
 export const adminMatchQualityCharts = () => adm('match-quality-charts')
+// Debug / Pipeline Inspector
+export const debugUserLookup = (email) => http.get('/debug/user-lookup', { params: { email } }).then(r => r.data)
+export const debugHardFilterSummary = (userId) => http.get(`/debug/hard-filter-summary/${userId}`).then(r => r.data)
+export const debugAnnPool = (userId) => http.get(`/debug/ann-pool/${userId}`).then(r => r.data)
+export const debugSoftFilter = (userId) => http.get(`/debug/soft-filter/${userId}`).then(r => r.data)
+export const debugScored = (userId) => http.get(`/debug/scored/${userId}`).then(r => r.data)
+
 export const adminUpdateThresholds = (thresholds) => {
   const uid = localStorage.getItem('userId')
   return http.patch('/admin/thresholds', { thresholds }, { params: { user_id: uid } }).then(r => r.data)

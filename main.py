@@ -10,6 +10,7 @@ from fastapi import FastAPI  # noqa: E402 — import after dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.admin import router as admin_router
+from api.debug import router as debug_router
 from api.companies import router as companies_router
 from api.feedback import click_router as feedback_click_router
 from api.feedback import router as feedback_router
@@ -58,6 +59,7 @@ app.include_router(pipeline_router)
 app.include_router(qa_router)
 app.include_router(companies_router)
 app.include_router(admin_router)
+app.include_router(debug_router)
 
 
 @app.get("/health", tags=["health"])

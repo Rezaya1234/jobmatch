@@ -9,6 +9,7 @@ import Pipeline from './pages/Pipeline'
 import Architecture from './pages/Architecture'
 import QA from './pages/QA'
 import Admin from './pages/Admin'
+import AdminDebug from './pages/AdminDebug'
 import Matches from './pages/Matches'
 import CompanyInsights from './pages/CompanyInsights'
 import CompanyDetail from './pages/CompanyDetail'
@@ -268,6 +269,7 @@ export default function App() {
 
         {/* Admin — own layout, no sidebar, access guarded in component */}
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/debug" element={<AdminDebug />} />
 
         {/* Authenticated app shell — handles all /dashboard, /positions, etc. */}
         <Route path="/*" element={<AppShell />} />

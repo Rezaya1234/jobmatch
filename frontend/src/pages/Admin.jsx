@@ -977,6 +977,7 @@ export default function Admin() {
         </div>
         <div className="flex items-center gap-4">
           <UtcClock />
+          <a href="/admin/debug" className="text-xs text-slate-500 hover:text-slate-700 transition-colors font-medium">Pipeline Inspector</a>
           <a href="/dashboard" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">← Back to app</a>
           <button
             onClick={() => setShowThresholds(true)}
