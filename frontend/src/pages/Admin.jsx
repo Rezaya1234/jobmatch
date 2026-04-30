@@ -35,7 +35,7 @@ const AGENT_COLORS = {
   'Test Agent':          'bg-rose-100 text-rose-700',
   'Insights Agent':      'bg-teal-100 text-teal-700',
   'Email Agent':         'bg-slate-100 text-slate-600',
-  'Vector Index':        'bg-indigo-100 text-indigo-700',
+  'Vector Index':        'bg-violet-100 text-violet-700',
 }
 
 const SEV_COLORS = {
@@ -52,7 +52,7 @@ const METRIC_COLORS = {
 }
 
 const DIM_COLORS = {
-  skills_match:        '#5B4FE8',
+  skills_match:        '#7c3aed',
   industry_alignment:  '#10B981',
   experience_level:    '#8B5CF6',
   function_type:       '#F59E0B',

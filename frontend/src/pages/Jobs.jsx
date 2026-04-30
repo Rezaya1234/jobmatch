@@ -71,7 +71,7 @@ const SORT_OPTIONS = [
 ]
 
 const WORK_MODE_BORDER = {
-  remote: 'border-l-indigo-400',
+  remote: 'border-l-violet-400',
   hybrid: 'border-l-amber-400',
   onsite: 'border-l-slate-300',
 }
@@ -112,7 +112,7 @@ function Pagination({ page, totalPages, onChange }) {
   if (right < totalPages) { if (right < totalPages - 1) pages.push('…'); pages.push(totalPages) }
 
   const btn = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors'
-  const active = `${btn} bg-indigo-600 text-white`
+  const active = `${btn} bg-violet-600 text-white`
   const inactive = `${btn} text-slate-600 hover:bg-slate-100 border border-slate-200`
   const disabled = `${btn} text-slate-300 border border-slate-100 cursor-not-allowed`
 
@@ -210,7 +210,7 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
               target="_blank"
               rel="noreferrer"
               onClick={handleLinkClick}
-              className="text-sm font-semibold text-slate-900 hover:text-indigo-700 transition-colors leading-snug block mt-0.5"
+              className="text-sm font-semibold text-slate-900 hover:text-violet-700 transition-colors leading-snug block mt-0.5"
             >
               {job.title}
             </a>
@@ -384,13 +384,13 @@ export default function Jobs() {
               placeholder="Search by title or company…"
               value={search}
               onChange={e => handleSearchChange(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
             />
           </div>
           <select
             value={sortBy}
             onChange={e => { setSortBy(e.target.value); setPage(1) }}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-700"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white text-slate-700"
           >
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
@@ -400,7 +400,7 @@ export default function Jobs() {
           <span className="text-xs text-slate-400 font-medium">Mode:</span>
           {['remote', 'hybrid', 'onsite'].map(m => (
             <button key={m} onClick={() => toggleFilter(setWorkMode, workMode, m)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors capitalize ${workMode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400 hover:text-indigo-600'}`}>
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors capitalize ${workMode === m ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-300 hover:border-violet-400 hover:text-violet-600'}`}>
               {m}
             </button>
           ))}
@@ -408,7 +408,7 @@ export default function Jobs() {
           <span className="text-xs text-slate-400 font-medium">Type:</span>
           {['full_time', 'part_time', 'contract'].map(t => (
             <button key={t} onClick={() => toggleFilter(setJobType, jobType, t)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${jobType === t ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400 hover:text-indigo-600'}`}>
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${jobType === t ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-300 hover:border-violet-400 hover:text-violet-600'}`}>
               {t.replace('_', ' ')}
             </button>
           ))}
@@ -423,7 +423,7 @@ export default function Jobs() {
           <span className="text-xs text-slate-400 font-medium">Sector:</span>
           {['Technology', 'Upstream Oil and Gas', 'Oilfield Services'].map(s => (
             <button key={s} onClick={() => { toggleFilter(setSector, sector, s); }}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${sector === s ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400 hover:text-indigo-600'}`}>
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${sector === s ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-300 hover:border-violet-400 hover:text-violet-600'}`}>
               {s}
             </button>
           ))}
@@ -441,7 +441,7 @@ export default function Jobs() {
           </svg>
           <p className="text-base font-semibold text-slate-600 mb-1">No positions found</p>
           {hasFilters
-            ? <button onClick={clearFilters} className="text-sm text-indigo-600 hover:underline">Clear filters</button>
+            ? <button onClick={clearFilters} className="text-sm text-violet-600 hover:underline">Clear filters</button>
             : <p className="text-sm text-slate-500">Try adjusting your search.</p>
           }
         </div>

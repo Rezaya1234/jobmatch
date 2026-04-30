@@ -185,7 +185,7 @@ export default function CompanyDetail() {
   const signalDotColors = {
     hiring_surge: '#22C55E',
     expansion:    '#3B82F6',
-    tech_stack:   '#5B4FE8',
+    tech_stack:   '#7c3aed',
     culture:      '#F59E0B',
     leadership:   '#6B7280',
   }
@@ -316,7 +316,7 @@ export default function CompanyDetail() {
                           <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
                             <div
                               className="h-5 rounded-full"
-                              style={{ width: `${d.pct}%`, backgroundColor: '#5B4FE8' }}
+                              style={{ width: `${d.pct}%`, backgroundColor: '#7c3aed' }}
                             />
                           </div>
                           <span className="text-xs font-bold text-violet-700 w-10 text-right shrink-0">{d.pct}%</span>

@@ -57,7 +57,7 @@ function JobCard({ match, userId, onFeedback, initialRating = null }) {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-3">
-        {match.work_mode && <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full">{match.work_mode}</span>}
+        {match.work_mode && <span className="text-xs bg-violet-50 text-violet-700 px-2 py-1 rounded-full">{match.work_mode}</span>}
         {match.salary_min && (
           <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">
             ${(match.salary_min / 1000).toFixed(0)}k{match.salary_max ? `–$${(match.salary_max / 1000).toFixed(0)}k` : '+'}
@@ -102,7 +102,7 @@ function JobCard({ match, userId, onFeedback, initialRating = null }) {
           </button>
         </div>
         {match.url && (
-          <a href={match.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:underline font-medium">
+          <a href={match.url} target="_blank" rel="noreferrer" className="text-xs text-violet-600 hover:underline font-medium">
             View job →
           </a>
         )}
@@ -159,7 +159,7 @@ export default function Matches() {
             <select
               value={minScore}
               onChange={e => setMinScore(parseFloat(e.target.value))}
-              className="border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
             >
               <option value={0}>All</option>
               <option value={0.5}>50%+</option>
@@ -167,7 +167,7 @@ export default function Matches() {
               <option value={0.8}>80%+</option>
             </select>
           </label>
-          <button onClick={load} className="text-sm text-indigo-600 hover:underline font-medium">Refresh</button>
+          <button onClick={load} className="text-sm text-violet-600 hover:underline font-medium">Refresh</button>
         </div>
       </div>
 

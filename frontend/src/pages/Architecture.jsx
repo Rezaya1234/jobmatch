@@ -104,7 +104,7 @@ const AGENTS = [
   },
   {
     name: 'Orchestrator',
-    color: 'indigo',
+    color: 'violet',
     icon: '⚙️',
     what: 'Coordinates the full pipeline. Decoupled into two independent phases: job collection (profile-independent) and user matching (per user).',
     config: [
@@ -156,7 +156,7 @@ const COLOR_MAP = {
   green:  { bg: 'bg-green-50',  border: 'border-green-200',  badge: 'bg-green-100 text-green-700',  dot: 'bg-green-500' },
   purple: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500' },
   amber:  { bg: 'bg-amber-50',  border: 'border-amber-200',  badge: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-500' },
-  indigo: { bg: 'bg-indigo-50', border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' },
+  violet: { bg: 'bg-violet-50', border: 'border-violet-200', badge: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500' },
   slate:  { bg: 'bg-slate-50',  border: 'border-slate-200',  badge: 'bg-slate-100 text-slate-600',  dot: 'bg-slate-400' },
 }
 
@@ -230,7 +230,7 @@ export default function Architecture() {
             { arrow: true },
             { label: 'Match Agent', sub: 'LLM scoring', color: 'bg-purple-100 text-purple-700' },
             { arrow: true },
-            { label: 'Matches', sub: 'shown to user', color: 'bg-indigo-100 text-indigo-700' },
+            { label: 'Matches', sub: 'shown to user', color: 'bg-violet-100 text-violet-700' },
           ].map((item, i) =>
             item.arrow ? (
               <span key={i} className="text-slate-300 font-bold">→</span>

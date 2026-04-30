@@ -38,7 +38,7 @@ function StepCard({ meta, stepStatus, onClick, disabled }) {
         'flex flex-col items-center p-3 rounded-xl border-2 text-center w-full transition-all',
         done    ? 'border-green-400 bg-green-50'                                    : '',
         error   ? 'border-red-300 bg-red-50'                                        : '',
-        running ? 'border-indigo-300 bg-indigo-50 cursor-wait'                     : '',
+        running ? 'border-violet-300 bg-violet-50 cursor-wait'                     : '',
         idle    ? 'border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50 cursor-pointer' : '',
         disabled && !running ? 'opacity-40 cursor-not-allowed' : '',
       ].join(' ')}
@@ -47,7 +47,7 @@ function StepCard({ meta, stepStatus, onClick, disabled }) {
       <div className={[
         'w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center mb-2 shrink-0',
         done    ? 'bg-green-500 text-white'  : '',
-        running ? 'bg-indigo-500 text-white' : '',
+        running ? 'bg-violet-500 text-white' : '',
         error   ? 'bg-red-400 text-white'    : '',
         idle    ? 'bg-slate-100 text-slate-600' : '',
       ].join(' ')}>
@@ -317,7 +317,7 @@ export default function Pipeline() {
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-semibold text-slate-800">Step-by-Step Testing</h2>
           {anyStepRunning && (
-            <span className="flex items-center gap-1.5 text-xs text-indigo-600 font-medium">
+            <span className="flex items-center gap-1.5 text-xs text-violet-600 font-medium">
               <Spinner size={3} /> Running…
             </span>
           )}
@@ -387,7 +387,7 @@ export default function Pipeline() {
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between">
           <span className="text-sm text-slate-600 font-medium">Total jobs in database</span>
-          <span className="text-2xl font-bold text-indigo-600">{totals.jobs.toLocaleString()}</span>
+          <span className="text-2xl font-bold text-violet-600">{totals.jobs.toLocaleString()}</span>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between">
           <span className="text-sm text-slate-600 font-medium">Your matches</span>
@@ -408,7 +408,7 @@ export default function Pipeline() {
           </div>
           {(isDone || isRunning) && (
             <div className="grid grid-cols-3 gap-3 text-center">
-              {[['New Jobs', pipe.new_jobs, 'indigo'], ['Passed Filter', pipe.passed_filter, 'purple'], ['Scored', pipe.scored, 'green']].map(([label, val, color]) => (
+              {[['New Jobs', pipe.new_jobs, 'violet'], ['Passed Filter', pipe.passed_filter, 'purple'], ['Scored', pipe.scored, 'green']].map(([label, val, color]) => (
                 <div key={label} className={`bg-${color}-50 rounded-lg p-3`}>
                   <div className={`text-2xl font-bold text-${color}-700`}>{val}</div>
                   <div className={`text-xs text-${color}-500 font-medium uppercase tracking-wide mt-0.5`}>{label}</div>

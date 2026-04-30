@@ -14,14 +14,14 @@ const EVENT_META = {
   click:                { icon: '👆', label: 'Clicked job',          color: 'bg-sky-100 text-sky-700 border-sky-200' },
   applied:              { icon: '📨', label: 'Applied',              color: 'bg-amber-100 text-amber-700 border-amber-200' },
   interview:            { icon: '🤝', label: 'Interview',            color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  dashboard_visit:      { icon: '👁', label: 'Dashboard visit',      color: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
+  dashboard_visit:      { icon: '👁', label: 'Dashboard visit',      color: 'bg-violet-50 text-violet-600 border-violet-200' },
   email_sent:           { icon: '✉️', label: 'Email sent',           color: 'bg-blue-50 text-blue-700 border-blue-200' },
   recap_sent:           { icon: '📋', label: 'Recap sent',           color: 'bg-blue-50 text-blue-600 border-blue-200' },
   profile_updated:      { icon: '🧠', label: 'Profile updated',      color: 'bg-purple-100 text-purple-700 border-purple-200' },
   weights_updated:      { icon: '⚖️', label: 'Weights updated',      color: 'bg-violet-100 text-violet-700 border-violet-200' },
   cold_start_graduated: { icon: '🎓', label: 'Cold start graduated', color: 'bg-teal-100 text-teal-700 border-teal-200' },
   llm_scored:           { icon: '🤖', label: 'LLM scored',           color: 'bg-orange-50 text-orange-700 border-orange-200' },
-  jobs_delivered:       { icon: '📦', label: 'Jobs delivered',       color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+  jobs_delivered:       { icon: '📦', label: 'Jobs delivered',       color: 'bg-violet-100 text-violet-700 border-violet-200' },
   filter_run:           { icon: '🔍', label: 'Filter run',           color: 'bg-slate-100 text-slate-600 border-slate-200' },
 }
 
@@ -246,7 +246,7 @@ function ActivityCard({ item }) {
             <div className="flex items-center gap-2 shrink-0">
               <p className="text-xs text-slate-400 whitespace-nowrap">{formatTs(item.created_at)}</p>
               {hasDetail && (
-                <button onClick={() => setExpanded(e => !e)} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">
+                <button onClick={() => setExpanded(e => !e)} className="text-xs text-violet-500 hover:text-violet-700 font-medium">
                   {expanded ? 'Hide' : 'Details'}
                 </button>
               )}
@@ -356,7 +356,7 @@ export default function QA() {
           <h1 className="text-2xl font-bold text-slate-900">QA Dashboard</h1>
           <p className="text-sm text-slate-500 mt-1">{activity.length} events logged</p>
         </div>
-        <button onClick={load} disabled={loading} className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold disabled:opacity-40">
+        <button onClick={load} disabled={loading} className="text-sm text-violet-600 hover:text-violet-800 font-semibold disabled:opacity-40">
           {loading ? 'Loading…' : 'Refresh'}
         </button>
       </div>
@@ -372,7 +372,7 @@ export default function QA() {
               key={f.key}
               onClick={() => setFilter(f.key)}
               className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                filter === f.key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'
+                filter === f.key ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-600 border-slate-300 hover:border-violet-400'
               }`}
             >
               {f.label} <span className="opacity-60 ml-1">{count}</span>
