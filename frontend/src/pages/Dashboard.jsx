@@ -420,7 +420,7 @@ function MatchFunnel({ matches, feedback }) {
       label: 'Jobs shown',
       sub: null,
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
         </svg>
@@ -432,7 +432,7 @@ function MatchFunnel({ matches, feedback }) {
       label: 'Jobs opened',
       sub: `${clickRate}% of shown`,
       icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
         </svg>
       ),
@@ -443,7 +443,7 @@ function MatchFunnel({ matches, feedback }) {
       label: 'Reactions',
       sub: `${likeRate}% of opened`,
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
           <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
         </svg>
       ),
@@ -453,37 +453,40 @@ function MatchFunnel({ matches, feedback }) {
 
   return (
     <div>
-      {/* Horizontal step line */}
-      <div className="relative flex items-center justify-between px-4">
-        {/* Connecting line */}
-        <div className="absolute left-1/6 right-1/6 top-1/2 -translate-y-1/2 h-0.5 bg-violet-200" style={{ left: '16.66%', right: '16.66%' }} />
-
+      {/* Circles row — line lives here so top-1/2 hits circle centers */}
+      <div className="relative flex justify-between items-center">
+        {/* Line passes through circle centers: offset by half circle width (16px = w-8/2) */}
+        <div className="absolute top-1/2 -translate-y-1/2 h-0.5 bg-violet-200" style={{ left: 16, right: 16 }} />
         {nodes.map((node, i) => (
-          <div key={i} className="flex flex-col items-center gap-2 z-10">
-            <div className={`w-12 h-12 rounded-full ${node.bg} ${node.iconColor} ring-4 ${node.ring} flex items-center justify-center shadow-sm`}>
-              {node.icon}
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-slate-800 leading-none">{node.value}</p>
-              <p className="text-xs font-medium text-slate-600 mt-0.5">{node.label}</p>
-              {node.sub && <p className="text-[10px] text-slate-400 mt-0.5">{node.sub}</p>}
-              {i === 2 && (liked + disliked > 0) && (
-                <div className="mt-2 flex items-center gap-2 justify-center">
-                  <div className="flex items-center gap-0.5">
-                    <svg className="w-3.5 h-3.5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                    </svg>
-                    <span className="text-xs text-slate-600 font-medium">{liked}</span>
-                  </div>
-                  <div className="flex items-center gap-0.5">
-                    <svg className="w-3.5 h-3.5 text-rose-500" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                    </svg>
-                    <span className="text-xs text-slate-600 font-medium">{disliked}</span>
-                  </div>
+          <div key={i} className={`w-8 h-8 rounded-full ${node.bg} ${node.iconColor} ring-2 ${node.ring} flex items-center justify-center shadow-sm z-10 shrink-0`}>
+            {node.icon}
+          </div>
+        ))}
+      </div>
+
+      {/* Labels row — strictly below circles, no influence on line */}
+      <div className="flex justify-between mt-2">
+        {nodes.map((node, i) => (
+          <div key={i} className="flex flex-col items-center" style={{ width: 32 }}>
+            <p className="text-lg font-bold text-slate-800 leading-none">{node.value}</p>
+            <p className="text-[10px] font-medium text-slate-600 mt-0.5 whitespace-nowrap">{node.label}</p>
+            {node.sub && <p className="text-[9px] text-slate-400 mt-0.5">{node.sub}</p>}
+            {i === 2 && (liked + disliked > 0) && (
+              <div className="mt-1 flex items-center gap-1.5 justify-center">
+                <div className="flex items-center gap-0.5">
+                  <svg className="w-3 h-3 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                  </svg>
+                  <span className="text-[10px] text-slate-600 font-medium">{liked}</span>
                 </div>
-              )}
-            </div>
+                <div className="flex items-center gap-0.5">
+                  <svg className="w-3 h-3 text-rose-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                  </svg>
+                  <span className="text-[10px] text-slate-600 font-medium">{disliked}</span>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
