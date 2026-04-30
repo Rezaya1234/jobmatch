@@ -453,12 +453,11 @@ function MatchFunnel({ matches, feedback }) {
 
   return (
     <div>
-      {/* Equal-thirds columns — line at top:16px (circle center), labels unrestricted below */}
-      <div className="relative flex">
-        {/* Line from center of col-1 to center of col-3 */}
-        <div className="absolute h-0.5 bg-violet-200" style={{ top: 16, left: 'calc(100% / 6)', right: 'calc(100% / 6)' }} />
+      {/* justify-between spreads circles edge-to-edge; line from left:16px to right:16px (circle center) */}
+      <div className="relative flex justify-between items-start">
+        <div className="absolute h-0.5 bg-violet-200" style={{ top: 16, left: 16, right: 16 }} />
         {nodes.map((node, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center">
+          <div key={i} className="flex flex-col items-center">
             <div className={`w-8 h-8 rounded-full ${node.bg} ${node.iconColor} ring-2 ${node.ring} flex items-center justify-center shadow-sm z-10 shrink-0`}>
               {node.icon}
             </div>
