@@ -461,6 +461,23 @@ class FilterAgent:
         accepted_set = {a.lower() for a in profile.locations}
         accepts_us = bool(accepted_set & _US_ALIASES)
 
+        # Onsite + not open to relocation: enforce city-level match against user's location
+        open_to_relocation = getattr(profile, "open_to_relocation", True)
+        if (
+            job.work_mode == "onsite"
+            and "onsite" in (profile.work_modes or [])
+            and not open_to_relocation
+        ):
+            user_city = next(
+                (loc for loc in profile.locations if loc.lower() not in _US_ALIASES),
+                None,
+            )
+            if user_city and user_city.lower() not in job_location:
+                return FilterResult(
+                    passed=False,
+                    reason=f"onsite job in '{job.location_raw}' does not match user city '{user_city}' (relocation off)",
+                )
+
         for accepted in profile.locations:
             if accepted.lower() in job_location:
                 return FilterResult(passed=True)

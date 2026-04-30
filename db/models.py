@@ -145,6 +145,9 @@ class UserProfile(Base):
     avatar_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Relocation preference (used with onsite work mode)
+    open_to_relocation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+
     # Profile completion gate
     profile_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 

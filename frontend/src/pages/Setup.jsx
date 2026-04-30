@@ -368,17 +368,18 @@ export default function Setup() {
   const [aiProfile, setAiProfile]   = useState('')
 
   const [profile, setProfile] = useState({
-    work_modes:       ['remote'],
-    job_types:        ['full_time'],
-    seniority_levels: ['mid'],
-    locations:        ['United States'],
-    visa_types:       ['no_sponsorship'],
-    sectors:          [],
-    companies:        [],
-    min_salary:       '',
-    max_salary:       '',
-    title_include:    [],
-    title_exclude:    [],
+    work_modes:          ['remote', 'hybrid', 'onsite'],
+    job_types:           ['full_time'],
+    seniority_levels:    [],
+    locations:           ['United States'],
+    visa_types:          ['no_sponsorship'],
+    sectors:             [],
+    companies:           [],
+    min_salary:          '',
+    max_salary:          '',
+    title_include:       [],
+    title_exclude:       [],
+    open_to_relocation:  true,
   })
 
   function showStatus(msg, error = false) {
@@ -399,17 +400,18 @@ export default function Setup() {
     if (!userId) return
     getProfile(userId).then(p => {
       setProfile({
-        work_modes:       p.work_modes          || ['remote'],
-        job_types:        p.job_types           || ['full_time'],
-        seniority_levels: p.seniority_level     ? [p.seniority_level] : ['mid'],
-        locations:        p.locations           || ['United States'],
-        sectors:          p.preferred_sectors   || [],
-        companies:        p.preferred_companies || [],
-        min_salary:       p.salary_min          || '',
-        max_salary:       p.salary_max          || '',
-        title_include:    p.title_include        || [],
-        title_exclude:    p.title_exclude        || [],
-        visa_types:       p.visa_types           || ['no_sponsorship'],
+        work_modes:         p.work_modes          || ['remote', 'hybrid', 'onsite'],
+        job_types:          p.job_types           || ['full_time'],
+        seniority_levels:   p.seniority_level     ? [p.seniority_level] : [],
+        locations:          p.locations           || ['United States'],
+        sectors:            p.preferred_sectors   || [],
+        companies:          p.preferred_companies || [],
+        min_salary:         p.salary_min          || '',
+        max_salary:         p.salary_max          || '',
+        title_include:      p.title_include        || [],
+        title_exclude:      p.title_exclude        || [],
+        visa_types:         p.visa_types           || ['no_sponsorship'],
+        open_to_relocation: p.open_to_relocation !== undefined ? p.open_to_relocation : true,
       })
       if (p.role_description) {
         setAiProfile(p.role_description)
@@ -468,6 +470,7 @@ export default function Setup() {
         title_exclude:               profile.title_exclude,
         visa_types:                  profile.visa_types,
         visa_sponsorship_required:   needsSponsorship,
+        open_to_relocation:          profile.open_to_relocation,
       })
       setProfile(p => ({
         ...p,
@@ -521,6 +524,7 @@ export default function Setup() {
         title_exclude:               profile.title_exclude,
         visa_types:                  profile.visa_types,
         visa_sponsorship_required:   needsSponsorship,
+        open_to_relocation:          profile.open_to_relocation,
         profile_complete:            true,
       })
       localStorage.setItem('profileComplete', 'true')
@@ -757,6 +761,24 @@ export default function Setup() {
                           onClick={() => toggleArr('work_modes', m.value)} />
                       ))}
                     </div>
+                    {profile.work_modes.includes('onsite') && (
+                      <div className="flex items-center gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setProfile(p => ({ ...p, open_to_relocation: !p.open_to_relocation }))}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 ${
+                            profile.open_to_relocation ? 'bg-violet-600' : 'bg-slate-200'
+                          }`}
+                          role="switch"
+                          aria-checked={profile.open_to_relocation}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
+                            profile.open_to_relocation ? 'translate-x-4' : 'translate-x-0'
+                          }`} />
+                        </button>
+                        <span className="text-sm text-slate-600">Open to relocation</span>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Job type</label>
@@ -773,12 +795,12 @@ export default function Setup() {
                 {/* Seniority */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Seniority level</label>
-                  <p className="text-xs text-slate-400 mb-2">Select your current level — this sets the seniority ceiling for your matches.</p>
+                  <p className="text-xs text-slate-400 mb-2">Select one or more — leave blank to see all levels.</p>
                   <div className="flex flex-wrap gap-2">
                     {SENIORITY_LEVELS.map(s => (
                       <Pill key={s.value} label={s.label}
                         selected={profile.seniority_levels.includes(s.value)}
-                        onClick={() => setProfile(p => ({ ...p, seniority_levels: [s.value] }))} />
+                        onClick={() => toggleArr('seniority_levels', s.value)} />
                     ))}
                   </div>
                 </div>

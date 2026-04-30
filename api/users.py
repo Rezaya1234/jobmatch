@@ -61,6 +61,7 @@ class ProfileRequest(BaseModel):
     avatar_url: str | None = None
     display_name: str | None = None
     goals_text: str | None = None
+    open_to_relocation: bool = True
     profile_complete: bool | None = None  # only written on explicit "Looks good" confirmation
 
 
@@ -452,6 +453,7 @@ def _profile_response(profile: UserProfile) -> ProfileResponse:
         avatar_url=getattr(profile, "avatar_url", None),
         display_name=getattr(profile, "display_name", None),
         goals_text=getattr(profile, "goals_text", None),
+        open_to_relocation=getattr(profile, "open_to_relocation", True),
         profile_complete=profile.profile_complete or False,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
