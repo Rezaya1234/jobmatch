@@ -69,7 +69,7 @@ async def list_jobs(
             .where(Job.is_active.is_(True))
         )
         stmt = _apply_filters(stmt, search, work_mode, job_type, sector)
-        stmt = stmt.order_by(JobMatch.embedding_score.desc().nullslast()).limit(limit).offset(offset)
+        stmt = stmt.order_by(JobMatch.score.desc().nullslast(), Job.created_at.desc()).limit(limit).offset(offset)
     else:
         order = _SORT_MAP.get(sort_by, Job.created_at.desc())
         stmt = select(Job).where(Job.is_active.is_(True))
