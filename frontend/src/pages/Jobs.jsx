@@ -281,6 +281,7 @@ export default function Jobs() {
   const [search, setSearch] = useState('')
   const [workMode, setWorkMode] = useState('')
   const [jobType, setJobType] = useState('')
+  const [sector, setSector] = useState('')
   const [sortBy, setSortBy] = useState('date_desc')
   const [feedbackMap, setFeedbackMap] = useState({})
 
@@ -299,10 +300,11 @@ export default function Jobs() {
     search: debouncedSearch,
     work_mode: workMode,
     job_type: jobType,
+    sector,
     sort_by: sortBy,
     limit: PAGE_SIZE,
     offset: (p - 1) * PAGE_SIZE,
-  }), [debouncedSearch, workMode, jobType, sortBy])
+  }), [debouncedSearch, workMode, jobType, sector, sortBy])
 
   async function load(p) {
     setLoading(true)
@@ -310,7 +312,7 @@ export default function Jobs() {
       const params = buildParams(p)
       const [data, countData, fb] = await Promise.all([
         listJobs(params),
-        getJobCount({ search: params.search, work_mode: params.work_mode, job_type: params.job_type }),
+        getJobCount({ search: params.search, work_mode: params.work_mode, job_type: params.job_type, sector: params.sector }),
         userId ? getFeedback(userId).catch(() => []) : Promise.resolve([]),
       ])
       setJobs(data)
@@ -326,7 +328,7 @@ export default function Jobs() {
   useEffect(() => {
     setPage(1)
     load(1)
-  }, [debouncedSearch, workMode, jobType, sortBy])
+  }, [debouncedSearch, workMode, jobType, sector, sortBy])
 
   useEffect(() => {
     load(page)
@@ -347,11 +349,12 @@ export default function Jobs() {
     setDebouncedSearch('')
     setWorkMode('')
     setJobType('')
+    setSector('')
     setSortBy('date_desc')
     setPage(1)
   }
 
-  const hasFilters = debouncedSearch || workMode || jobType
+  const hasFilters = debouncedSearch || workMode || jobType || sector
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const to = Math.min(page * PAGE_SIZE, total)
 
@@ -412,6 +415,16 @@ export default function Jobs() {
               Clear all
             </button>
           )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-400 font-medium">Sector:</span>
+          {['Technology', 'Upstream Oil and Gas', 'Oilfield Services'].map(s => (
+            <button key={s} onClick={() => { toggleFilter(setSector, sector, s); }}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${sector === s ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400 hover:text-indigo-600'}`}>
+              {s}
+            </button>
+          ))}
         </div>
       </div>
 

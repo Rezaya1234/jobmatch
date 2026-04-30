@@ -37,7 +37,7 @@ _SORT_MAP = {
 }
 
 
-def _apply_filters(stmt, search: str, work_mode: str, job_type: str):
+def _apply_filters(stmt, search: str, work_mode: str, job_type: str, sector: str = ""):
     if search:
         like = f"%{search}%"
         stmt = stmt.where(Job.title.ilike(like) | Job.company.ilike(like))
@@ -45,6 +45,8 @@ def _apply_filters(stmt, search: str, work_mode: str, job_type: str):
         stmt = stmt.where(Job.work_mode == work_mode)
     if job_type:
         stmt = stmt.where(Job.job_type == job_type)
+    if sector:
+        stmt = stmt.where(Job.sector == sector)
     return stmt
 
 
@@ -55,12 +57,13 @@ async def list_jobs(
     search: str = Query(default=""),
     work_mode: str = Query(default=""),
     job_type: str = Query(default=""),
+    sector: str = Query(default=""),
     sort_by: str = Query(default="date_desc"),
     session: AsyncSession = Depends(get_session),
 ) -> list[JobResponse]:
     order = _SORT_MAP.get(sort_by, Job.created_at.desc())
     stmt = select(Job).where(Job.is_active.is_(True))
-    stmt = _apply_filters(stmt, search, work_mode, job_type)
+    stmt = _apply_filters(stmt, search, work_mode, job_type, sector)
     stmt = stmt.order_by(order).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return [
@@ -90,9 +93,10 @@ async def count_jobs(
     search: str = Query(default=""),
     work_mode: str = Query(default=""),
     job_type: str = Query(default=""),
+    sector: str = Query(default=""),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     stmt = select(func.count()).select_from(Job).where(Job.is_active.is_(True))
-    stmt = _apply_filters(stmt, search, work_mode, job_type)
+    stmt = _apply_filters(stmt, search, work_mode, job_type, sector)
     result = await session.execute(stmt)
     return {"count": result.scalar()}
