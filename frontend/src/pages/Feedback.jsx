@@ -677,7 +677,7 @@ export default function Feedback() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <SectionLabel>Improvement</SectionLabel>
-              <SectionCard title="Ways to improve your matches" subtitle="Skill gaps in roles you engage with">
+              <SectionCard title="Close your skill gaps" subtitle="Skill gaps in roles you engage with">
                 {!displayedCourses || displayedCourses.length === 0 ? (
                   <p className="text-xs text-slate-400">Like a few jobs to get personalised course recommendations.</p>
                 ) : (
