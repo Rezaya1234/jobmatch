@@ -36,6 +36,7 @@ class MatchResponse(BaseModel):
     company_size: str | None
     description: str | None
     emailed_at: datetime | None
+    delivered_at: datetime | None
     is_fallback: bool
     created_at: datetime
 
@@ -150,6 +151,7 @@ def _to_response(match: JobMatch, job: Job) -> MatchResponse:
         company_size=job.company_size,
         description=job.description[:1500] if job.description else None,
         emailed_at=match.emailed_at,
+        delivered_at=match.delivered_at,
         is_fallback=bool(match.is_fallback),
         created_at=match.created_at,
     )

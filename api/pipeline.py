@@ -283,6 +283,55 @@ async def backfill_logos(
     return PipelineResponse(status="ok", detail=f"Backfilled {updated} company logo domains.")
 
 
+class FirstRunResponse(BaseModel):
+    status: str   # "complete" | "processing" | "already_run"
+    jobs_found: int = 0
+
+
+@router.post("/run-for-user/{user_id}", response_model=FirstRunResponse, status_code=200)
+async def run_pipeline_for_user(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+    llm: LLMClient = Depends(get_llm),
+) -> FirstRunResponse:
+    """
+    Trigger a full matching pipeline run for a first-time user.
+    Only executes if no OrchestrationLog entry exists for this user.
+    Synchronous with 60-second timeout; returns 'processing' if it takes longer.
+    """
+    import asyncio
+    import uuid as _uuid
+    from sqlalchemy import func as sqlfunc
+    from db.models import JobMatch, OrchestrationLog
+
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        return FirstRunResponse(status="error")
+
+    existing = await session.scalar(
+        select(sqlfunc.count()).select_from(OrchestrationLog)
+        .where(OrchestrationLog.user_id == uid)
+    )
+    if existing:
+        return FirstRunResponse(status="already_run")
+
+    stats = PipelineStats()
+    try:
+        async with asyncio.timeout(60):
+            await OrchestratorAgent(session, llm)._process_user(user_id, stats)
+        jobs_found = await session.scalar(
+            select(sqlfunc.count()).select_from(JobMatch)
+            .where(JobMatch.user_id == uid, JobMatch.delivered_at.isnot(None))
+        ) or 0
+        return FirstRunResponse(status="complete", jobs_found=int(jobs_found))
+    except TimeoutError:
+        return FirstRunResponse(status="processing")
+    except Exception:
+        logger.exception("run-for-user failed for %s", user_id)
+        return FirstRunResponse(status="processing")
+
+
 @router.post("/match/{user_id}", response_model=PipelineResponse, status_code=202)
 async def trigger_on_demand_match(
     user_id: str,
