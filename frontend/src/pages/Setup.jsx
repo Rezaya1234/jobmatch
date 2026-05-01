@@ -415,7 +415,6 @@ export default function Setup() {
       })
       if (p.role_description) {
         setAiProfile(p.role_description)
-        setProfileGenerated(true)
       }
       // Sync localStorage so route guard is accurate
       if (p.profile_complete) {
