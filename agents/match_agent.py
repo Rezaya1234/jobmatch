@@ -63,8 +63,18 @@ class MatchAgent:
         self._session = session
         self._llm = llm
 
-    async def run(self, user_id: str, match_run_id: str | None = None) -> MatchRunResult:
-        """Score top candidates (Call 1), then enrich with Call 2 for active users."""
+    async def run(
+        self,
+        user_id: str,
+        match_run_id: str | None = None,
+        candidate_job_ids: list[str] | None = None,
+    ) -> MatchRunResult:
+        """Score top candidates (Call 1), then enrich with Call 2 for active users.
+
+        candidate_job_ids: if provided, score exactly these jobs (the final output
+        of FilterAgent.get_candidates — soft-filtered + diversified). When omitted,
+        falls back to a DB query using the embedding_score threshold.
+        """
         profile = await self._get_profile(user_id)
         if profile is None:
             logger.warning("No profile for user %s — skipping matching", user_id)
@@ -76,7 +86,7 @@ class MatchAgent:
             weights = DEFAULT_WEIGHTS.copy()
 
         # ---- Call 1: batch LLM scoring ----
-        matches = await self._get_top_candidates(user_id)
+        matches = await self._get_top_candidates(user_id, job_ids=candidate_job_ids)
         jobs_by_id: dict[str, Job] = {}
         scored = 0
 
@@ -237,27 +247,44 @@ class MatchAgent:
             logger.exception("Call 2 failed for match %s", match.id)
         return None
 
-    async def _get_top_candidates(self, user_id: str) -> list[JobMatch]:
-        result = await self._session.execute(
-            select(JobMatch)
-            .join(Job, JobMatch.job_id == Job.id)
-            .where(
-                JobMatch.user_id == user_id,
-                JobMatch.passed_hard_filter.is_(True),
-                JobMatch.score.is_(None),
-                Job.is_active.is_(True),
-                or_(
-                    JobMatch.embedding_score.is_(None),
-                    JobMatch.embedding_score >= _EMBEDDING_THRESHOLD,
-                ),
+    async def _get_top_candidates(
+        self, user_id: str, job_ids: list[str] | None = None
+    ) -> list[JobMatch]:
+        if job_ids is not None:
+            # Score exactly the jobs that survived soft filter + diversification.
+            result = await self._session.execute(
+                select(JobMatch)
+                .join(Job, JobMatch.job_id == Job.id)
+                .where(
+                    JobMatch.user_id == user_id,
+                    JobMatch.passed_hard_filter.is_(True),
+                    JobMatch.score.is_(None),
+                    Job.is_active.is_(True),
+                    JobMatch.job_id.in_(job_ids),
+                )
             )
-            .order_by(
-                JobMatch.embedding_score.desc().nulls_last(),
-                JobMatch.heuristic_score.desc().nulls_last(),
-                Job.posted_at.desc().nulls_last(),
+        else:
+            # Fallback: use embedding threshold (legacy path, no candidate list available).
+            result = await self._session.execute(
+                select(JobMatch)
+                .join(Job, JobMatch.job_id == Job.id)
+                .where(
+                    JobMatch.user_id == user_id,
+                    JobMatch.passed_hard_filter.is_(True),
+                    JobMatch.score.is_(None),
+                    Job.is_active.is_(True),
+                    or_(
+                        JobMatch.embedding_score.is_(None),
+                        JobMatch.embedding_score >= _EMBEDDING_THRESHOLD,
+                    ),
+                )
+                .order_by(
+                    JobMatch.embedding_score.desc().nulls_last(),
+                    JobMatch.heuristic_score.desc().nulls_last(),
+                    Job.posted_at.desc().nulls_last(),
+                )
+                .limit(_TOP_K)
             )
-            .limit(_TOP_K)
-        )
         return list(result.scalars().all())
 
     async def _get_call2_pending(self, user_id: str) -> list[JobMatch]:

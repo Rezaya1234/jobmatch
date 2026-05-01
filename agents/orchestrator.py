@@ -186,6 +186,7 @@ class OrchestratorAgent:
 
         # Step 2: Soft constraints + heuristic + BGE embedding → top 10-15 candidates
         candidates = await filter_agent.get_candidates(user_id)
+        candidate_ids = [str(j.id) for j in candidates]
 
         # Step 3: LLM scoring — only if enough candidates and within daily cap
         pending = len(candidates)
@@ -196,7 +197,7 @@ class OrchestratorAgent:
         elif pending >= _MIN_CANDIDATES_FOR_LLM:
             await self._emit(f"Scoring top candidates with AI ({pending} candidates)...")
             match_agent = MatchAgent(self._session, self._llm)
-            result = await match_agent.run(user_id, match_run_id=match_run_id)
+            result = await match_agent.run(user_id, match_run_id=match_run_id, candidate_job_ids=candidate_ids)
             scored = result.scored
             stats.total_scored += scored
             if result.scored > 0:
@@ -384,6 +385,7 @@ class OrchestratorAgent:
         filter_agent = FilterAgent(self._session)
         await filter_agent.run(user_id)
         candidates = await filter_agent.get_candidates(user_id)
+        candidate_ids = [str(j.id) for j in candidates]
 
         if len(candidates) < _MIN_CANDIDATES_FOR_LLM:
             logger.info(
@@ -392,7 +394,7 @@ class OrchestratorAgent:
             return 0
 
         match_agent = MatchAgent(self._session, self._llm)
-        result = await match_agent.run(user_id)
+        result = await match_agent.run(user_id, candidate_job_ids=candidate_ids)
         logger.info("On-demand scoring complete for user %s — %d scored", user_id, result.scored)
         return result.scored
 
