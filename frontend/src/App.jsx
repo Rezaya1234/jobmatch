@@ -29,6 +29,8 @@ import Terms from './pages/Terms'
 import SignIn from './pages/SignIn'
 import SignUp from './pages/SignUp'
 import ForgotPassword from './pages/ForgotPassword'
+import VerifyEmail from './pages/VerifyEmail'
+import ResetPassword from './pages/ResetPassword'
 
 import { getNotifications } from './api'
 import './index.css'
@@ -390,6 +392,8 @@ export default function App() {
         <Route path="/signin"          element={<PublicLayout><SignIn /></PublicLayout>} />
         <Route path="/signup"          element={<PublicLayout><SignUp /></PublicLayout>} />
         <Route path="/forgot-password" element={<PublicLayout><ForgotPassword /></PublicLayout>} />
+        <Route path="/verify-email"    element={<PublicLayout><VerifyEmail /></PublicLayout>} />
+        <Route path="/reset-password"  element={<PublicLayout><ResetPassword /></PublicLayout>} />
 
         {/* Admin — own layout, no sidebar */}
         <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />

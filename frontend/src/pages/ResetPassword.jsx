@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { authRegister } from '../api'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { authResetPassword } from '../api'
 
 function getStrength(password) {
   if (!password) return { label: '', color: '', width: '0%' }
@@ -16,88 +16,66 @@ function getStrength(password) {
   return { label: 'Strong', color: 'bg-green-500', width: '100%' }
 }
 
-export default function SignUp() {
-  const [email,    setEmail]    = useState('')
+export default function ResetPassword() {
+  const [searchParams] = useSearchParams()
+  const token = searchParams.get('token')
+  const navigate = useNavigate()
+
   const [password, setPassword] = useState('')
   const [confirm,  setConfirm]  = useState('')
   const [showPw,   setShowPw]   = useState(false)
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
-  const [sent,     setSent]     = useState(false)
-  const navigate = useNavigate()
   const strength = getStrength(password)
+
+  if (!token) {
+    return (
+      <div className="px-5 py-16 max-w-sm mx-auto text-center">
+        <h1 className="text-xl font-bold text-slate-900 mb-2">Invalid reset link</h1>
+        <p className="text-slate-500 text-sm mb-5">
+          This reset link is missing or malformed.
+        </p>
+        <Link to="/forgot-password" className="text-violet-600 text-sm font-medium hover:underline">
+          Request a new one →
+        </Link>
+      </div>
+    )
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    const trimmed = email.trim().toLowerCase()
-    if (!trimmed) return
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
     if (password !== confirm) { setError('Passwords do not match'); return }
     setLoading(true)
     setError('')
     try {
-      await authRegister(trimmed, password)
-      localStorage.setItem('pendingVerifyEmail', trimmed)
-      setSent(true)
+      await authResetPassword(token, password)
+      navigate('/signin?reset=1')
     } catch (err) {
-      const status = err.response?.status
-      if (status === 409) {
-        setError('An account with that email already exists.')
+      const detail = err.response?.data?.detail || ''
+      if (detail.includes('expired')) {
+        setError('This reset link has expired. Request a new one.')
+      } else if (detail.includes('Invalid')) {
+        setError('This reset link is invalid or already used.')
       } else {
-        setError(err.response?.data?.detail || 'Something went wrong. Please try again.')
+        setError(detail || 'Something went wrong. Please try again.')
       }
     } finally {
       setLoading(false)
     }
   }
 
-  if (sent) {
-    return (
-      <div className="px-5 py-16 max-w-sm mx-auto text-center">
-        <div className="w-14 h-14 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-5">
-          <svg className="w-7 h-7 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        </div>
-        <h1 className="text-xl font-bold text-slate-900 mb-2">Check your inbox</h1>
-        <p className="text-slate-500 text-sm leading-relaxed mb-6">
-          We sent a verification link to <strong className="text-slate-700">{email}</strong>.
-          Click it to activate your account.
-        </p>
-        <p className="text-xs text-slate-400">
-          Didn't get it?{' '}
-          <Link to="/signin" className="text-violet-600 font-medium hover:underline">
-            Sign in to resend
-          </Link>
-        </p>
-      </div>
-    )
-  }
-
   return (
     <div className="px-5 py-16 max-w-sm mx-auto">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Create your account</h1>
-        <p className="text-slate-500 text-sm">Start getting personalised job matches in minutes.</p>
+        <h1 className="text-2xl font-bold text-slate-900 mb-2">Set a new password</h1>
+        <p className="text-slate-500 text-sm">Choose a strong password for your account.</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-7">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-              autoFocus
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">New password</label>
             <div className="relative">
               <input
                 type={showPw ? 'text' : 'password'}
@@ -105,6 +83,7 @@ export default function SignUp() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="At least 8 characters"
                 required
+                autoFocus
                 className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
               />
               <button
@@ -130,7 +109,7 @@ export default function SignUp() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm password</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm new password</label>
             <input
               type={showPw ? 'text' : 'password'}
               value={confirm}
@@ -149,33 +128,21 @@ export default function SignUp() {
           {error && (
             <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
               {error}{' '}
-              {error.includes('already exists') && (
-                <Link to="/signin" className="font-semibold underline">Sign in instead →</Link>
+              {(error.includes('expired') || error.includes('invalid')) && (
+                <Link to="/forgot-password" className="font-semibold underline">Request a new link →</Link>
               )}
             </p>
           )}
 
           <button
             type="submit"
-            disabled={loading || !email.trim() || !password || password !== confirm}
+            disabled={loading || !password || password !== confirm}
             className="w-full py-2.5 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? 'Creating account…' : 'Get started'}
+            {loading ? 'Saving…' : 'Set new password'}
           </button>
         </form>
-
-        <p className="text-xs text-slate-400 mt-4 text-center leading-relaxed">
-          By continuing, you agree to our{' '}
-          <Link to="/terms" className="underline hover:text-slate-600">Terms</Link>
-          {' '}and{' '}
-          <Link to="/privacy" className="underline hover:text-slate-600">Privacy Policy</Link>.
-        </p>
       </div>
-
-      <p className="text-center text-xs text-slate-400 mt-5">
-        Already have an account?{' '}
-        <Link to="/signin" className="text-violet-600 font-medium hover:underline">Sign in</Link>
-      </p>
     </div>
   )
 }
