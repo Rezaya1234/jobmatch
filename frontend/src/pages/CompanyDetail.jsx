@@ -7,6 +7,15 @@ import { SLUG_DOMAINS } from '../utils/companyDomains'
 // Helpers
 // ---------------------------------------------------------------------------
 
+function relativeTime(isoStr) {
+  const diffDays = Math.floor((Date.now() - new Date(isoStr)) / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) !== 1 ? 's' : ''} ago`
+  return new Date(isoStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 function parseResponseRatePct(str) {
   if (!str) return null
   const n = parseFloat(str.replace(/[~%\s]/g, ''))
@@ -426,38 +435,40 @@ export default function CompanyDetail() {
             </Section>
           )}
 
-          {/* Recent Signals — vertical timeline */}
-          {company.signals?.length > 0 && (
-            <Section title="Recent Signals">
-              <div>
-                {company.signals.map((s, i) => {
-                  const dotColor = signalDotColors[s.type] || '#6B7280'
-                  const isLast = i === company.signals.length - 1
-                  return (
-                    <div key={i} className="flex gap-3 relative">
-                      {/* Date */}
-                      <div className="w-14 shrink-0 text-right pt-0.5">
-                        {s.date && <span className="text-xs text-slate-400">{s.date}</span>}
-                      </div>
-                      {/* Dot + connecting line */}
-                      <div className="flex flex-col items-center shrink-0">
-                        <div
-                          className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
-                          style={{ backgroundColor: dotColor }}
-                        />
-                        {!isLast && <div className="w-px flex-1 bg-slate-200 my-1" style={{ minHeight: '20px' }} />}
-                      </div>
-                      {/* Content */}
-                      <div className={`flex-1 min-w-0 ${!isLast ? 'pb-4' : ''}`}>
-                        <SignalTypeBadge type={s.type} />
-                        <p className="text-sm font-semibold text-slate-700 mt-1">{s.title}</p>
-                      </div>
+          {/* Recent News */}
+          <Section title="Recent News">
+            {!company.recent_news?.length ? (
+              <p className="text-sm text-slate-400">No recent news found for this company in the last 30 days.</p>
+            ) : (
+              <div className="space-y-4">
+                {company.recent_news.map((item, i) => (
+                  <div key={i} className="flex flex-col gap-0.5">
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-semibold text-slate-800 hover:text-violet-700 leading-snug"
+                    >
+                      {item.headline}
+                    </a>
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      {item.source && <span>{item.source}</span>}
+                      {item.source && <span>·</span>}
+                      <span>{relativeTime(item.published_at)}</span>
                     </div>
-                  )
-                })}
+                  </div>
+                ))}
+                <a
+                  href={`https://news.google.com/search?q=${encodeURIComponent(company.company_name)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block pt-2 text-sm font-medium text-violet-600 hover:underline"
+                >
+                  View more news →
+                </a>
               </div>
-            </Section>
-          )}
+            )}
+          </Section>
 
           {/* Risks */}
           {company.risks?.length > 0 && (

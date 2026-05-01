@@ -1,6 +1,12 @@
+import asyncio
 import logging
-from datetime import date, timedelta
+import time
+import xml.etree.ElementTree as ET
+from datetime import date, datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+from urllib.parse import quote as urlquote
 
+import requests as http_requests
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -13,6 +19,9 @@ from db.models import CompanyHiringSnapshot, CompanyInsight, FeedbackEvent, Job
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/companies", tags=["companies"])
+
+_news_cache: dict[str, tuple[list, float]] = {}
+_NEWS_TTL = 86400  # 24 hours
 
 
 class CompanySummary(BaseModel):
@@ -43,6 +52,13 @@ class HiringVelocity(BaseModel):
     snapshot_date: date | None
 
 
+class RecentNewsItem(BaseModel):
+    headline: str
+    source: str
+    url: str
+    published_at: str
+
+
 class CompanyDetail(BaseModel):
     slug: str
     company_name: str
@@ -69,6 +85,7 @@ class CompanyDetail(BaseModel):
     active_job_count: int
     generated_at: str | None
     hiring_velocity: HiringVelocity | None
+    recent_news: list[RecentNewsItem]
     user_feedback_count: int
 
 
@@ -215,13 +232,16 @@ async def get_company(
             trend="flat", data_available=False, snapshot_date=None,
         )
 
-    # ---- User feedback count (distinct users who interacted with this company's jobs) ----
+    # ---- User feedback count ----
     fb_result = await session.execute(
         select(func.count(FeedbackEvent.user_id.distinct()))
         .join(Job, FeedbackEvent.job_id == Job.id)
         .where(Job.company == row.company_name)
     )
     user_feedback_count = int(fb_result.scalar() or 0)
+
+    # ---- Recent news ----
+    news_items = await _fetch_company_news(row.company_name)
 
     return CompanyDetail(
         slug=row.slug,
@@ -249,6 +269,7 @@ async def get_company(
         active_job_count=live_active_count,
         generated_at=row.generated_at.isoformat() if row.generated_at else None,
         hiring_velocity=hiring_velocity,
+        recent_news=[RecentNewsItem(**item) for item in news_items],
         user_feedback_count=user_feedback_count,
     )
 
@@ -286,3 +307,72 @@ async def get_company_jobs(
         )
         for j in jobs_result.scalars().all()
     ]
+
+
+# ---------------------------------------------------------------------------
+# News helpers
+# ---------------------------------------------------------------------------
+
+def _fetch_company_news_sync(company_name: str) -> list[dict]:
+    """Fetch Google News RSS, return up to 5 items from the last 30 days."""
+    try:
+        url = (
+            "https://news.google.com/rss/search"
+            f"?q={urlquote(company_name)}&hl=en-US&gl=US&ceid=US:en"
+        )
+        resp = http_requests.get(
+            url, timeout=10,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; StellaPath/1.0)"},
+        )
+        if resp.status_code != 200:
+            return []
+        root = ET.fromstring(resp.content)
+        channel = root.find("channel")
+        if channel is None:
+            return []
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        results: list[dict] = []
+        for item in channel.findall("item"):
+            if len(results) >= 5:
+                break
+            title = item.findtext("title") or ""
+            link = item.findtext("link") or ""
+            pub_str = item.findtext("pubDate") or ""
+            source_name = item.findtext("source") or ""
+            try:
+                published_at = parsedate_to_datetime(pub_str)
+                if published_at.tzinfo is None:
+                    published_at = published_at.replace(tzinfo=timezone.utc)
+                if published_at < cutoff:
+                    continue
+            except Exception:
+                continue
+            if source_name and title.endswith(f" - {source_name}"):
+                headline = title[: -len(f" - {source_name}")]
+            else:
+                parts = title.rsplit(" - ", 1)
+                headline = parts[0]
+                if not source_name and len(parts) > 1:
+                    source_name = parts[1]
+            results.append({
+                "headline": headline.strip(),
+                "source": source_name.strip(),
+                "url": link.strip(),
+                "published_at": published_at.isoformat(),
+            })
+        return results
+    except Exception:
+        logger.warning("News fetch failed for %s", company_name, exc_info=True)
+        return []
+
+
+async def _fetch_company_news(company_name: str) -> list[dict]:
+    now = time.time()
+    cached = _news_cache.get(company_name)
+    if cached:
+        items, ts = cached
+        if now - ts < _NEWS_TTL:
+            return items
+    items = await asyncio.to_thread(_fetch_company_news_sync, company_name)
+    _news_cache[company_name] = (items, now)
+    return items
