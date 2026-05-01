@@ -45,7 +45,7 @@ export default function SignIn() {
       if (status === 403) {
         setUnverified(true)
       } else if (status === 401) {
-        setError('Incorrect email or password. If you haven't set a password yet, use Forgot Password below.')
+        setError("Incorrect email or password. If you haven't set a password yet, use Forgot Password below.")
       } else {
         setError(err.response?.data?.detail || 'Something went wrong. Please try again.')
       }
