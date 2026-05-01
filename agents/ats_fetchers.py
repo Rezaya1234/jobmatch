@@ -905,7 +905,7 @@ async def _fetch_microsoft(client: httpx.AsyncClient) -> list[dict]:
 
 async def _fetch_amazon(client: httpx.AsyncClient) -> list[dict]:
     results = []
-    for offset in range(0, 200, 100):
+    for offset in range(0, 2000, 100):
         resp = await client.get(
             "https://www.amazon.jobs/en/search.json",
             params={
