@@ -1,5 +1,6 @@
 anthropic
 bcrypt
+requests
 python-dotenv
 fastapi
 uvicorn
