@@ -99,6 +99,7 @@ class MatchAgent:
                 return MatchRunResult(scored=0, call2_count=0)
 
             weighted_scores = _compute_weighted_scores(raw_scores, jobs_by_id, weights)
+            _apply_function_floor(raw_scores, weighted_scores)
             normalized = _normalize(weighted_scores)
 
             for match in matches:
@@ -412,6 +413,27 @@ def _compute_weighted_scores(
         else:
             result[job_id] = sum(dim_scores.get(d, 0.5) * weights.get(d, 0.0) for d in ALLOWED_DIMENSIONS)
     return result
+
+
+_FUNCTION_FLOOR_THRESHOLD = 0.40
+_FUNCTION_FLOOR_MULTIPLIER = 0.70
+
+
+def _apply_function_floor(
+    raw_scores: dict[str, dict[str, float]],
+    weighted_scores: dict[str, float],
+) -> None:
+    """Penalize jobs where function_type score < 0.40 (strictly less than).
+    Mutates weighted_scores in place. Applied before normalization."""
+    for job_id, dim_scores in raw_scores.items():
+        func_score = dim_scores.get("function_type", 0.5)
+        if func_score < _FUNCTION_FLOOR_THRESHOLD:
+            old = weighted_scores[job_id]
+            weighted_scores[job_id] = round(old * _FUNCTION_FLOOR_MULTIPLIER, 6)
+            logger.debug(
+                "Function floor penalty applied to job %s: function=%.2f, score %.4f → %.4f",
+                job_id, func_score, old, weighted_scores[job_id],
+            )
 
 
 def _compress_job_description(text: str) -> str:

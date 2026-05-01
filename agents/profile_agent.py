@@ -53,12 +53,12 @@ logger = logging.getLogger(__name__)
 
 # Default weights for cold start users (fewer than 5 feedback signals)
 DEFAULT_WEIGHTS: dict[str, float] = {
-    "skills_match": 0.35,
-    "experience_level": 0.25,
-    "salary": 0.20,
-    "industry_alignment": 0.10,
-    "function_type": 0.05,
-    "career_trajectory": 0.05,
+    "skills_match": 0.30,
+    "experience_level": 0.15,
+    "salary": 0.15,
+    "industry_alignment": 0.15,
+    "function_type": 0.15,
+    "career_trajectory": 0.10,
 }
 
 _COLD_START_GRADUATION_THRESHOLD = 5

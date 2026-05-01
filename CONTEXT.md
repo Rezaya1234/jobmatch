@@ -170,12 +170,12 @@ Daily budget alert:  $600 total
 
 ## Matching Dimensions (fixed — never change)
 
-skills_match:        0.35 cold start
-experience_level:    0.25 cold start
-salary:              0.20 cold start
-industry_alignment:  0.10 cold start
-function_type:       0.05 cold start
-career_trajectory:   0.05 cold start
+skills_match:        0.30 cold start
+experience_level:    0.15 cold start
+salary:              0.15 cold start
+industry_alignment:  0.15 cold start
+function_type:       0.15 cold start
+career_trajectory:   0.10 cold start
 
 ---
 
