@@ -398,7 +398,7 @@ function JobCard({ match, userId, profile, initialRating, removing, onReact, onO
 // ---------------------------------------------------------------------------
 
 function MatchFunnel({ matches, feedback }) {
-  const shown = matches.length
+  const shown = matches.filter(m => m.delivered_at).length
   const reacted = feedback.length
   const liked = feedback.filter(f => f.rating === 'thumbs_up').length
   const disliked = feedback.filter(f => f.rating === 'thumbs_down').length
