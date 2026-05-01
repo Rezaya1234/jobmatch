@@ -62,6 +62,9 @@ _ANN_POOL = 50
 _SECTOR_CAP_FRACTION = 0.60
 # Skip diversification if fewer than this fraction of jobs have sector data
 _SECTOR_DATA_MIN_FRACTION = 0.20
+# Per-company hard cap — prevents one company from dominating all result slots
+# even when sector data is missing or all its jobs span multiple sector labels.
+_COMPANY_CAP = 2
 
 # Patterns for explicitly non-US locations. Word-boundary safe.
 # Applied when user profile only accepts US locations.
@@ -96,24 +99,28 @@ _NON_US_LOCATION_PATTERNS: list[re.Pattern] = [
 
 
 def _diversify(jobs: list[Job], max_count: int) -> list[Job]:
-    """Cap any single sector at 60% of returned jobs. Skip if <20% have sector data."""
+    """Cap any single sector at 60% and any single company at _COMPANY_CAP slots."""
     with_sector = sum(1 for j in jobs if j.sector)
-    if with_sector / max(len(jobs), 1) < _SECTOR_DATA_MIN_FRACTION:
-        return jobs[:max_count]
+    apply_sector_cap = with_sector / max(len(jobs), 1) >= _SECTOR_DATA_MIN_FRACTION
 
-    cap = max(1, int(max_count * _SECTOR_CAP_FRACTION))
+    sector_cap = max(1, int(max_count * _SECTOR_CAP_FRACTION))
     sector_counts: dict[str, int] = {}
+    company_counts: dict[str, int] = {}
     result: list[Job] = []
 
     for job in jobs:
-        sector = job.sector
-        if sector is None:
-            result.append(job)
-        else:
-            count = sector_counts.get(sector, 0)
-            if count < cap:
-                result.append(job)
-                sector_counts[sector] = count + 1
+        company_key = (job.company or "").lower().strip()
+        if company_counts.get(company_key, 0) >= _COMPANY_CAP:
+            continue
+
+        if apply_sector_cap and job.sector is not None:
+            if sector_counts.get(job.sector, 0) >= sector_cap:
+                continue
+            sector_counts[job.sector] = sector_counts.get(job.sector, 0) + 1
+
+        result.append(job)
+        company_counts[company_key] = company_counts.get(company_key, 0) + 1
+
         if len(result) >= max_count:
             break
 

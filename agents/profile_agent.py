@@ -16,10 +16,9 @@ def build_intent_query(profile: UserProfile) -> str:
     Build an intent-weighted text query for embedding.
 
     HIGH:    role_description, title_include (repeated for semantic weight)
-    MEDIUM:  seniority_level, work_modes
-    EXCLUDED: preferred_sectors, preferred_companies — industry history and
-              employer names skew the embedding toward past experience rather
-              than future intent.
+    MEDIUM:  seniority_level, work_modes, goals_text
+    LOW:     preferred_sectors (framed as target industry — not past history)
+    EXCLUDED: preferred_companies — employer names skew the embedding
     """
     parts = []
 
@@ -36,6 +35,12 @@ def build_intent_query(profile: UserProfile) -> str:
 
     if profile.work_modes:
         parts.append(f"Work mode: {', '.join(profile.work_modes)}")
+
+    if profile.goals_text:
+        parts.append(profile.goals_text)
+
+    if profile.preferred_sectors:
+        parts.append(f"Target industry: {', '.join(profile.preferred_sectors)}")
 
     return " ".join(parts) or "software engineer"
 

@@ -464,13 +464,24 @@ def _build_system_prompt(profile: UserProfile, weights: dict) -> str:
     profile_str = "\n".join(lines) or "No profile data."
     weight_str = "\n".join(f"  {d}: {v:.2f}" for d, v in weights.items())
 
+    sector_rule = ""
+    if profile.preferred_sectors:
+        sectors = ", ".join(profile.preferred_sectors)
+        sector_rule = f"""
+
+SECTOR RULE (mandatory — applies before all other scoring):
+- This candidate's target sectors are: {sectors}
+- If the job's sector or company does NOT belong to any of these target sectors,
+  score industry_alignment ≤ 0.25 regardless of other signals.
+- If the job clearly belongs to a target sector, score industry_alignment normally (0.0–1.0)."""
+
     return f"""You are a job-matching expert. Score each job on exactly these 6 dimensions.
 
 CANDIDATE PROFILE:
 {profile_str}
 
 DIMENSION WEIGHTS (reference only — do NOT compute weighted totals):
-{weight_str}
+{weight_str}{sector_rule}
 
 STRICT RULES:
 - Score ONLY these dimensions: {', '.join(ALLOWED_DIMENSIONS)}
