@@ -379,7 +379,7 @@ export default function Setup() {
     max_salary:          '',
     title_include:       [],
     title_exclude:       [],
-    open_to_relocation:  true,
+    open_to_relocation:  false,
   })
 
   function showStatus(msg, error = false) {
@@ -764,24 +764,25 @@ export default function Setup() {
                           onClick={() => toggleArr('work_modes', m.value)} />
                       ))}
                     </div>
-                    {profile.work_modes.includes('onsite') && (
-                      <div className="flex items-center gap-2 mt-3">
-                        <button
-                          type="button"
-                          onClick={() => setProfile(p => ({ ...p, open_to_relocation: !p.open_to_relocation }))}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 ${
-                            profile.open_to_relocation ? 'bg-violet-600' : 'bg-slate-200'
-                          }`}
-                          role="switch"
-                          aria-checked={profile.open_to_relocation}
-                        >
-                          <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
-                            profile.open_to_relocation ? 'translate-x-4' : 'translate-x-0'
-                          }`} />
-                        </button>
+                    <div className="flex items-start gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => setProfile(p => ({ ...p, open_to_relocation: !p.open_to_relocation }))}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 mt-0.5 ${
+                          profile.open_to_relocation ? 'bg-violet-600' : 'bg-slate-200'
+                        }`}
+                        role="switch"
+                        aria-checked={profile.open_to_relocation}
+                      >
+                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
+                          profile.open_to_relocation ? 'translate-x-4' : 'translate-x-0'
+                        }`} />
+                      </button>
+                      <div>
                         <span className="text-sm text-slate-600">Open to relocation</span>
+                        <p className="text-xs text-slate-400 mt-0.5">Turn on if you are willing to relocate for the right opportunity</p>
                       </div>
-                    )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Job type</label>
