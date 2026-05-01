@@ -1,6 +1,6 @@
 # Stellapath — Product Backlog
 
-*Last updated: April 2026*
+*Last updated: May 2026*
 
 ---
 
@@ -80,6 +80,11 @@
 | 38f | Outcome-anchored profile embedding | ✅ Complete | 0.8 × profile_embedding + 0.2 × job_embedding normalized on interview/applied signal |
 | 38g | Embedding health metrics + /admin/embedding-health | ✅ Complete | Job + profile coverage in TestAgentMetrics.label_sources, dedicated admin endpoint |
 | 39 | Prompts directory created | ✅ Complete | All 5 prompts in prompts/ + 3 agent implementation prompts in prompts/agents/ |
+| 55 | First-run pipeline on profile completion | ✅ Complete | POST /pipeline/run-for-user/{id} with 60s asyncio.timeout; loading overlay in Setup step 4; polls matches every 3s before redirect |
+| 56 | Match funnel delivered count fix | ✅ Complete | MatchFunnel.shown uses delivered_at filter; delivered_at added to MatchResponse |
+| 57 | Feedback count accuracy fix | ✅ Complete | Passive link-clicks (weight=1) no longer create Feedback rows; feedback_count filters weight>=2; Apply uses recordSignal('applied') |
+| 58 | Text feedback commentary + AI interpretation | ✅ Complete | Comment box in job modal + card chat icon; POST /users/{id}/feedback/event; Claude Haiku _COMMENTARY_SYSTEM → dimension/direction/confidence/hard_exclusion; ±0.01/0.03/0.05 delta |
+| 59 | Commentary prompt library files | ✅ Complete | prompts/agents/feedback_agent_commentary.txt + prompts/agents/matching_agent_weights.txt |
 
 ### Frontend and UX
 

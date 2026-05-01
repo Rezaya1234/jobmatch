@@ -1,0 +1,79 @@
+# Matching Agent — Dimension Weight System
+#
+# Source:  agents/feedback_agent.py — _update_weights(), _normalize_weights()
+#          agents/match_agent.py — ALLOWED_DIMENSIONS, weight validation
+#
+# Purpose: Document the weight system used in both the Matching Agent
+#          (scoring) and Feedback Agent (learning). Weights sum to 1.0
+#          and are validated before every LLM call.
+
+---
+
+## Allowed Dimensions (fixed — never add or remove)
+
+  skills_match         Cold start: 0.30
+  experience_level     Cold start: 0.15
+  salary               Cold start: 0.15
+  industry_alignment   Cold start: 0.15
+  function_type        Cold start: 0.15
+  career_trajectory    Cold start: 0.10
+
+---
+
+## Weight Constraints
+
+  Minimum per dimension:  0.05   (_WEIGHT_MIN)
+  Maximum per dimension:  0.50   (_WEIGHT_MAX)
+  Sum must equal:         1.0    (enforced by _normalize_weights before every LLM call)
+  Version increment:      +1 on every weight update (profile.weights_version)
+
+  If salary data unavailable for a job: exclude salary dimension,
+  re-normalize remaining 5 dimensions to sum to 1.0 for that scoring call.
+
+---
+
+## Learning Sources That Update Weights
+
+  1. Thumbs feedback (rule-based, _update_weights):
+       thumbs_up   → skills_match +0.01
+       thumbs_down → skills_match −0.005
+       Comment keywords drive dimension-specific deltas:
+         "too senior" / "over-qualified" → experience_level −0.02 × |signal|
+         "salary" / "low pay"           → salary ±0.02 × |signal|
+         "wrong function" / "role type" → function_type +0.015 × |signal|
+         "trajectory" / "growth"        → career_trajectory +0.015 × |signal|
+         "industry" / "sector"          → industry_alignment +0.015 × |signal|
+
+  2. Applied / interview signals (rule-based, _update_weights):
+       Boost top-3 highest-scoring dimensions by 0.03 × (3−rank) × (|signal|/4)
+
+  3. Free-text commentary (Claude Haiku, _process_commentaries):
+       confidence → delta:
+         high   → ±0.05
+         medium → ±0.03
+         low    → ±0.01
+       direction "up" → +delta, direction "down" → −delta
+       hard_exclusion phrase → appended to profile.excluded_companies
+
+---
+
+## Normalization
+
+  Applied after every adjustment:
+    new_weight[d] = max(0.05, min(0.50, current[d] + adjustment[d]))
+    normalized[d] = round(new_weight[d] / sum(all_weights), 4)
+
+---
+
+## Scoring Integration (Matching Agent Call 1)
+
+  The current profile.learned_weights (or DEFAULT_WEIGHTS for cold-start users)
+  are passed to Call 1 as the scoring rubric. The LLM scores each dimension
+  0.0–1.0; the Matching Agent computes the weighted sum in code (never in LLM):
+
+    final_score = sum(weight[d] × dimension_score[d] for d in dimensions)
+
+  Function floor penalty applied post-scoring:
+    if function_type score < 0.40: final_score × 0.70
+
+  Scores normalized across all jobs in the batch before ranking.

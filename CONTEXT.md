@@ -4,7 +4,7 @@ Paste this entire file at the start of
 every new claude.ai conversation to 
 restore full project context instantly.
 
-Last updated: April 2026
+Last updated: May 2026
 
 ---
 
@@ -303,6 +303,20 @@ SESSION_STARTER.txt  Paste to Claude Code
    Profile embedding + aspiration blend
    Outcome-anchored on interview/applied
    /admin/embedding-health endpoint
+✅ First-run pipeline trigger on profile completion
+   POST /pipeline/run-for-user/{id} 60s timeout
+   Loading overlay with spinner in Setup step 4
+   Polls matches every 3s before dashboard redirect
+✅ Match funnel delivered count fix
+   MatchFunnel.shown filtered by delivered_at
+✅ Feedback count accuracy fix
+   Passive clicks excluded from feedback_count
+   Apply uses recordSignal('applied')
+✅ Text feedback commentary
+   Comment box after Good fit / Not a fit in modal
+   Chat icon + inline input on job cards
+   Claude Haiku interprets commentary
+   Adjusts dimension weights by confidence level
 
 ---
 
@@ -367,20 +381,18 @@ lawyer consultation.
 
 ## Last Working On
 
-pgvector ANN embedding pipeline complete.
-Shipped to dev branch.
+Bug fixes shipped to dev branch (May 2026).
 
 Changes made this session:
-- Backfill 6667 jobs with embeddings ($0.04)
-- New jobs embedded at ingestion
-- build_intent_query() intent-weighted text
-- Profile embedding on save (background task)
-- Aspiration blend 0.7 profile + 0.3 goals
-- ANN replaces BGE in Filter Agent
-- Outcome-anchored 0.8/0.2 on interview/applied
-- Embedding health in TestAgent +
-  /admin/embedding-health endpoint
-- All documentation updated
+- BUG 1: POST /pipeline/run-for-user/{id}
+  asyncio.timeout(60), Setup loading overlay
+- BUG 2: MatchFunnel uses delivered_at count
+- BUG 7: Passive clicks excluded from feedback
+  Apply uses recordSignal('applied')
+- BUG 8: Text commentary on modal + cards
+  Claude Haiku interprets dimension signals
+- prompts/agents/ two new files created
+- All four documentation files updated
 
 Remaining before beta:
 1. SendGrid API key on Render
