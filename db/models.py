@@ -81,8 +81,17 @@ class User(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="user", server_default="'user'")
     notification_prefs: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"
+
+    @is_admin.setter
+    def is_admin(self, value: bool) -> None:
+        self.role = "admin" if value else "user"
+
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

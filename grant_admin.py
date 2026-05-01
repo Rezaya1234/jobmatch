@@ -10,7 +10,7 @@ async def run():
     url = raw.replace("postgresql://", "postgresql+asyncpg://")
     engine = create_async_engine(url)
     async with AsyncSession(engine) as s:
-        await s.execute(text("UPDATE users SET is_admin = true WHERE email = 'reza.rah@gmail.com'"))
+        await s.execute(text("UPDATE users SET role = 'admin' WHERE email = 'reza.rah@gmail.com'"))
         await s.commit()
     print("done")
 

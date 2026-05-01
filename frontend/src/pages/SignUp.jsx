@@ -18,6 +18,7 @@ export default function SignUp() {
       const user = await createUser(trimmed)
       localStorage.setItem('userId', user.id)
       localStorage.setItem('userEmail', trimmed)
+      localStorage.setItem('userRole', user.role || 'user')
       localStorage.removeItem('profileComplete')
 
       if (!user.is_new) {

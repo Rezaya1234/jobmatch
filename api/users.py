@@ -29,6 +29,7 @@ class CreateUserRequest(BaseModel):
 class UserResponse(BaseModel):
     id: str
     email: str
+    role: str = "user"
     created_at: datetime
     is_new: bool = False
 
@@ -538,7 +539,7 @@ async def _get_user_or_404(user_id: str, session: AsyncSession) -> User:
 
 
 def _user_response(user: User, is_new: bool = False) -> UserResponse:
-    return UserResponse(id=str(user.id), email=user.email, created_at=user.created_at, is_new=is_new)
+    return UserResponse(id=str(user.id), email=user.email, role=user.role, created_at=user.created_at, is_new=is_new)
 
 
 def _profile_response(profile: UserProfile) -> ProfileResponse:

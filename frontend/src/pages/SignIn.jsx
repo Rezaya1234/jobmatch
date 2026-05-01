@@ -18,6 +18,7 @@ export default function SignIn() {
       const user = await lookupUserByEmail(trimmed)
       localStorage.setItem('userId', user.id)
       localStorage.setItem('userEmail', trimmed)
+      localStorage.setItem('userRole', user.role || 'user')
 
       // Sync profileComplete so RequireProfile guard works for returning users
       try {

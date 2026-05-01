@@ -34,12 +34,19 @@ import { getNotifications } from './api'
 import './index.css'
 
 // ---------------------------------------------------------------------------
-// Route guard — requires completed profile
+// Route guards
 // ---------------------------------------------------------------------------
 function RequireProfile({ children }) {
   const userId = localStorage.getItem('userId')
   if (!userId) return <Navigate to="/signup" replace />
   if (localStorage.getItem('profileComplete') !== 'true') return <Navigate to="/profile" replace />
+  return children
+}
+
+function RequireAdmin({ children }) {
+  const userId = localStorage.getItem('userId')
+  if (!userId) return <Navigate to="/signin" replace />
+  if (localStorage.getItem('userRole') !== 'admin') return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -62,6 +69,7 @@ function AccountMenu({ email, onClose }) {
     localStorage.removeItem('userId')
     localStorage.removeItem('userEmail')
     localStorage.removeItem('profileComplete')
+    localStorage.removeItem('userRole')
     onClose()
     navigate('/')
   }
@@ -312,9 +320,9 @@ function AppShell() {
               <Route path="/positions"    element={<RequireProfile><Jobs /></RequireProfile>} />
               <Route path="/matches"      element={<RequireProfile><Matches /></RequireProfile>} />
               <Route path="/profile"      element={<Setup />} />
-              <Route path="/pipeline"     element={<Pipeline />} />
-              <Route path="/architecture" element={<Architecture />} />
-              <Route path="/qa"           element={<QA />} />
+              <Route path="/pipeline"     element={<RequireAdmin><Pipeline /></RequireAdmin>} />
+              <Route path="/architecture" element={<RequireAdmin><Architecture /></RequireAdmin>} />
+              <Route path="/qa"           element={<RequireAdmin><QA /></RequireAdmin>} />
               <Route path="/insights"     element={<RequireProfile><CompanyInsights /></RequireProfile>} />
               <Route path="/insights/:slug" element={<RequireProfile><CompanyDetail /></RequireProfile>} />
               <Route path="/feedback"     element={<RequireProfile><Feedback /></RequireProfile>} />
@@ -383,9 +391,9 @@ export default function App() {
         <Route path="/signup"          element={<PublicLayout><SignUp /></PublicLayout>} />
         <Route path="/forgot-password" element={<PublicLayout><ForgotPassword /></PublicLayout>} />
 
-        {/* Admin — own layout, no sidebar, access guarded in component */}
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/admin/debug" element={<AdminDebug />} />
+        {/* Admin — own layout, no sidebar */}
+        <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
+        <Route path="/admin/debug" element={<RequireAdmin><AdminDebug /></RequireAdmin>} />
 
         {/* Authenticated app shell — handles all /dashboard, /positions, etc. */}
         <Route path="/*" element={<AppShell />} />
