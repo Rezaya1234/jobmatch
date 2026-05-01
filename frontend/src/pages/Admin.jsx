@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -977,8 +977,8 @@ export default function Admin() {
         </div>
         <div className="flex items-center gap-4">
           <UtcClock />
-          <a href="/admin/debug" className="text-xs text-slate-500 hover:text-slate-700 transition-colors font-medium">Pipeline Inspector</a>
-          <a href="/dashboard" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">← Back to app</a>
+          <Link to="/admin/debug" className="text-xs text-slate-500 hover:text-slate-700 transition-colors font-medium">Pipeline Inspector</Link>
+          <Link to="/dashboard" className="text-xs text-slate-500 hover:text-slate-700 transition-colors">← Back to app</Link>
           <button
             onClick={() => setShowThresholds(true)}
             className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-500"

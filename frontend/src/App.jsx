@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom'
 
 // App pages
 import Setup from './pages/Setup'
@@ -32,7 +32,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import VerifyEmail from './pages/VerifyEmail'
 import ResetPassword from './pages/ResetPassword'
 
-import { getNotifications } from './api'
+import { getNotifications, adminCheck } from './api'
 import './index.css'
 
 // ---------------------------------------------------------------------------
@@ -46,9 +46,26 @@ function RequireProfile({ children }) {
 }
 
 function RequireAdmin({ children }) {
+  const navigate = useNavigate()
   const userId = localStorage.getItem('userId')
-  if (!userId) return <Navigate to="/signin" replace />
-  if (localStorage.getItem('userRole') !== 'admin') return <Navigate to="/dashboard" replace />
+  const [ready, setReady] = useState(localStorage.getItem('userRole') === 'admin')
+
+  useEffect(() => {
+    if (!userId) { navigate('/signin', { replace: true }); return }
+    if (localStorage.getItem('userRole') === 'admin') { setReady(true); return }
+    adminCheck()
+      .then(d => {
+        if (d.is_admin) {
+          localStorage.setItem('userRole', 'admin')
+          setReady(true)
+        } else {
+          navigate('/dashboard', { replace: true })
+        }
+      })
+      .catch(() => navigate('/dashboard', { replace: true }))
+  }, [userId, navigate])
+
+  if (!ready) return null
   return children
 }
 
