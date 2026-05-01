@@ -916,11 +916,6 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-semibold text-slate-900">Today's Top Matches</h2>
-            {!loading && allMatches.length > 0 && (
-              <p className="text-xs text-slate-400 mt-0.5">
-                {displayed.length} of {allMatches.filter(m => !feedbackMap[m.job_id]).length}
-              </p>
-            )}
           </div>
           <Link to="/matches" className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">
             View all matches →
