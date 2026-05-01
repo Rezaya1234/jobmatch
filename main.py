@@ -10,6 +10,7 @@ from fastapi import FastAPI  # noqa: E402 — import after dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.admin import router as admin_router
+from api.auth import router as auth_router
 from api.debug import router as debug_router
 from api.companies import router as companies_router
 from api.feedback import click_router as feedback_click_router
@@ -51,6 +52,7 @@ app.add_middleware(
 )
 
 app.include_router(users_router)
+app.include_router(auth_router)
 app.include_router(jobs_router)
 app.include_router(matches_router)
 app.include_router(feedback_router)

@@ -82,6 +82,12 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user", server_default="'user'")
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    verification_token: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    verification_token_expires_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reset_token: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    reset_token_expires_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notification_prefs: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     @property

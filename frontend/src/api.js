@@ -46,6 +46,14 @@ export const getNotificationPrefs = (id) => http.get(`/users/${id}/notification-
 export const updateNotificationPrefs = (id, prefs) => http.patch(`/users/${id}/notification-prefs`, prefs).then(r => r.data)
 export const getApplications = (id) => http.get(`/users/${id}/applications`).then(r => r.data)
 export const getNotifications = (id) => http.get(`/users/${id}/notifications`).then(r => r.data)
+// Auth
+export const authRegister = (email, password) => http.post('/auth/register', { email, password }).then(r => r.data)
+export const authLogin = (email, password) => http.post('/auth/login', { email, password }).then(r => r.data)
+export const authVerifyEmail = (token) => http.get(`/auth/verify-email/${token}`).then(r => r.data)
+export const authResendVerification = (email) => http.post('/auth/resend-verification', { email }).then(r => r.data)
+export const authForgotPassword = (email) => http.post('/auth/forgot-password', { email }).then(r => r.data)
+export const authResetPassword = (token, password) => http.post(`/auth/reset-password/${token}`, { password }).then(r => r.data)
+
 export const parseProfile = (id, text, resumeFile) => {
   const form = new FormData()
   if (text) form.append('text', text)
