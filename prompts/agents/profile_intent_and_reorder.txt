@@ -1,0 +1,177 @@
+# Profile Intent-Conditioning and Post-Scoring Reorder Pass
+# Decision log: May 2026
+#
+# Root cause: user with "AI implementation" background received Databricks as #1 match
+# despite profile explicitly stating "Seeking senior leadership role in oil and gas industry,
+# PhD in Petroleum Engineering." The LLM's own Call-2 commentary called the match
+# a "career regression" — yet the same system delivered it first.
+#
+# Two root causes addressed in this file. The three sector-fix root causes from
+# the previous incident are documented in matching_sector_intent_fix.txt.
+
+---
+
+## Root Cause 1 — role_description was a neutral resume summary ignoring stated intent
+# File: api/users.py — parse_profile_from_text()
+
+### Problem
+The parse prompt generated role_description as "2-3 sentence summary covering their
+professional background and key skills." For a petroleum engineer who built AI systems,
+the dominant pattern in the resume is AI/tech — so role_description came out as
+"Senior technology leader with 15+ years of experience in AI implementation..."
+
+This text then goes into build_intent_query() where it carries HIGH weight in the
+profile embedding. Result: the profile vector points at AI/tech companies regardless
+of what the user wrote in goals_text or preferred_sectors.
+
+The stated goal was treated as an afterthought (appended), not as the framing lens.
+
+### Fix
+Changed the role_description instruction in the parse prompt to:
+
+  "2-3 sentence professional summary for job matching. IMPORTANT: if the text states
+  a target role, industry, or career goal, frame the summary around that goal — lead
+  with the experience and skills most relevant to that goal, and present other experience
+  as supporting context or tools they bring to the target. If no goal is expressed,
+  summarize the background broadly."
+
+### Re-generation trigger (same file: upsert_profile)
+Previously role_description was only generated once at parse time and never updated.
+If a user added goals_text or changed preferred_sectors after initial setup, the
+profile embedding still pointed at their resume's dominant skill pattern.
+
+Fix: upsert_profile now detects when goals_text or preferred_sectors changes.
+If either changes AND original_role_description exists, it schedules
+_regenerate_description_bg instead of just _update_embedding_bg.
+
+_regenerate_description_bg:
+  - Takes original_role_description as the stable background source
+  - Uses goals_text + preferred_sectors as the framing lens
+  - Calls Haiku to rewrite role_description around the goal
+  - Then calls update_profile_embedding to re-embed with the new text
+
+### Why original_role_description as the source?
+original_role_description is locked at first parse and never overwritten.
+It is the LLM's unfiltered summary of what the resume actually contains —
+all domains, all skills. Re-generation uses this as input so we never lose
+information from the resume, we just reframe how it is presented.
+
+If we re-generated from the current role_description, each re-generation would
+drift further from the underlying resume evidence.
+
+### When does intent-conditioned generation NOT apply?
+When goals_text and preferred_sectors are both empty. In that case the original
+neutral resume summary is used as-is. No regression risk for users without stated goals.
+
+---
+
+## Root Cause 2 — Skills-dominant scoring overrode sector intent in final ranking
+# File: agents/match_agent.py — run() and new _run_reorder_pass()
+
+### Problem
+After the sector fixes (matching_sector_intent_fix.txt), Databricks still ranked #1
+because:
+  - skills_match for a tech job against an AI-skilled profile: ~0.78 (HIGH)
+  - industry_alignment for Databricks (penalized by SECTOR RULE): ~0.40
+  - industry_alignment weight: 0.15
+
+Math: tech job scores ~65.2 weighted points. ExxonMobil scores ~66.5.
+These are very close. After normalization to 0–1 range across the batch,
+minor numerical differences determine delivery order.
+
+More fundamentally: the LLM scores each dimension independently. It cannot
+holistically reason "given this person wants a career in oil and gas, does
+this Databricks role serve that goal?" — that judgment only emerges in Call-2
+commentary, which runs after delivery selection.
+
+### Fix
+Added a reorder pass between normalization and delivery:
+
+  After _normalize(weighted_scores) completes, when profile.goals_text or
+  profile.preferred_sectors is non-empty, call _run_reorder_pass().
+
+_run_reorder_pass():
+  - Takes top-7 ranked jobs (by normalized score)
+  - Sends to Sonnet with: profile background, stated goal, target sectors,
+    seniority — plus each job's title, company, industry_alignment score,
+    and function_type score
+  - Asks: "Given this candidate's stated career direction, identify the 3 jobs
+    from this list that best serve their goal — not just skills overlap."
+  - Returns: {"top_3_ids": [...], "swaps_made": bool, "reasoning": "one sentence"}
+  - If swaps_made=true: redistributes the existing normalized score values
+    across the reordered positions (the score distribution is preserved,
+    just reassigned to different jobs)
+
+### Why redistribute scores rather than assign new ones?
+Normalized scores are displayed to users as match percentages. If we assigned
+new arbitrary values, the displayed percentage would not reflect the underlying
+dimension scores the user sees in the breakdown.
+
+Redistributing preserves the semantics: the job in position 1 shows the
+highest score that was already present in the batch. The job in position 2
+shows the second highest. The visual scores remain consistent with the
+dimension breakdown — only the order of which job gets which rank changes.
+
+### Why Sonnet (not Haiku) for the reorder pass?
+This is a holistic career judgment call requiring the LLM to reason about:
+  1. The candidate's stated career direction
+  2. The industry/function alignment of each job
+  3. Whether skills overlap across industries constitutes genuine career fit
+
+Haiku handles fast dimension scoring well but produces less reliable holistic
+judgment. A misfire here directly affects delivery — the wrong job gets shown.
+Sonnet is used despite the higher cost because the reorder pass runs once per
+pipeline run per user (not per job), and only when goals are set.
+
+### When does the reorder pass NOT fire?
+When profile.goals_text and profile.preferred_sectors are both empty.
+Unchanged behavior for users without stated goals — no regression risk.
+
+Also: if the pass raises an exception or returns invalid IDs, the original
+normalized ranking is preserved (fail-safe fallback with logger.exception).
+
+### Why top-7, not top-3 or top-15?
+Top-3: too narrow — the LLM can only see the current top-3, so it cannot
+promote anything from positions 4+.
+
+Top-15: too wide — the LLM would need to reason across all 15 jobs, which
+increases token cost, response length, and the chance of hallucinating job IDs.
+Also, promoting a job ranked #14 to #1 would be a very aggressive swap that
+may not be reliable.
+
+Top-7: the LLM sees the top-3 plus the 4 most likely alternatives.
+It can catch cases where #4 or #5 is clearly better than something in top-3,
+without making implausibly large promotions.
+
+---
+
+## Coherence between the two fixes
+
+The reorder pass is a downstream safety net for when profile generation
+produces a skewed role_description. Once intent-conditioned generation is
+working well and the profile embedding reliably points toward the stated goal,
+the reorder pass will mostly confirm the existing ranking (swaps_made=false).
+
+In the near term, while users with existing profiles still have AI-heavy
+role_descriptions (until they update goals or their profile is re-generated),
+the reorder pass catches the remaining ranking errors.
+
+---
+
+## Files changed (commit 9f611b7)
+
+  api/users.py          — parse prompt role_description instruction updated;
+                          upsert_profile detects intent changes + adds llm dep;
+                          _regenerate_description_bg new helper
+  agents/match_agent.py — _REORDER_SYSTEM + _REORDER_TOP_N constants;
+                          _run_reorder_pass() method;
+                          run() wires reorder pass after normalization
+
+---
+
+## Important note for future sessions
+
+original_role_description must never be overwritten after first parse.
+It is the stable source for all future re-generation passes.
+If it gets corrupted or reset, re-generation loses its grounding
+in the actual resume content and may produce inaccurate summaries.
