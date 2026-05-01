@@ -202,7 +202,7 @@ export default function Sidebar({ collapsed, onToggle }) {
         {[
           { to: '/dashboard',    label: 'Home',      icon: 'dashboard' },
           { to: '/positions',    label: 'Positions', icon: 'positions' },
-          { to: '/applications', label: 'Applied',   icon: 'applications' },
+          { to: '/applications', label: 'Reviewed',  icon: 'applications' },
           { to: '/qa',           label: 'Activity',  icon: 'qa' },
           { to: '/profile',      label: 'Profile',   icon: 'profile' },
         ].map(item => (
