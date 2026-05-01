@@ -40,7 +40,6 @@ const ICONS = {
 const PRIMARY_NAV = [
   { to: '/dashboard',    label: 'Dashboard',        icon: 'dashboard' },
   { to: '/positions',    label: 'Open Positions',    icon: 'positions' },
-  { to: '/applications', label: 'Applications',      icon: 'applications', soon: true },
   { to: '/feedback',     label: 'Feedback',          icon: 'feedback' },
   { to: '/insights',     label: 'Company Insights',  icon: 'insights' },
 ]
