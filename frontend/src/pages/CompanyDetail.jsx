@@ -360,7 +360,7 @@ export default function CompanyDetail() {
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <a
-                  href={`https://www.glassdoor.com/Reviews/${encodeURIComponent(company.company_name)}-reviews.htm`}
+                  href={`https://www.glassdoor.com/Search/results.htm?keyword=${encodeURIComponent(company.company_name)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-between gap-2 border border-slate-200 rounded-xl px-4 py-3 text-violet-700 hover:border-violet-300 hover:bg-violet-50 transition-colors"
@@ -372,7 +372,7 @@ export default function CompanyDetail() {
                   <span className="text-slate-400">→</span>
                 </a>
                 <a
-                  href={`https://www.teamblind.com/company/${encodeURIComponent(company.company_name)}`}
+                  href={`https://www.teamblind.com/search?q=${encodeURIComponent(company.company_name)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="flex items-center justify-between gap-2 border border-slate-200 rounded-xl px-4 py-3 text-violet-700 hover:border-violet-300 hover:bg-violet-50 transition-colors"
