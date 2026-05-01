@@ -40,7 +40,6 @@ const ICONS = {
 const PRIMARY_NAV = [
   { to: '/dashboard',    label: 'Dashboard',        icon: 'dashboard' },
   { to: '/positions',    label: 'Open Positions',    icon: 'positions' },
-  { to: '/matches',      label: 'Saved Jobs',        icon: 'saved' },
   { to: '/applications', label: 'Applications',      icon: 'applications', soon: true },
   { to: '/feedback',     label: 'Feedback',          icon: 'feedback' },
   { to: '/insights',     label: 'Company Insights',  icon: 'insights' },
@@ -201,11 +200,11 @@ export default function Sidebar({ collapsed, onToggle }) {
       {/* Mobile bottom tabs */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 flex h-16">
         {[
-          { to: '/dashboard', label: 'Home',      icon: 'dashboard' },
-          { to: '/positions', label: 'Positions',  icon: 'positions' },
-          { to: '/matches',   label: 'Saved',      icon: 'saved' },
-          { to: '/qa',        label: 'Activity',   icon: 'qa' },
-          { to: '/profile',   label: 'Profile',    icon: 'profile' },
+          { to: '/dashboard',    label: 'Home',      icon: 'dashboard' },
+          { to: '/positions',    label: 'Positions', icon: 'positions' },
+          { to: '/applications', label: 'Applied',   icon: 'applications' },
+          { to: '/qa',           label: 'Activity',  icon: 'qa' },
+          { to: '/profile',      label: 'Profile',   icon: 'profile' },
         ].map(item => (
           <NavLink
             key={item.to}
