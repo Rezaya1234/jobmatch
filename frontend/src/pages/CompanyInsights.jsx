@@ -30,24 +30,15 @@ function CompanyLogo({ name, website, slug, cls = 'w-12 h-12' }) {
   )
 }
 
-function OutlookBadge({ outlook }) {
-  if (!outlook) return null
-  const map = {
-    growing: 'bg-green-100 text-green-700',
-    stable:  'bg-blue-100 text-blue-700',
-    slowing: 'bg-amber-100 text-amber-700',
-  }
+function WeekChange({ change }) {
+  if (change === null || change === undefined) return null
+  if (change === 0) return <span className="text-xs text-slate-400">no change this week</span>
+  const positive = change > 0
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${map[outlook] || 'bg-slate-100 text-slate-500'}`}>
-      {outlook}
+    <span className={`text-xs font-medium ${positive ? 'text-green-600' : 'text-red-500'}`}>
+      {positive ? '+' : ''}{change} jobs this week
     </span>
   )
-}
-
-function TrendArrow({ trend }) {
-  if (trend === 'up') return <span className="text-green-500 font-bold">↑</span>
-  if (trend === 'down') return <span className="text-red-400 font-bold">↓</span>
-  return <span className="text-slate-400 font-bold">→</span>
 }
 
 function CompanyCard({ company, onClick }) {
@@ -59,15 +50,12 @@ function CompanyCard({ company, onClick }) {
       <div className="flex items-start gap-3">
         <CompanyLogo name={company.company_name} website={company.website} slug={company.slug} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <h3 className="font-semibold text-slate-900 text-sm truncate">{company.company_name}</h3>
-            <TrendArrow trend={company.hiring_trend} />
-          </div>
+          <h3 className="font-semibold text-slate-900 text-sm truncate mb-0.5">{company.company_name}</h3>
           {company.sector && (
             <p className="text-xs text-slate-500 truncate">{company.sector}</p>
           )}
         </div>
-        <OutlookBadge outlook={company.hiring_outlook} />
+        <WeekChange change={company.week_change} />
       </div>
 
       {company.summary && (
@@ -99,28 +87,20 @@ function CompanyCard({ company, onClick }) {
   )
 }
 
-const OUTLOOK_FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'growing', label: 'Growing' },
-  { value: 'stable', label: 'Stable' },
-  { value: 'slowing', label: 'Slowing' },
-]
-
 export default function CompanyInsights() {
   const navigate = useNavigate()
   const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [outlook, setOutlook] = useState('')
   const [query, setQuery] = useState('')
 
   useEffect(() => {
     setLoading(true)
-    listCompanies({ q: query || undefined, outlook: outlook || undefined })
+    listCompanies({ q: query || undefined })
       .then(setCompanies)
       .catch(() => setCompanies([]))
       .finally(() => setLoading(false))
-  }, [query, outlook])
+  }, [query])
 
   function handleSearch(e) {
     e.preventDefault()
@@ -136,39 +116,22 @@ export default function CompanyInsights() {
         </p>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <form onSubmit={handleSearch} className="flex gap-2 flex-1">
-          <input
-            type="text"
-            placeholder="Search companies..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-          >
-            Search
-          </button>
-        </form>
-        <div className="flex gap-1.5">
-          {OUTLOOK_FILTERS.map(f => (
-            <button
-              key={f.value}
-              onClick={() => setOutlook(f.value)}
-              className={`px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
-                outlook === f.value
-                  ? 'bg-violet-600 text-white border-violet-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-violet-300'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Search */}
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Search companies..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
+        />
+        <button
+          type="submit"
+          className="px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+        >
+          Search
+        </button>
+      </form>
 
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -179,8 +142,8 @@ export default function CompanyInsights() {
       ) : companies.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-slate-500 text-sm">
-            {query || outlook
-              ? 'No companies match your filters.'
+            {query
+              ? 'No companies match your search.'
               : 'No company insights yet. Run the insights pipeline from the Pipeline admin page.'}
           </p>
         </div>

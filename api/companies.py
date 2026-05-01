@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 import xml.etree.ElementTree as ET
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from urllib.parse import quote as urlquote
@@ -37,6 +38,7 @@ class CompanySummary(BaseModel):
     logo_url: str | None
     website: str | None
     hiring_areas: list | None
+    week_change: int | None = None
 
 
 class HiringVelocity(BaseModel):
@@ -127,6 +129,41 @@ async def list_companies(
         stmt = stmt.where(CompanyInsight.hiring_outlook == outlook)
     stmt = stmt.offset(offset).limit(limit)
     result = await session.execute(stmt)
+    rows_data = result.all()
+
+    # -- Week-over-week job count change from CompanyHiringSnapshot --
+    company_to_src = {
+        r.company_name: COMPANY_SOURCE_SLUG.get(r.company_name, r.slug)
+        for r, _ in rows_data
+    }
+    all_src_slugs = list(set(company_to_src.values()))
+    week_changes: dict[str, int | None] = {}
+    if all_src_slugs:
+        from_date = date.today() - timedelta(days=45)
+        snaps_result = await session.execute(
+            select(CompanyHiringSnapshot)
+            .where(
+                CompanyHiringSnapshot.source_slug.in_(all_src_slugs),
+                CompanyHiringSnapshot.snapshot_date >= from_date,
+            )
+            .order_by(
+                CompanyHiringSnapshot.source_slug,
+                CompanyHiringSnapshot.snapshot_date.desc(),
+            )
+        )
+        snaps_by_slug: dict[str, list] = defaultdict(list)
+        for snap in snaps_result.scalars().all():
+            snaps_by_slug[snap.source_slug].append(snap)
+
+        for src_slug, snaps in snaps_by_slug.items():
+            latest = snaps[0]
+            target = latest.snapshot_date - timedelta(days=7)
+            week_ago = next((s for s in snaps if s.snapshot_date <= target), None)
+            week_changes[src_slug] = (
+                latest.active_job_count - week_ago.active_job_count
+                if week_ago else None
+            )
+
     return [
         CompanySummary(
             slug=r.slug,
@@ -141,8 +178,9 @@ async def list_companies(
             logo_url=r.logo_url,
             website=r.website,
             hiring_areas=r.hiring_areas,
+            week_change=week_changes.get(company_to_src.get(r.company_name, r.slug)),
         )
-        for r, live_count in result.all()
+        for r, live_count in rows_data
     ]
 
 
