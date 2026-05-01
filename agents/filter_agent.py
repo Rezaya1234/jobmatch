@@ -63,6 +63,37 @@ _SECTOR_CAP_FRACTION = 0.60
 # Skip diversification if fewer than this fraction of jobs have sector data
 _SECTOR_DATA_MIN_FRACTION = 0.20
 
+# Patterns for explicitly non-US locations. Word-boundary safe.
+# Applied when user profile only accepts US locations.
+_NON_US_LOCATION_PATTERNS: list[re.Pattern] = [
+    # Countries / territories
+    re.compile(r'\bindia\b'),
+    re.compile(r'\bcanada\b'),
+    re.compile(r'\bunited kingdom\b'),
+    re.compile(r'\b(?:england|scotland|wales)\b'),
+    re.compile(r'\b(?:germany|france|spain|italy|netherlands|poland|sweden|norway|denmark|finland|austria|switzerland|belgium|portugal|ireland|czechia|czech republic|romania|hungary|ukraine|greece|serbia|croatia|bulgaria|slovakia)\b'),
+    re.compile(r'\b(?:singapore|malaysia|philippines|indonesia|thailand|vietnam|myanmar|pakistan|bangladesh|sri lanka)\b'),
+    re.compile(r'\b(?:china|japan|south korea|taiwan)\b'),
+    re.compile(r'\bhong kong\b'),
+    re.compile(r'\b(?:saudi arabia|uae|united arab emirates|qatar|kuwait|bahrain|israel|turkey|egypt|jordan|iraq|iran|oman|azerbaijan)\b'),
+    re.compile(r'\b(?:brazil|argentina|chile|colombia|peru|venezuela|uruguay|ecuador|bolivia|paraguay)\b'),
+    re.compile(r'(?<!new )mexico\b'),  # "New Mexico" (US state) is exempt via lookbehind
+    re.compile(r'\b(?:australia|new zealand)\b'),
+    re.compile(r'\b(?:south africa|nigeria|kenya|ghana|ethiopia|morocco|algeria|tunisia|cameroon)\b'),
+    re.compile(r'\b(?:uk|u\.k\.)\b'),
+    # High-confidence non-US cities (no meaningful US counterpart)
+    re.compile(r'\b(?:bangalore|bengaluru|hyderabad|mumbai|delhi|pune|chennai|kolkata|ahmedabad|noida|gurgaon|gurugram)\b'),
+    re.compile(r'\b(?:montreal|calgary|ottawa|edmonton|winnipeg|quebec)\b'),
+    re.compile(r'\b(?:tokyo|osaka|kyoto|yokohama|nagoya|sapporo)\b'),
+    re.compile(r'\b(?:seoul|busan|incheon)\b'),
+    re.compile(r'\b(?:beijing|shanghai|guangzhou|shenzhen|chengdu|hangzhou|nanjing|wuhan|tianjin)\b'),
+    re.compile(r'\b(?:dubai|abu dhabi|riyadh|doha|kuwait city|manama|muscat)\b'),
+    re.compile(r'\b(?:cape town|johannesburg|nairobi|lagos|accra|addis ababa)\b'),
+    # Regions
+    re.compile(r'\b(?:emea|apac|latam)\b'),
+    re.compile(r'\b(?:europe|asia[- ]pacific|middle east|latin america|southeast asia|south asia|east asia)\b'),
+]
+
 
 def _diversify(jobs: list[Job], max_count: int) -> list[Job]:
     """Cap any single sector at 60% of returned jobs. Skip if <20% have sector data."""
@@ -452,17 +483,13 @@ class FilterAgent:
         if not job.location_raw:
             return FilterResult(passed=True)
 
-        # A job tagged remote passes location for any user who accepts remote
-        if job.work_mode == "remote" and "remote" in (profile.work_modes or []):
-            return FilterResult(passed=True)
-
         job_location = job.location_raw.lower()
         _US_ALIASES = {"united states", "usa", "us", "u.s.", "u.s.a.", "america"}
         accepted_set = {a.lower() for a in profile.locations}
         accepts_us = bool(accepted_set & _US_ALIASES)
-
-        # Onsite + not open to relocation: enforce city-level match against user's location
         open_to_relocation = getattr(profile, "open_to_relocation", True)
+
+        # Onsite + no relocation: city-level check (must precede broad US pass)
         if (
             job.work_mode == "onsite"
             and "onsite" in (profile.work_modes or [])
@@ -478,10 +505,12 @@ class FilterAgent:
                     reason=f"onsite job in '{job.location_raw}' does not match user city '{user_city}' (relocation off)",
                 )
 
+        # Accepted-location substring match (handles multi-country profiles)
         for accepted in profile.locations:
             if accepted.lower() in job_location:
                 return FilterResult(passed=True)
 
+        # US-specific location matching
         if accepts_us:
             for alias in _US_ALIASES:
                 if _alias_in_location(alias, job_location):
@@ -489,8 +518,23 @@ class FilterAgent:
             if _contains_us_state(job.location_raw):
                 return FilterResult(passed=True)
 
+        # Block jobs with an explicit non-US location for US-only users.
+        # This must come after the accepted-location loop so that multi-country
+        # profiles (e.g. "United States" + "Canada") still pass their other country.
+        if accepts_us and not _is_us_compatible_location(job.location_raw):
+            logger.debug("Blocked non-US location '%s' for US user", job.location_raw)
+            return FilterResult(
+                passed=False,
+                reason=f"location '{job.location_raw}' is outside the US",
+            )
+
+        # Remote jobs: pass if user accepts remote
+        # (non-US remotes already blocked above for US-only users)
+        if job.work_mode == "remote" and "remote" in (profile.work_modes or []):
+            return FilterResult(passed=True)
+
         _GLOBAL_KEYWORDS = {"remote", "worldwide", "anywhere", "global", "distributed"}
-        if "remote" in profile.work_modes and any(k in job_location for k in _GLOBAL_KEYWORDS):
+        if "remote" in (profile.work_modes or []) and any(k in job_location for k in _GLOBAL_KEYWORDS):
             return FilterResult(passed=True)
 
         return FilterResult(
@@ -582,3 +626,9 @@ def _alias_in_location(alias: str, job_location_lower: str) -> bool:
 def _contains_us_state(location: str) -> bool:
     parts = [p.strip() for p in location.replace(";", ",").split(",")]
     return any(p.upper() in _US_STATES for p in parts)
+
+
+def _is_us_compatible_location(location_raw: str) -> bool:
+    """Return False if location explicitly names a non-US country or region."""
+    loc_lower = location_raw.lower()
+    return not any(p.search(loc_lower) for p in _NON_US_LOCATION_PATTERNS)
