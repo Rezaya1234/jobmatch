@@ -71,29 +71,29 @@ async def _send_auth_email(to: str, subject: str, html: str, plain: str) -> None
 
 
 async def _send_verification_email(email: str, token: str) -> None:
+    from mailer.templates import build_verification_html, build_verification_plain_text
     link = f"{FRONTEND_URL}/verify-email?token={token}"
-    html = (
-        f"<p>Welcome to StellaPath! Please verify your email address:</p>"
-        f'<p><a href="{link}">{link}</a></p>'
-        f"<p>This link expires in 24 hours.</p>"
-    )
-    plain = f"Verify your StellaPath email:\n{link}\n\nExpires in 24 hours."
     try:
-        await _send_auth_email(email, "Verify your StellaPath email", html, plain)
+        await _send_auth_email(
+            email,
+            "Verify your StellaPath email",
+            build_verification_html(email, link),
+            build_verification_plain_text(email, link),
+        )
     except Exception:
         logger.exception("Failed to send verification email to %s", email)
 
 
 async def _send_reset_email(email: str, token: str) -> None:
+    from mailer.templates import build_password_reset_html, build_password_reset_plain_text
     link = f"{FRONTEND_URL}/reset-password?token={token}"
-    html = (
-        f"<p>Reset your StellaPath password:</p>"
-        f'<p><a href="{link}">{link}</a></p>'
-        f"<p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>"
-    )
-    plain = f"Reset your StellaPath password:\n{link}\n\nExpires in 1 hour."
     try:
-        await _send_auth_email(email, "Reset your StellaPath password", html, plain)
+        await _send_auth_email(
+            email,
+            "Reset your StellaPath password",
+            build_password_reset_html(email, link),
+            build_password_reset_plain_text(email, link),
+        )
     except Exception:
         logger.exception("Failed to send reset email to %s", email)
 

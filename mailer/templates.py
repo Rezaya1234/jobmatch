@@ -238,6 +238,154 @@ def build_reengagement_plain_text(recipient_email: str, frontend_url: str) -> st
 
 
 # ------------------------------------------------------------------
+# Email verification
+# ------------------------------------------------------------------
+
+def build_verification_html(recipient_email: str, verify_link: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify your email — StellaPath</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }}
+    .wrapper {{ max-width: 560px; margin: 48px auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06); }}
+    .header {{ background: #7c3aed; padding: 28px 40px; }}
+    .header-logo {{ font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -.3px; }}
+    .body {{ padding: 40px 40px 32px; }}
+    h1 {{ font-size: 22px; color: #1a1a2e; margin: 0 0 12px; line-height: 1.3; }}
+    p {{ font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 20px; }}
+    .cta-block {{ text-align: center; padding: 8px 0 24px; }}
+    .cta-btn {{ display: inline-block; background: #7c3aed; color: #fff !important; padding: 14px 36px;
+               border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 700;
+               letter-spacing: -.1px; }}
+    .fallback {{ font-size: 12px; color: #999; word-break: break-all; margin-top: 16px; }}
+    .fallback a {{ color: #7c3aed; }}
+    .expiry {{ font-size: 13px; color: #888; background: #f8f7ff; border: 1px solid #ede9fe;
+               border-radius: 6px; padding: 10px 14px; margin-top: 8px; }}
+    .footer {{ text-align: center; padding: 20px; font-size: 12px; color: #bbb; border-top: 1px solid #f0f0f0; }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <div class="header-logo">StellaPath</div>
+    </div>
+    <div class="body">
+      <h1>Verify your email address</h1>
+      <p>Thanks for signing up! Click the button below to verify <strong>{_esc(recipient_email)}</strong> and activate your account.</p>
+      <div class="cta-block">
+        <a href="{_esc(verify_link)}" class="cta-btn">Verify Email &rarr;</a>
+      </div>
+      <div class="expiry">&#128274;&nbsp; This link expires in <strong>24 hours</strong>.</div>
+      <p class="fallback">
+        Button not working? Copy and paste this link into your browser:<br>
+        <a href="{_esc(verify_link)}">{_esc(verify_link)}</a>
+      </p>
+    </div>
+    <div class="footer">
+      You&rsquo;re receiving this because you created a StellaPath account.<br>
+      If you didn&rsquo;t sign up, you can safely ignore this email.
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+def build_verification_plain_text(recipient_email: str, verify_link: str) -> str:
+    return "\n".join([
+        "VERIFY YOUR EMAIL — STELLAPATH",
+        "",
+        f"Hi {recipient_email},",
+        "",
+        "Please verify your email address to activate your StellaPath account.",
+        "",
+        f"Verification link: {verify_link}",
+        "",
+        "This link expires in 24 hours.",
+        "",
+        "If you didn't create a StellaPath account, you can safely ignore this email.",
+    ])
+
+
+# ------------------------------------------------------------------
+# Password reset
+# ------------------------------------------------------------------
+
+def build_password_reset_html(recipient_email: str, reset_link: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset your password — StellaPath</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }}
+    .wrapper {{ max-width: 560px; margin: 48px auto; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06); }}
+    .header {{ background: #7c3aed; padding: 28px 40px; }}
+    .header-logo {{ font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -.3px; }}
+    .body {{ padding: 40px 40px 32px; }}
+    h1 {{ font-size: 22px; color: #1a1a2e; margin: 0 0 12px; line-height: 1.3; }}
+    p {{ font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 20px; }}
+    .cta-block {{ text-align: center; padding: 8px 0 24px; }}
+    .cta-btn {{ display: inline-block; background: #7c3aed; color: #fff !important; padding: 14px 36px;
+               border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 700;
+               letter-spacing: -.1px; }}
+    .fallback {{ font-size: 12px; color: #999; word-break: break-all; margin-top: 16px; }}
+    .fallback a {{ color: #7c3aed; }}
+    .expiry {{ font-size: 13px; color: #888; background: #f8f7ff; border: 1px solid #ede9fe;
+               border-radius: 6px; padding: 10px 14px; margin-top: 8px; }}
+    .security-note {{ font-size: 13px; color: #888; border-top: 1px solid #f0f0f0; padding-top: 20px; margin-top: 8px; }}
+    .footer {{ text-align: center; padding: 20px; font-size: 12px; color: #bbb; border-top: 1px solid #f0f0f0; }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <div class="header-logo">StellaPath</div>
+    </div>
+    <div class="body">
+      <h1>Reset your password</h1>
+      <p>We received a request to reset the password for <strong>{_esc(recipient_email)}</strong>. Click the button below to choose a new password.</p>
+      <div class="cta-block">
+        <a href="{_esc(reset_link)}" class="cta-btn">Reset Password &rarr;</a>
+      </div>
+      <div class="expiry">&#9203;&nbsp; This link expires in <strong>1 hour</strong>.</div>
+      <p class="fallback">
+        Button not working? Copy and paste this link into your browser:<br>
+        <a href="{_esc(reset_link)}">{_esc(reset_link)}</a>
+      </p>
+      <p class="security-note">
+        If you didn&rsquo;t request a password reset, you can safely ignore this email. Your password will not be changed.
+      </p>
+    </div>
+    <div class="footer">
+      This reset link was requested for {_esc(recipient_email)} on StellaPath.
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+def build_password_reset_plain_text(recipient_email: str, reset_link: str) -> str:
+    return "\n".join([
+        "RESET YOUR PASSWORD — STELLAPATH",
+        "",
+        f"Hi {recipient_email},",
+        "",
+        "We received a request to reset your StellaPath password.",
+        "",
+        f"Reset link: {reset_link}",
+        "",
+        "This link expires in 1 hour.",
+        "",
+        "If you didn't request a password reset, you can safely ignore this email.",
+        "Your password will not be changed.",
+    ])
+
+
+# ------------------------------------------------------------------
 # Private helpers
 # ------------------------------------------------------------------
 
