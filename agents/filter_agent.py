@@ -612,6 +612,19 @@ _US_STATES = {
     "TX","UT","VT","VA","WA","WV","WI","WY","DC",
 }
 
+_US_STATE_NAMES = {
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+    "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+    "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana",
+    "maine", "maryland", "massachusetts", "michigan", "minnesota",
+    "mississippi", "missouri", "montana", "nebraska", "nevada",
+    "new hampshire", "new jersey", "new mexico", "new york",
+    "north carolina", "north dakota", "ohio", "oklahoma", "oregon",
+    "pennsylvania", "rhode island", "south carolina", "south dakota",
+    "tennessee", "texas", "utah", "vermont", "virginia", "washington",
+    "west virginia", "wisconsin", "wyoming", "district of columbia",
+}
+
 
 def _alias_in_location(alias: str, job_location_lower: str) -> bool:
     """
@@ -625,7 +638,10 @@ def _alias_in_location(alias: str, job_location_lower: str) -> bool:
 
 def _contains_us_state(location: str) -> bool:
     parts = [p.strip() for p in location.replace(";", ",").split(",")]
-    return any(p.upper() in _US_STATES for p in parts)
+    if any(p.upper() in _US_STATES for p in parts):
+        return True
+    loc_lower = location.lower()
+    return any(name in loc_lower for name in _US_STATE_NAMES)
 
 
 def _is_us_compatible_location(location_raw: str) -> bool:
