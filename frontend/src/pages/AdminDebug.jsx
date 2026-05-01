@@ -148,7 +148,12 @@ export default function AdminDebug() {
       setUserId(data.user_id)
       setUserInfo(data)
     } catch (e) {
-      setUserError(e?.response?.data?.detail || 'User not found')
+      const status = e?.response?.status
+      if (status === 404) {
+        setUserError(`No account found for "${val.toLowerCase()}" in this environment`)
+      } else {
+        setUserError(e?.response?.data?.detail || `Request failed (${status || 'network error'})`)
+      }
     } finally {
       setLoadingUser(false)
     }

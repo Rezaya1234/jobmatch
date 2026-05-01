@@ -179,11 +179,11 @@ async def user_lookup(
     result = await session.execute(
         select(User, UserProfile)
         .outerjoin(UserProfile, UserProfile.user_id == User.id)
-        .where(User.email == email)
+        .where(User.email == email.strip().lower())
     )
     row = result.first()
     if row is None:
-        raise HTTPException(status_code=404, detail=f"No user found with email '{email}'")
+        raise HTTPException(status_code=404, detail=f"No user found with email '{email.strip().lower()}'")
     user, profile = row
     return UserLookupResponse(
         user_id=str(user.id),
