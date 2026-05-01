@@ -35,6 +35,15 @@ ALLOWED_DIMENSIONS = [
 
 _COST_PER_BATCH_USD = 0.00125   # Haiku Call 1, ~10-job batch
 _COST_PER_CALL2_USD = 0.003     # Sonnet Call 2, per job
+_REORDER_TOP_N = 7              # candidates reviewed by the reorder pass
+
+_REORDER_SYSTEM = (
+    "You are a senior career advisor reviewing AI job match rankings. "
+    "Catch cases where the algorithm ranked a job highly due to skills overlap "
+    "but the job clearly does not serve the candidate's stated career goal. "
+    "Only reorder when there is a meaningful mismatch — not for minor differences. "
+    "Return valid JSON only."
+)
 
 
 @dataclass
@@ -101,6 +110,11 @@ class MatchAgent:
             weighted_scores = _compute_weighted_scores(raw_scores, jobs_by_id, weights)
             _apply_function_floor(raw_scores, weighted_scores)
             normalized = _normalize(weighted_scores)
+
+            if profile.goals_text or profile.preferred_sectors:
+                normalized = await self._run_reorder_pass(
+                    profile, matches, jobs_by_id, normalized, raw_scores
+                )
 
             for match in matches:
                 job_id = str(match.job_id)
@@ -247,6 +261,103 @@ class MatchAgent:
         except Exception:
             logger.exception("Call 2 failed for match %s", match.id)
         return None
+
+    async def _run_reorder_pass(
+        self,
+        profile: UserProfile,
+        matches: list[JobMatch],
+        jobs_by_id: dict[str, Job],
+        normalized: dict[str, float],
+        raw_scores: dict[str, dict[str, float]],
+    ) -> dict[str, float]:
+        """Career advisor coherence check on the top-N ranked jobs.
+
+        If a job in positions 4-7 is clearly more aligned with the candidate's stated
+        goal than something in positions 1-3, promote it. Returns adjusted normalized
+        scores that reflect the new order; original score values are preserved and
+        redistributed across the reordered positions.
+        """
+        ranked = sorted(matches, key=lambda m: normalized.get(str(m.job_id), 0.0), reverse=True)
+        top_n = ranked[:_REORDER_TOP_N]
+        original_ids = [str(m.job_id) for m in top_n]
+
+        goal_parts = []
+        if profile.role_description:
+            goal_parts.append(f"Background: {profile.role_description}")
+        if profile.goals_text:
+            goal_parts.append(f"Career goal: {profile.goals_text}")
+        if profile.preferred_sectors:
+            goal_parts.append(f"Target sectors: {', '.join(profile.preferred_sectors)}")
+        if profile.seniority_level:
+            goal_parts.append(f"Seniority: {profile.seniority_level}")
+
+        job_lines = []
+        for i, match in enumerate(top_n, 1):
+            job = jobs_by_id.get(str(match.job_id))
+            if not job:
+                continue
+            dim = raw_scores.get(str(match.job_id), {})
+            ind = dim.get("industry_alignment")
+            func = dim.get("function_type")
+            scores_str = f"industry={ind:.2f}" if ind is not None else ""
+            if func is not None:
+                scores_str += f", function={func:.2f}"
+            job_lines.append(
+                f'{i}. job_id="{match.job_id}" | {job.title} at {job.company} | {scores_str}'
+            )
+
+        if len(job_lines) < 3:
+            return normalized
+
+        user_prompt = (
+            f"Candidate:\n{chr(10).join(goal_parts)}\n\n"
+            f"Current ranking (top {len(job_lines)}):\n" + "\n".join(job_lines) + "\n\n"
+            "Given the candidate's stated goal, identify the 3 jobs from this list that best serve "
+            "their career direction — not just skills overlap.\n"
+            "Return JSON only:\n"
+            '{"top_3_ids": ["id1", "id2", "id3"], "swaps_made": true|false, "reasoning": "one sentence"}'
+        )
+
+        try:
+            response = await self._llm.complete(
+                messages=[Message(role="user", content=user_prompt)],
+                system=_REORDER_SYSTEM,
+                tier=ModelTier.STANDARD,
+                max_tokens=256,
+            )
+            start, end = response.find("{"), response.rfind("}")
+            if start == -1 or end == -1:
+                return normalized
+            data = json.loads(response[start:end + 1])
+
+            if not data.get("swaps_made"):
+                return normalized
+
+            top3_ids = [str(i) for i in data.get("top_3_ids", [])]
+            if len(top3_ids) != 3 or not all(i in original_ids for i in top3_ids):
+                logger.warning("Reorder pass returned invalid top_3_ids — ignoring")
+                return normalized
+
+            # New order: promoted top-3 first, remaining in their original sequence
+            rest_ids = [jid for jid in original_ids if jid not in set(top3_ids)]
+            new_order = top3_ids + rest_ids
+
+            # Redistribute the existing score values to the new positions
+            score_values = sorted(
+                [normalized.get(jid, 0.0) for jid in original_ids], reverse=True
+            )
+            adjusted = dict(normalized)
+            for rank, job_id in enumerate(new_order):
+                adjusted[job_id] = score_values[rank]
+
+            logger.info(
+                "Reorder pass adjusted top-3 for user — %s", data.get("reasoning", "")
+            )
+            return adjusted
+
+        except Exception:
+            logger.exception("Reorder pass failed — keeping original ranking")
+            return normalized
 
     async def _get_top_candidates(
         self, user_id: str, job_ids: list[str] | None = None

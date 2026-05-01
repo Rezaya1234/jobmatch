@@ -138,6 +138,7 @@ async def upsert_profile(
     body: ProfileRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
+    llm: LLMClient = Depends(get_llm),
 ) -> ProfileResponse:
     await _get_user_or_404(user_id, session)
 
@@ -145,6 +146,10 @@ async def upsert_profile(
         select(UserProfile).where(UserProfile.user_id == user_id)
     )
     profile = result.scalar_one_or_none()
+
+    # Capture intent fields before update so we can detect changes
+    old_goals = profile.goals_text if profile else None
+    old_sectors = set(profile.preferred_sectors or []) if profile else set()
 
     if profile is None:
         profile = UserProfile(user_id=user_id)
@@ -160,7 +165,15 @@ async def upsert_profile(
 
     await session.commit()
     await session.refresh(profile)
-    background_tasks.add_task(_update_embedding_bg, user_id)
+
+    new_goals = profile.goals_text
+    new_sectors = set(profile.preferred_sectors or [])
+    intent_changed = (old_goals != new_goals) or (old_sectors != new_sectors)
+
+    if intent_changed and profile.original_role_description:
+        background_tasks.add_task(_regenerate_description_bg, user_id, llm)
+    else:
+        background_tasks.add_task(_update_embedding_bg, user_id)
     return _profile_response(profile)
 
 
@@ -227,7 +240,7 @@ Return a JSON object with exactly these keys (use null if unknown):
   "company_type": "public"|"private"|null,
   "preferred_company_sizes": ["startup"|"small"|"medium"|"large"],
   "preferred_companies": ["exact company names if mentioned, e.g. Google, OpenAI, Anthropic"],
-  "role_description": "2-3 sentence summary covering: their professional background and key skills, years/level of experience, and what kind of role/company they want next. This will be used to match them to jobs, so be specific about their skills and background."
+  "role_description": "2-3 sentence professional summary for job matching. IMPORTANT: if the text states a target role, industry, or career goal, frame the summary around that goal — lead with the experience and skills most relevant to that goal, and present other experience as supporting context or tools they bring to the target. If no goal is expressed, summarize the background broadly. Be specific about skills and level."
 }}
 
 Rules:
@@ -349,6 +362,49 @@ async def _update_embedding_bg(user_id: str) -> None:
         profile = result.scalar_one_or_none()
         if profile:
             await update_profile_embedding(profile, session)
+
+
+async def _regenerate_description_bg(user_id: str, llm: LLMClient) -> None:
+    """Rebuild role_description through the lens of stated career goals, then re-embed."""
+    from db.database import AsyncSessionLocal
+    from agents.profile_agent import update_profile_embedding
+    from llm.client import Message, ModelTier
+    async with AsyncSessionLocal() as session:
+        from sqlalchemy import select as _select
+        result = await session.execute(_select(UserProfile).where(UserProfile.user_id == user_id))
+        profile = result.scalar_one_or_none()
+        if profile is None or not profile.original_role_description:
+            return
+
+        goal_parts = []
+        if profile.goals_text:
+            goal_parts.append(f"Career goal: {profile.goals_text}")
+        if profile.preferred_sectors:
+            goal_parts.append(f"Target sectors: {', '.join(profile.preferred_sectors)}")
+        if not goal_parts:
+            return
+
+        prompt = (
+            f"Candidate background:\n{profile.original_role_description}\n\n"
+            + "\n".join(goal_parts) + "\n\n"
+            "Write a 2-3 sentence professional summary for job matching. "
+            "Lead with the experience and skills from their background most relevant to their stated goal. "
+            "Frame skills from other domains as tools they bring to the target role or industry. "
+            "Return only the summary text, no labels or preamble."
+        )
+        try:
+            new_description = await llm.complete(
+                [Message(role="user", content=prompt)],
+                tier=ModelTier.FAST,
+                max_tokens=200,
+            )
+            profile.role_description = new_description.strip()
+            await session.commit()
+        except Exception:
+            logger.exception("Failed to regenerate role_description for user %s", user_id)
+            return
+
+        await update_profile_embedding(profile, session)
 
 
 async def _run_on_demand_matching(user_id: str, llm: LLMClient) -> None:
