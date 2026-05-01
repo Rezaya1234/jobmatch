@@ -331,67 +331,41 @@ export default function CompanyDetail() {
           </Section>
 
           {/* What to Expect */}
-          {(company.interview_difficulty != null || company.response_rate || company.time_to_hire || company.overall_rating != null) && (
-            <Section title={
-              <span className="flex items-center gap-1.5">
-                What to Expect
-                <span className="relative group">
-                  <span className="text-slate-400 font-normal cursor-help text-xs">ⓘ</span>
-                  <span className="absolute left-0 bottom-full mb-2 w-64 bg-slate-800 text-white text-xs rounded-lg p-2.5 z-10 leading-relaxed opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity block">
-                    These metrics are estimated from industry data and job posting signals. They will be updated with real figures as Stellapath users report their experiences.
-                  </span>
-                </span>
-              </span>
-            }>
-              <div className="space-y-4">
-                {company.interview_difficulty != null && (
-                  <div>
-                    <p className="text-sm text-slate-500 mb-2">Interview Difficulty</p>
-                    <DifficultyPill level={company.interview_difficulty} />
+          <Section title="What to Expect">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <a
+                  href={`https://www.glassdoor.com/Reviews/${encodeURIComponent(company.company_name)}-reviews.htm`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between gap-2 border border-slate-200 rounded-xl px-4 py-3 text-violet-700 hover:border-violet-300 hover:bg-violet-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">★</span>
+                    <span className="text-sm font-medium">Interview reviews on Glassdoor</span>
                   </div>
-                )}
-
-                {company.response_rate && responseRatePos !== null && (
-                  <div>
-                    <p className="text-sm text-slate-500">Response Rate</p>
-                    <GradientBar position={responseRatePos} label={company.response_rate} />
+                  <span className="text-slate-400">→</span>
+                </a>
+                <a
+                  href={`https://www.teamblind.com/company/${encodeURIComponent(company.company_name)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between gap-2 border border-slate-200 rounded-xl px-4 py-3 text-violet-700 hover:border-violet-300 hover:bg-violet-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💬</span>
+                    <span className="text-sm font-medium">Employee reviews on Blind</span>
                   </div>
-                )}
-                {company.response_rate && responseRatePos === null && (
-                  <div>
-                    <p className="text-sm text-slate-500 mb-1">Response Rate</p>
-                    <p className="text-base font-bold text-slate-800">{company.response_rate}</p>
-                  </div>
-                )}
-
-                {company.time_to_hire && timeToHirePos !== null && (
-                  <div>
-                    <p className="text-sm text-slate-500">Time to Hire</p>
-                    <GradientBar position={timeToHirePos} label={company.time_to_hire} />
-                  </div>
-                )}
-                {company.time_to_hire && timeToHirePos === null && (
-                  <div>
-                    <p className="text-sm text-slate-500 mb-1">Time to Hire</p>
-                    <p className="text-base font-bold text-slate-800">{company.time_to_hire}</p>
-                  </div>
-                )}
-
-                {sentimentPos !== null && (
-                  <div>
-                    <p className="text-sm text-slate-500">Employee Sentiment</p>
-                    <GradientBar position={sentimentPos} label={`${company.overall_rating.toFixed(1)} / 5.0`} />
-                  </div>
-                )}
-
-                <p className="text-xs italic text-slate-400 pt-1">
-                  {(company.user_feedback_count || 0) >= 10
-                    ? `Based on ${company.user_feedback_count} Stellapath users`
-                    : 'ⓘ Estimated from industry data'}
+                  <span className="text-slate-400">→</span>
+                </a>
+              </div>
+              <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-3">
+                <p className="text-xs italic text-slate-500">
+                  Interview and offer data coming soon — we will show real figures once Stellapath users report their experiences with this company.
                 </p>
               </div>
-            </Section>
-          )}
+            </div>
+          </Section>
 
           {/* Employee Sentiment — pros / cons */}
           {(company.overall_rating || company.pros?.length || company.cons?.length) && (
