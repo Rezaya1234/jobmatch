@@ -308,6 +308,48 @@ async def trigger_feedback_pipeline(
 # Step-by-step testing endpoints (synchronous — return result directly)
 # ------------------------------------------------------------------
 
+@router.post("/step/embed-jobs", response_model=StepResult, status_code=200)
+async def trigger_step_embed_jobs(
+    session: AsyncSession = Depends(get_session),
+) -> StepResult:
+    """Backfill: embed all active jobs that are missing an embedding vector."""
+    from sqlalchemy import func, select, update
+    from db.models import Job
+    from agents.embeddings import embed_batch
+
+    try:
+        result = await session.execute(
+            select(Job.id, Job.title, Job.description)
+            .where(Job.is_active.is_(True), Job.embedding_vector.is_(None))
+        )
+        jobs = result.all()
+        total_missing = len(jobs)
+        if not jobs:
+            return StepResult(status="done", detail="No jobs missing embeddings", count=0)
+
+        _BATCH = 100
+        embedded = 0
+        for i in range(0, len(jobs), _BATCH):
+            chunk = jobs[i : i + _BATCH]
+            texts = [f"{title}. {(description or '')[:500]}" for _, title, description in chunk]
+            vectors = await embed_batch(texts)
+            for (job_id, _, _), vector in zip(chunk, vectors):
+                if vector is not None:
+                    await session.execute(
+                        update(Job).where(Job.id == job_id).values(embedding_vector=vector)
+                    )
+                    embedded += 1
+            await session.commit()
+
+        return StepResult(
+            status="done",
+            detail=f"{embedded}/{total_missing} jobs embedded",
+            count=embedded,
+        )
+    except Exception as exc:
+        return StepResult(status="error", detail=str(exc))
+
+
 @router.post("/step/reset/{user_id}", response_model=StepResult, status_code=200)
 async def trigger_step_reset(
     user_id: str,

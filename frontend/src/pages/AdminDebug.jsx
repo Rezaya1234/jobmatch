@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   triggerCollect,
+  triggerStepEmbedJobs,
   triggerStepReset,
   triggerStepFilter,
   triggerStepCandidates,
@@ -104,6 +105,7 @@ function formatReason(r) {
 
 const INITIAL_STEPS = {
   collect:    { status: 'idle', result: '' },
+  embed:      { status: 'idle', result: '' },
   reset:      { status: 'idle', result: '' },
   filter:     { status: 'idle', result: '' },
   candidates: { status: 'idle', result: '' },
@@ -178,6 +180,10 @@ export default function AdminDebug() {
     {
       key: 'collect', label: 'Collect Jobs', desc: 'Scrape all 41 companies',
       fn: () => triggerCollect(), needsUser: false,
+    },
+    {
+      key: 'embed', label: 'Embed Jobs', desc: 'Backfill embeddings for jobs missing vectors',
+      fn: () => triggerStepEmbedJobs(), needsUser: false,
     },
     {
       key: 'reset', label: 'Reset Matches', desc: 'Clear job_match rows for this user',

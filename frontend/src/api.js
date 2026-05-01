@@ -35,6 +35,7 @@ export const getCompanyJobs = (slug, params = {}) => http.get(`/companies/${slug
 export const triggerCompanyInsights = () => http.post('/pipeline/company-insights').then(r => r.data)
 export const getInsightsStatus = () => http.get('/pipeline/insights-status').then(r => r.data)
 export const backfillLogos = () => http.post('/pipeline/backfill-logos').then(r => r.data)
+export const triggerStepEmbedJobs = () => http.post('/pipeline/step/embed-jobs').then(r => r.data)
 export const triggerStepReset = (id) => http.post(`/pipeline/step/reset/${id}`).then(r => r.data)
 export const triggerStepFilter = (id) => http.post(`/pipeline/step/filter/${id}`).then(r => r.data)
 export const triggerStepCandidates = (id) => http.post(`/pipeline/step/candidates/${id}`).then(r => r.data)

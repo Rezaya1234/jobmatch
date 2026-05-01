@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agents.alert_writer import maybe_insert_alert
 from agents.ats_fetchers import fetch_company_jobs
 from agents.company_sources import COMPANY_SOURCES
-from agents.embeddings import embed_single
+from agents.embeddings import embed_batch, embed_single
 from db.models import (
     CompanyHiringSnapshot,
     Feedback,
@@ -268,7 +268,7 @@ class JobSearchAgent:
         return new_count, len(closed_ids)
 
     async def _embed_new_jobs(self, new_urls: set[str]) -> None:
-        """Embed newly inserted jobs and store the vector. Skips any that already have one."""
+        """Embed newly inserted jobs in batches of 100. Skips any that already have one."""
         result = await self._session.execute(
             select(Job.id, Job.title, Job.description)
             .where(Job.url.in_(new_urls), Job.embedding_vector.is_(None))
@@ -277,15 +277,18 @@ class JobSearchAgent:
         if not jobs:
             return
 
+        _BATCH = 100
         embedded = 0
-        for job_id, title, description in jobs:
-            text = f"{title}. {(description or '')[:500]}"
-            vector = await embed_single(text)
-            if vector is not None:
-                await self._session.execute(
-                    update(Job).where(Job.id == job_id).values(embedding_vector=vector)
-                )
-                embedded += 1
+        for i in range(0, len(jobs), _BATCH):
+            chunk = jobs[i : i + _BATCH]
+            texts = [f"{title}. {(description or '')[:500]}" for _, title, description in chunk]
+            vectors = await embed_batch(texts)
+            for (job_id, _, _), vector in zip(chunk, vectors):
+                if vector is not None:
+                    await self._session.execute(
+                        update(Job).where(Job.id == job_id).values(embedding_vector=vector)
+                    )
+                    embedded += 1
 
         if embedded:
             await self._session.commit()

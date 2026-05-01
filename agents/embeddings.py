@@ -85,6 +85,31 @@ def _openai_client():
     return AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
+async def embed_batch(texts: list[str]) -> list[list[float] | None]:
+    """
+    Embed multiple texts in one OpenAI API call.
+    Returns a list aligned with input; None for any slot that failed.
+    OpenAI supports up to 2048 inputs per request.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or not texts:
+        return [None] * len(texts)
+    try:
+        client = _openai_client()
+        response = await client.embeddings.create(model=_OPENAI_MODEL, input=texts)
+        out: list[list[float] | None] = []
+        for item in sorted(response.data, key=lambda x: x.index):
+            arr = np.array(item.embedding, dtype=np.float32)
+            norm = np.linalg.norm(arr)
+            if norm > 0:
+                arr = arr / norm
+            out.append(arr.tolist())
+        return out
+    except Exception as exc:
+        logger.warning("embed_batch failed: %s", exc)
+        return [None] * len(texts)
+
+
 async def embed_single(text: str) -> list[float] | None:
     """
     Embed a single text string using OpenAI text-embedding-3-small.
