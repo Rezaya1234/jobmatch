@@ -517,6 +517,8 @@ class FilterAgent:
                     return FilterResult(passed=True)
             if _contains_us_state(job.location_raw):
                 return FilterResult(passed=True)
+            if _contains_us_city(job.location_raw):
+                return FilterResult(passed=True)
 
         # Block jobs with an explicit non-US location for US-only users.
         # This must come after the accepted-location loop so that multi-country
@@ -648,3 +650,179 @@ def _is_us_compatible_location(location_raw: str) -> bool:
     """Return False if location explicitly names a non-US country or region."""
     loc_lower = location_raw.lower()
     return not any(p.search(loc_lower) for p in _NON_US_LOCATION_PATTERNS)
+
+
+# ---------------------------------------------------------------------------
+# US cities (top ~500 by population + state capitals + major business hubs)
+# ---------------------------------------------------------------------------
+
+_US_CITIES: frozenset[str] = frozenset({
+    # ── Top 100 by population ──
+    "new york city", "new york", "los angeles", "chicago", "houston",
+    "phoenix", "philadelphia", "san antonio", "san diego", "dallas",
+    "san jose", "austin", "jacksonville", "fort worth", "columbus",
+    "charlotte", "indianapolis", "san francisco", "seattle", "denver",
+    "nashville", "oklahoma city", "el paso", "las vegas", "louisville",
+    "memphis", "portland", "baltimore", "milwaukee", "albuquerque",
+    "tucson", "fresno", "sacramento", "mesa", "kansas city", "atlanta",
+    "omaha", "colorado springs", "raleigh", "long beach", "virginia beach",
+    "minneapolis", "tampa", "new orleans", "arlington", "bakersfield",
+    "honolulu", "anaheim", "aurora", "santa ana", "corpus christi",
+    "riverside", "st. louis", "lexington", "pittsburgh", "stockton",
+    "anchorage", "cincinnati", "st. paul", "greensboro", "toledo",
+    "newark", "plano", "henderson", "orlando", "lincoln", "jersey city",
+    "chandler", "st. petersburg", "laredo", "norfolk", "madison", "durham",
+    "lubbock", "winston-salem", "garland", "glendale", "hialeah", "reno",
+    "baton rouge", "irvine", "chesapeake", "irving", "scottsdale",
+    "north las vegas", "fremont", "gilbert", "san bernardino", "birmingham",
+    "boise", "rochester", "richmond", "spokane", "des moines", "montgomery",
+    "modesto", "fayetteville", "tacoma", "shreveport", "fontana",
+    "moreno valley", "akron", "yonkers", "huntington beach", "little rock",
+    "augusta", "grand rapids", "oxnard", "tallahassee", "huntsville",
+    "worcester", "knoxville", "newport news", "providence", "salt lake city",
+    "brownsville", "fort lauderdale", "garden grove", "oceanside",
+    "chattanooga", "santa clarita", "fort wayne", "tempe",
+    "rancho cucamonga", "cape coral", "sioux falls", "elk grove",
+    "pembroke pines", "salem", "corona", "eugene", "cary", "fort collins",
+    "alexandria", "hayward", "lancaster", "salinas", "palmdale", "sunnyvale",
+    "pomona", "escondido", "pasadena", "surprise", "rockford", "torrance",
+    "paterson", "joliet", "bridgeport", "mcallen", "savannah", "mesquite",
+    "killeen", "syracuse", "dayton", "hollywood", "macon", "hampton",
+    "clarksville", "warren", "west valley city", "columbia",
+    "sterling heights", "new haven", "olathe", "thousand oaks",
+    "cedar rapids", "topeka", "visalia", "elizabeth", "simi valley",
+    "hartford", "stamford", "concord", "roseville", "thornton", "abilene",
+    "beaumont", "independence", "el monte", "ann arbor", "provo", "lansing",
+    "inglewood", "victorville", "berkeley", "santa rosa", "midland",
+    "manchester", "murfreesboro", "downey", "costa mesa", "erie",
+    "miami gardens", "westminster", "pueblo", "clearwater", "arvada",
+    "allentown", "west jordan", "lowell", "elgin", "round rock",
+    "pompano beach", "antioch", "west palm beach", "everett", "miami",
+    "wichita", "billings", "amarillo", "murrieta", "charleston",
+    "gainesville", "frisco", "mckinney", "denton", "carrollton", "miramar",
+    "davenport", "fullerton", "centennial", "west covina", "athens",
+    "rialto", "waco", "odessa", "lakewood", "fargo", "mobile", "flint",
+    "port arthur", "burbank", "grand prairie", "palm bay", "las cruces",
+    "santa clara", "coral springs", "clovis", "norwalk", "richardson",
+    "lewisville", "league city", "tyler", "overland park", "springfield",
+    "peoria",
+    # ── State capitals not in top 100 ──
+    "juneau", "dover", "frankfort", "annapolis", "helena", "carson city",
+    "trenton", "santa fe", "albany", "bismarck", "harrisburg", "pierre",
+    "montpelier", "olympia", "cheyenne", "jefferson city",
+    # ── Pacific Northwest ──
+    "bellevue", "redmond", "kirkland", "renton", "kent", "bothell",
+    "shoreline", "bellingham", "kennewick", "pasco", "richland", "yakima",
+    "lacey", "tumwater", "bremerton", "gresham", "hillsboro", "beaverton",
+    "bend", "medford", "albany", "corvallis", "lake oswego",
+    # ── California (Silicon Valley + suburbs) ──
+    "palo alto", "mountain view", "cupertino", "menlo park", "santa monica",
+    "culver city", "el segundo", "manhattan beach", "redondo beach",
+    "hawthorne", "compton", "carson", "gardena", "el cajon", "santee",
+    "chula vista", "national city", "encinitas", "carlsbad", "vista",
+    "san marcos", "ventura", "camarillo", "temecula", "palm springs",
+    "palm desert", "cathedral city", "san leandro", "union city", "milpitas",
+    "redwood city", "san mateo", "daly city", "south san francisco",
+    "vallejo", "fairfield", "vacaville", "woodland", "davis", "folsom",
+    "rocklin", "turlock", "merced", "tulare", "hanford",
+    "santa barbara", "san luis obispo", "santa maria", "lompoc",
+    "campbell", "los gatos", "saratoga", "los altos", "rancho cordova",
+    # ── Texas (extended) ──
+    "sugar land", "katy", "conroe", "pearland", "cedar park",
+    "pflugerville", "georgetown", "allen", "cedar hill", "mansfield",
+    "north richland hills", "euless", "hurst", "bedford", "haltom city",
+    "rowlett", "wylie", "burleson", "flower mound", "southlake",
+    "san angelo", "victoria", "texarkana", "lufkin", "nacogdoches",
+    "longview", "sherman",
+    # ── Florida (extended) ──
+    "boca raton", "boynton beach", "delray beach", "sunrise", "plantation",
+    "deerfield beach", "davie", "fort myers", "sarasota", "bradenton",
+    "lakeland", "kissimmee", "daytona beach", "palm coast", "ocala",
+    "pensacola", "panama city", "melbourne", "titusville", "vero beach",
+    "naples", "bonita springs", "punta gorda", "port st. lucie",
+    # ── Georgia (extended) ──
+    "marietta", "alpharetta", "sandy springs", "smyrna", "roswell",
+    "decatur", "norcross", "duluth", "kennesaw", "peachtree city",
+    "dunwoody", "johns creek", "lawrenceville", "valdosta", "brunswick",
+    "rome", "dalton",
+    # ── Midwest (extended) ──
+    "naperville", "schaumburg", "evanston", "oak brook", "downers grove",
+    "waukegan", "cicero", "arlington heights", "bolingbrook", "palatine",
+    "skokie", "des plaines", "orland park", "tinley park",
+    "carmel", "fishers", "bloomington", "south bend", "evansville", "gary",
+    "hammond", "muncie", "terre haute", "lafayette",
+    "cleveland", "youngstown", "canton", "parma", "lorain", "hamilton",
+    "kettering", "cuyahoga falls", "elyria",
+    "dearborn", "livonia", "troy", "southfield", "pontiac", "kalamazoo",
+    "saginaw", "bay city", "battle creek",
+    "duluth", "burnsville", "plymouth", "eden prairie", "woodbury",
+    "maple grove", "eagan", "coon rapids", "brooklyn park",
+    "green bay", "kenosha", "racine", "appleton", "oshkosh", "eau claire",
+    "waukesha", "sheboygan", "la crosse", "janesville", "beloit",
+    "st. joseph", "joplin", "lenexa", "shawnee", "manhattan",
+    "iowa city", "waterloo", "sioux city", "ames", "council bluffs",
+    "grand island", "kearney",
+    "rapid city", "aberdeen", "brookings",
+    "grand forks", "minot",
+    "waterloo",
+    # ── Southeast (extended) ──
+    "bowling green", "owensboro", "covington", "elizabethtown",
+    "tuscaloosa", "dothan", "hoover", "vestavia hills",
+    "gulfport", "biloxi", "hattiesburg", "meridian", "tupelo",
+    "lafayette", "lake charles", "metairie", "bossier city",
+    "rogers", "bentonville", "jonesboro", "fort smith",
+    "asheville", "wilmington", "high point", "gastonia",
+    "spartanburg", "greenville", "mount pleasant", "hilton head",
+    "roanoke", "lynchburg", "charlottesville", "blacksburg",
+    "fredericksburg", "hagerstown", "bowie", "silver spring",
+    "college park", "germantown", "ellicott city",
+    "brentwood", "franklin", "spring hill", "hendersonville",
+    # ── Mountain West (extended) ──
+    "greeley", "boulder", "broomfield", "castle rock", "parker",
+    "highlands ranch", "englewood", "avondale", "goodyear",
+    "paradise valley", "fountain hills",
+    "rio rancho", "taos", "roswell", "carlsbad",
+    "sparks", "elko", "st. george", "logan", "orem", "sandy", "ogden",
+    "nampa", "meridian", "idaho falls", "pocatello", "caldwell",
+    "twin falls",
+    "missoula", "great falls", "bozeman", "butte", "kalispell",
+    "casper", "laramie", "gillette", "rock springs",
+    # ── Northeast (extended) ──
+    "buffalo", "utica", "schenectady", "new rochelle", "white plains",
+    "mount vernon", "poughkeepsie", "binghamton", "troy", "niagara falls",
+    "scranton", "reading", "bethlehem", "york", "wilkes-barre",
+    "camden", "trenton", "edison", "woodbridge", "toms river",
+    "morristown", "hackensack", "passaic",
+    "cranston", "warwick", "pawtucket", "woonsocket",
+    "new bedford", "fall river", "quincy", "lynn", "brockton",
+    "cambridge", "somerville", "newton", "waltham", "malden",
+    "lewiston", "bangor", "south portland",
+    "nashua", "dover", "portsmouth",
+    "burlington", "rutland",
+    # ── Hawaii & Alaska ──
+    "pearl city", "hilo", "kailua", "kaneohe", "ewa beach",
+    "fairbanks", "sitka", "ketchikan",
+    # ── DC metro / Northern Virginia / Maryland ──
+    "reston", "tysons", "mclean", "herndon", "chantilly", "ashburn",
+    "bethesda", "rockville", "gaithersburg",
+    # ── Additional business / tech hubs ──
+    "the woodlands", "port st lucie",
+})
+
+
+def _contains_us_city(location: str) -> bool:
+    """Return True if location contains a known US city name."""
+    loc_lower = location.lower()
+    tokens = {
+        t.strip(".,()[]")
+        for t in re.split(r"[\s,;/\-–]+", loc_lower)
+        if t.strip(".,()[]")
+    }
+    for city in _US_CITIES:
+        if " " in city:
+            if city in loc_lower:
+                return True
+        else:
+            if city in tokens:
+                return True
+    return False
