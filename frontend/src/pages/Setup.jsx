@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createUser, upsertProfile, getProfile, parseProfile, triggerOnDemandMatch } from '../api'
+import { createUser, upsertProfile, getProfile, parseProfile, runForUser, getMatches } from '../api'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -357,6 +357,7 @@ export default function Setup() {
   const [dragOver, setDragOver]     = useState(false)
   const [titleExpanded, setTitleExpanded] = useState(false)
   const [autoSaved, setAutoSaved]   = useState(false)
+  const [firstRunLoading, setFirstRunLoading] = useState(false)
 
   // Start at step 2 if already logged in (skip account creation)
   const [currentStep, setCurrentStep] = useState(() =>
@@ -527,8 +528,20 @@ export default function Setup() {
         profile_complete:            true,
       })
       localStorage.setItem('profileComplete', 'true')
-      // Fire on-demand matching in the background so new users get matches quickly
-      triggerOnDemandMatch(userId).catch(() => {})
+      setFirstRunLoading(true)
+      try {
+        const result = await runForUser(userId)
+        if (result.status === 'processing') {
+          let elapsed = 0
+          while (elapsed < 60000) {
+            await new Promise(r => setTimeout(r, 3000))
+            elapsed += 3000
+            const matches = await getMatches(userId, 0, 1).catch(() => [])
+            if (matches.length > 0) break
+          }
+        }
+      } catch { /* silent */ }
+      setFirstRunLoading(false)
       navigate('/dashboard')
     } catch (err) {
       showStatus('Error saving profile — please try again', true)
@@ -963,6 +976,22 @@ export default function Setup() {
           status.error ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
         }`}>
           {status.msg}
+        </div>
+      )}
+
+      {/* First-run loading overlay */}
+      {firstRunLoading && (
+        <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center gap-5">
+          <div className="w-14 h-14 rounded-2xl bg-violet-600 flex items-center justify-center shadow-lg">
+            <svg className="w-8 h-8 text-white" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+            </svg>
+          </div>
+          <div className="w-8 h-8 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+          <div className="text-center max-w-xs">
+            <p className="text-base font-semibold text-slate-900">Hold tight — we are finding your first 3 matches.</p>
+            <p className="text-sm text-slate-500 mt-1">This takes about 30 seconds.</p>
+          </div>
         </div>
       )}
     </div>
