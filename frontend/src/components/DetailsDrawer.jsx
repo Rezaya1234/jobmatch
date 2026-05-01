@@ -370,18 +370,14 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
 
   async function handleApply() {
     if (job.url) window.open(job.url, '_blank', 'noreferrer')
-    if (localRating !== 'thumbs_up') {
-      setLocalRating('thumbs_up')
-      try {
-        await submitFeedback(userId, job.job_id, 'thumbs_up', '', 2)
-        onFeedback?.('thumbs_up', job.job_id)
-      } catch { /* silent */ }
-    }
+    try {
+      await submitFeedback(userId, job.job_id, 'thumbs_up', '', 2)
+      onFeedback?.('thumbs_up', job.job_id)
+    } catch { /* silent */ }
     onClose()
   }
 
   async function handleNotInterested() {
-    setLocalRating('thumbs_down')
     try {
       await submitFeedback(userId, job.job_id, 'thumbs_down', 'not_interested', 2)
       onFeedback?.('thumbs_down', job.job_id)
@@ -558,24 +554,16 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
             <button
               onClick={handleApply}
               disabled={saving}
-              className={`flex-1 text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 min-h-[44px] disabled:opacity-50 ${
-                localRating === 'thumbs_up'
-                  ? 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500'
-                  : 'bg-violet-600 hover:bg-violet-700 text-white focus:ring-violet-500'
-              }`}
+              className="flex-1 text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 min-h-[44px] disabled:opacity-50 bg-violet-600 hover:bg-violet-700 text-white focus:ring-violet-500"
             >
-              {localRating === 'thumbs_up' ? 'Applied ✓' : 'Apply →'}
+              Apply →
             </button>
             <button
               onClick={handleNotInterested}
               disabled={saving}
-              className={`text-sm font-medium px-4 py-2.5 rounded-xl border transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300 min-h-[44px] disabled:opacity-50 ${
-                localRating === 'thumbs_down'
-                  ? 'text-rose-600 border-rose-300 bg-rose-50'
-                  : 'text-slate-500 hover:text-slate-700 border-slate-200 hover:border-slate-300'
-              }`}
+              className="text-sm font-medium px-4 py-2.5 rounded-xl border transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300 min-h-[44px] disabled:opacity-50 text-slate-500 hover:text-slate-700 border-slate-200 hover:border-slate-300"
             >
-              {localRating === 'thumbs_down' ? 'Skipped' : 'Not interested'}
+              Not interested
             </button>
           </div>
           <div className="flex items-center justify-center gap-3">
