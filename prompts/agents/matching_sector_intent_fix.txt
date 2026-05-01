@@ -1,0 +1,125 @@
+# Matching Pipeline — Sector Intent Fix
+# Decision log: May 2026
+#
+# Root cause incident: user with "AI implementation" background and PhD in
+# Petroleum Engineering received 15/15 matches from Anthropic, 0 from oil and gas,
+# despite explicitly stating "Seeking senior leadership role in oil and gas industry."
+#
+# Three root causes identified and fixed. This file documents the design decision
+# for each fix so future sessions can understand why these rules exist.
+
+---
+
+## Root Cause 1 — build_intent_query excluded preferred_sectors and goals_text
+# File: agents/profile_agent.py
+
+### Problem
+build_intent_query() previously excluded preferred_sectors and goals_text entirely.
+The rationale was that sector/employer names "skew the embedding toward past experience."
+This is correct for preferred_companies (employer name bias), but wrong for preferred_sectors
+when the user's target industry differs from their skills background.
+
+A petroleum engineer with "AI implementation" in their role_description gets an embedding
+that points toward AI companies. Without preferred_sectors or goals_text in the query,
+the pipeline had no signal that the user wants oil and gas, not tech.
+
+### Fix
+Include goals_text at MEDIUM weight and preferred_sectors as "Target industry: ..." at LOW weight.
+Exclude preferred_companies (employer names still cause bias).
+
+### Query weight hierarchy (current)
+  HIGH:    role_description, title_include (repeated)
+  MEDIUM:  seniority_level, work_modes, goals_text
+  LOW:     preferred_sectors ("Target industry: oil and gas, energy")
+  EXCLUDED: preferred_companies
+
+### Why LOW for preferred_sectors (not MEDIUM or HIGH)?
+Sectors are categorical labels. Embedding "oil and gas" at high weight would make the
+profile embedding point strongly at oil and gas job descriptions, which is good for
+ANN recall but may over-constrain similarity at the expense of finding adjacent roles.
+LOW weight provides directional bias without locking the embedding to one sector cluster.
+
+---
+
+## Root Cause 2 — No per-company slot cap in _diversify()
+# File: agents/filter_agent.py
+
+### Problem
+_diversify() capped results by SECTOR at 60% (max 9 of 15 from one sector).
+But the sector cap was bypassed when <20% of jobs had sector data.
+Even when active, one company could fill all 9 sector slots if its jobs
+spanned multiple sector labels or had inconsistent sector tagging.
+
+Result: Anthropic, which posts 100+ jobs across "AI", "Technology", "Research" sector
+labels (or no sector at all), could fill all 15 candidate slots.
+
+### Fix
+Add _COMPANY_CAP = 2: no single company may occupy more than 2 of the 15 final slots.
+This cap is ALWAYS enforced, regardless of sector data availability.
+The sector cap continues to apply when sector data is sufficient.
+
+### Constants (current)
+  _COMPANY_CAP = 2             # hard cap per employer, always enforced
+  _SECTOR_CAP_FRACTION = 0.60  # max 60% from one sector (when data available)
+  _SECTOR_DATA_MIN_FRACTION = 0.20  # skip sector cap if <20% jobs have sector tagged
+
+### Why 2 (not 1 or 3)?
+1 per company would be too restrictive — a company with 50 relevant jobs
+would be under-represented in candidates delivered to users who want that company.
+3 is reasonable but still allows 3/15 = 20% from one employer.
+2 is the right balance: provides variety, allows strong matches from a good company,
+prevents dominance.
+
+---
+
+## Root Cause 3 — LLM had no explicit penalty for sector mismatches
+# File: agents/match_agent.py — _build_system_prompt()
+
+### Problem
+The system prompt passed preferred_sectors as context ("Preferred sectors: oil and gas")
+but gave no scoring rule for sector mismatches. The LLM would reason:
+"This candidate has leadership experience. Anthropic needs a VP. Leadership transfers
+across industries." Result: industry_alignment scored 0.55–0.70 for Anthropic
+instead of near-zero.
+
+### Fix
+When profile.preferred_sectors is non-empty, inject a mandatory SECTOR RULE block
+into the system prompt:
+
+  SECTOR RULE (mandatory — applies before all other scoring):
+  - This candidate's target sectors are: {sectors}
+  - If the job's sector or company does NOT belong to any of these target sectors,
+    score industry_alignment ≤ 0.25 regardless of other signals.
+  - If the job clearly belongs to a target sector, score industry_alignment normally.
+
+### Why ≤ 0.25 (not 0.0)?
+Forcing 0.0 would be too strict. Some jobs are genuinely cross-sector
+(e.g. a petroleum data scientist at an energy-focused AI company).
+0.25 is a strong penalty that keeps mismatched jobs at the bottom of rankings
+while allowing the LLM to give partial credit for adjacent cases.
+
+### When does this rule fire?
+Only when profile.preferred_sectors is non-empty. Users who have not set
+sector preferences get the original unconstrained scoring — no regression risk.
+
+---
+
+## Important note for future sessions
+
+"I do not want to work for Company X" written in profile text or goals_text
+is NOT the same as adding Company X to excluded_companies.
+
+excluded_companies is an array field in UserProfile. The hard filter checks this array.
+Profile text is not parsed for company exclusions — it is only embedded.
+
+Users must add companies to the Excluded companies field in Profile settings
+for the hard filter to block those jobs entirely. Profile text exclusions
+are soft signals that may affect embedding but do not guarantee filtering.
+
+---
+
+## Files changed (commit 423871a)
+
+  agents/filter_agent.py    — _COMPANY_CAP constant + _diversify() rewrite
+  agents/profile_agent.py   — build_intent_query() includes goals_text + preferred_sectors
+  agents/match_agent.py     — _build_system_prompt() injects SECTOR RULE when applicable
