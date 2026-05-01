@@ -267,6 +267,14 @@ export default function AdminDebug() {
         {/* ── Section 1: Pipeline Steps ── */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <h2 className="text-sm font-semibold text-slate-800 mb-4">Pipeline Steps</h2>
+          {!userId && (
+            <div className="mb-4 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-amber-700">Load a user above to enable steps 2–6. Step 1 (Collect) runs globally and is always available.</p>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-3">
             {STEPS.map((step, i) => (
               <div key={step.key} className="border border-slate-200 rounded-lg p-4 space-y-3">
@@ -304,7 +312,9 @@ export default function AdminDebug() {
             loading={loading.hardFilter}
             disabled={!userId}
           />
-          {hardFilter ? (
+          {!userId ? (
+            <EmptyState>Load a user above to fetch filter data</EmptyState>
+          ) : hardFilter ? (
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <SummaryCard label="Total Jobs Evaluated" value={hardFilter.total_jobs} />
@@ -344,7 +354,9 @@ export default function AdminDebug() {
             loading={loading.annPool}
             disabled={!userId}
           />
-          {annPool?.jobs?.length > 0 ? (
+          {!userId ? (
+            <EmptyState>Load a user above to fetch ANN pool data</EmptyState>
+          ) : annPool?.jobs?.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -391,7 +403,9 @@ export default function AdminDebug() {
             loading={loading.softFilter}
             disabled={!userId}
           />
-          {softFilter?.jobs?.length > 0 ? (
+          {!userId ? (
+            <EmptyState>Load a user above to fetch soft filter data</EmptyState>
+          ) : softFilter?.jobs?.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -454,7 +468,9 @@ export default function AdminDebug() {
             loading={loading.scored}
             disabled={!userId}
           />
-          {scored?.jobs?.length > 0 ? (
+          {!userId ? (
+            <EmptyState>Load a user above to fetch scored jobs</EmptyState>
+          ) : scored?.jobs?.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
