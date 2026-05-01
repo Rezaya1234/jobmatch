@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { listJobs, getJobCount, submitFeedback, deleteFeedback, getFeedback } from '../api'
+import { listJobs, getJobCount, submitFeedback, deleteFeedback, getFeedback, submitCommentary } from '../api'
 
 // slug → domain for Clearbit logo lookup
 const SLUG_DOMAIN = {
@@ -163,6 +163,9 @@ function SkeletonRow() {
 function JobCard({ job, userId, feedbackMap, onFeedback }) {
   const existing = feedbackMap[job.id]
   const [vote, setVote] = useState(existing?.rating ?? null) // 'thumbs_up' | 'thumbs_down' | null
+  const [showComment, setShowComment] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [commentSent, setCommentSent] = useState(false)
   const borderColor = WORK_MODE_BORDER[job.work_mode] || 'border-l-slate-200'
 
   function handleLinkClick() {
@@ -185,6 +188,14 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
     } catch {
       setVote(prev)
     }
+  }
+
+  async function handleSubmitCardComment() {
+    if (!commentText.trim() || !userId) return
+    try {
+      await submitCommentary(userId, job.id, commentText.trim(), 'card')
+      setCommentSent(true)
+    } catch { /* silent */ }
   }
 
   const salary = formatSalary(job.salary_min, job.salary_max)
@@ -263,10 +274,45 @@ function JobCard({ job, userId, feedbackMap, onFeedback }) {
                   <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
                 </svg>
               </button>
+              <button
+                onClick={() => { setShowComment(v => !v); setCommentSent(false) }}
+                title="Add comment"
+                className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all ${
+                  showComment
+                    ? 'border-violet-300 text-violet-600 bg-violet-50'
+                    : 'border-slate-200 text-slate-400 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 16.5A2.5 2.5 0 0118.5 19H6l-4 4V5.5A2.5 2.5 0 014.5 3h14A2.5 2.5 0 0121 5.5v11z" />
+                </svg>
+              </button>
             </div>
           )}
         </div>
       </div>
+      {showComment && !commentSent && (
+        <div className="mt-3 flex gap-2 items-end border-t border-slate-100 pt-3">
+          <input
+            type="text"
+            value={commentText}
+            onChange={e => setCommentText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmitCardComment()}
+            placeholder="What's your take on this role?"
+            className="flex-1 text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent text-slate-700 placeholder-slate-400"
+          />
+          <button
+            onClick={handleSubmitCardComment}
+            disabled={!commentText.trim()}
+            className="shrink-0 px-3 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
+          >
+            Send
+          </button>
+        </div>
+      )}
+      {showComment && commentSent && (
+        <p className="mt-2 text-xs text-slate-400 border-t border-slate-100 pt-2">Thanks — your comment helps improve your matches.</p>
+      )}
     </div>
   )
 }

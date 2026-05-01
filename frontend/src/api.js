@@ -15,6 +15,8 @@ export const getFeedback = (id) => http.get(`/users/${id}/feedback`).then(r => r
 export const deleteFeedback = (id, jobId) => http.delete(`/users/${id}/feedback/${jobId}`)
 export const recordSignal = (id, jobId, signalType) =>
   http.post(`/users/${id}/feedback/signal`, { job_id: jobId, signal_type: signalType }).then(r => r.data)
+export const submitCommentary = (id, jobId, commentary, source = 'modal') =>
+  http.post(`/users/${id}/feedback/event`, { job_id: jobId, commentary, interaction_source: source }).then(r => r.data)
 export const listJobs = (params = {}) =>
   http.get('/jobs', { params }).then(r => r.data)
 export const getJobCount = (params = {}) =>

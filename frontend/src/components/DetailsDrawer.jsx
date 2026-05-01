@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { submitFeedback, deleteFeedback, recordSignal } from '../api'
+import { submitFeedback, deleteFeedback, recordSignal, submitCommentary } from '../api'
 import CompanyLogo from './CompanyLogo'
 
 const DIMENSIONS = [
@@ -319,6 +319,9 @@ function scoreLabel(pct) {
 export default function DetailsDrawer({ job, userId, profile, currentRating, onClose, onFeedback }) {
   const [localRating, setLocalRating] = useState(currentRating || null)
   const [saving, setSaving] = useState(false)
+  const [showCommentBox, setShowCommentBox] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [commentSent, setCommentSent] = useState(false)
 
   useEffect(() => { setLocalRating(currentRating || null) }, [currentRating, job?.job_id])
 
@@ -357,8 +360,12 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
     try {
       if (next === null) {
         await deleteFeedback(userId, job.job_id)
+        setShowCommentBox(false)
       } else {
         await submitFeedback(userId, job.job_id, next, '', 2)
+        setShowCommentBox(true)
+        setCommentText('')
+        setCommentSent(false)
       }
       onFeedback?.(next, job.job_id)
     } catch {
@@ -366,6 +373,14 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleSubmitComment() {
+    if (!commentText.trim() || !userId) return
+    try {
+      await submitCommentary(userId, job.job_id, commentText.trim(), 'modal')
+      setCommentSent(true)
+    } catch { /* silent */ }
   }
 
   async function handleApply() {
@@ -596,6 +611,28 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
               Not a fit
             </button>
           </div>
+
+          {showCommentBox && !commentSent && (
+            <div className="mt-3 flex gap-2 items-end">
+              <textarea
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder="Tell us more — what stood out or didn't fit?"
+                rows={2}
+                className="flex-1 text-xs border border-slate-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent text-slate-700 placeholder-slate-400"
+              />
+              <button
+                onClick={handleSubmitComment}
+                disabled={!commentText.trim()}
+                className="shrink-0 px-3 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
+              >
+                Send
+              </button>
+            </div>
+          )}
+          {showCommentBox && commentSent && (
+            <p className="mt-2 text-center text-xs text-slate-400">Thanks — your feedback helps improve your matches.</p>
+          )}
         </div>
       </div>
     </>

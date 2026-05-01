@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.match_agent import ALLOWED_DIMENSIONS
 from agents.profile_agent import DEFAULT_WEIGHTS, update_profile_embedding
-from db.models import Feedback, FeedbackSignal, Job, JobMatch, UserProfile
+from db.models import Feedback, FeedbackEvent, FeedbackSignal, Job, JobMatch, UserProfile
 from llm.client import LLMClient, Message, ModelTier
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,20 @@ SIGNAL_VALUES: dict[str, int] = {
     "applied": 3,
     "interview": 4,
 }
+
+_COMMENTARY_SYSTEM = """\
+You are a job preference analyst. A user left a brief comment about a job. Return ONLY a JSON object — no prose, no markdown.
+
+Fields (all optional — omit if the comment gives no clear signal):
+  dimension: one of [skills_match, experience_level, salary, function_type, career_trajectory, industry_alignment]
+  direction: "up" (this dimension should matter more) or "down" (should matter less)
+  confidence: "high" | "medium" | "low"
+  hard_exclusion: a short keyword or company name to permanently exclude (only from explicit "never", "no", "avoid", "hate" language)
+  reasoning: one sentence
+
+Return {} if the comment is too vague to interpret reliably."""
+
+_CONFIDENCE_DELTA: dict[str, float] = {"high": 0.05, "medium": 0.03, "low": 0.01}
 
 _PROFILE_UPDATE_SYSTEM = """\
 You are a job preference analyst. Analyze feedback patterns and return ONLY a JSON object — no prose, no markdown.
@@ -189,6 +203,86 @@ class FeedbackAgent:
             "Outcome-anchored embedding update for user %s (signal=%s, job=%s)",
             user_id, signal_type, signal.job_id,
         )
+
+    # ------------------------------------------------------------------
+    # Commentary-driven weight updates (Haiku, called via /feedback/event)
+    # ------------------------------------------------------------------
+
+    async def run_commentaries(self, user_id: str) -> bool:
+        """Process FeedbackEvent commentary rows and update weights. Returns True if changed."""
+        profile = await self._get_profile(user_id)
+        if profile is None:
+            return False
+        return await self._process_commentaries(user_id, profile)
+
+    async def _interpret_commentary(self, commentary: str, job_title: str, job_company: str) -> dict:
+        prompt = (
+            f"Job: {job_title} at {job_company}\n"
+            f"User comment: \"{commentary}\""
+        )
+        response = await self._llm.complete(
+            messages=[Message(role="user", content=prompt)],
+            system=_COMMENTARY_SYSTEM,
+            tier=ModelTier.FAST,
+        )
+        return _parse_json_object(response)
+
+    async def _process_commentaries(self, user_id: str, profile: UserProfile) -> bool:
+        result = await self._session.execute(
+            select(FeedbackEvent, Job)
+            .join(Job, FeedbackEvent.job_id == Job.id)
+            .where(
+                FeedbackEvent.user_id == user_id,
+                FeedbackEvent.commentary.isnot(None),
+            )
+            .order_by(FeedbackEvent.created_at.desc())
+            .limit(20)
+        )
+        rows = result.all()
+        if not rows:
+            return False
+
+        current = dict(profile.learned_weights or DEFAULT_WEIGHTS)
+        for d in ALLOWED_DIMENSIONS:
+            if d not in current:
+                current[d] = DEFAULT_WEIGHTS[d]
+
+        excluded = list(profile.excluded_companies or [])
+        changed = False
+
+        for event, job in rows:
+            try:
+                signal = await self._interpret_commentary(
+                    event.commentary, job.title, job.company
+                )
+            except Exception:
+                logger.exception("Commentary interpretation failed for event %s", event.id)
+                continue
+
+            dim = signal.get("dimension")
+            direction = signal.get("direction")
+            confidence = signal.get("confidence", "low")
+            hard_exclusion = signal.get("hard_exclusion")
+
+            delta = _CONFIDENCE_DELTA.get(confidence, 0.01)
+            if dim in ALLOWED_DIMENSIONS and direction in ("up", "down"):
+                adjustment = delta if direction == "up" else -delta
+                current[dim] = max(_WEIGHT_MIN, min(_WEIGHT_MAX, current[dim] + adjustment))
+                changed = True
+
+            if hard_exclusion:
+                lc = hard_exclusion.lower()
+                if lc not in {e.lower() for e in excluded}:
+                    excluded.append(hard_exclusion)
+                    changed = True
+
+        if changed:
+            profile.learned_weights = _normalize_weights(current)
+            profile.excluded_companies = excluded
+            await self._session.commit()
+            logger.info("Commentary learning updated weights for user %s", user_id)
+
+        return changed
 
     # ------------------------------------------------------------------
     # LLM profile text update (keeps existing behavior)

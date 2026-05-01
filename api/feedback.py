@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import get_llm, get_session
 from db.activity import log_event
 from db.database import AsyncSessionLocal
-from db.models import ActivityLog, Feedback, FeedbackSignal, Job, JobMatch, UserProfile
+from db.models import ActivityLog, Feedback, FeedbackEvent, FeedbackSignal, Job, JobMatch, UserProfile
 from llm.client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -646,6 +646,55 @@ def _build_preferences(profile) -> dict:
         "visa_sponsorship_required": profile.visa_sponsorship_required,
         "excluded_companies":      profile.excluded_companies or [],
     }
+
+
+class CommentaryRequest(BaseModel):
+    job_id: str
+    commentary: str
+    interaction_source: str = "modal"
+
+
+@router.post("/event", status_code=status.HTTP_201_CREATED)
+async def submit_commentary(
+    user_id: str,
+    body: CommentaryRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    llm: LLMClient = Depends(get_llm),
+) -> dict:
+    text = body.commentary.strip()
+    if not text:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="commentary must not be empty")
+
+    job_result = await session.execute(select(Job).where(Job.id == body.job_id))
+    if job_result.scalar_one_or_none() is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    event = FeedbackEvent(
+        user_id=user_id,
+        job_id=body.job_id,
+        signal_type="commentary",
+        signal_value=1,
+        interaction_source=body.interaction_source,
+        commentary=text,
+    )
+    session.add(event)
+    await session.commit()
+    background_tasks.add_task(_run_commentary_learning, user_id, llm)
+    return {"status": "received"}
+
+
+async def _run_commentary_learning(user_id: str, llm: LLMClient) -> None:
+    async with AsyncSessionLocal() as session:
+        from agents.feedback_agent import FeedbackAgent
+        from agents.match_agent import MatchAgent
+        try:
+            updated = await FeedbackAgent(session, llm).run_commentaries(user_id)
+            if updated:
+                logger.info("Commentary learning updated weights for user %s — rescoring", user_id)
+                await MatchAgent(session, llm).run(user_id)
+        except Exception:
+            logger.exception("commentary_learning failed for user %s", user_id)
 
 
 _VALID_SIGNALS = {"click", "applied", "interview"}
