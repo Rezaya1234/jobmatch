@@ -224,6 +224,18 @@ async def get_company(
             data_available=True,
             snapshot_date=snap_date,
         )
+
+        # Derive outlook from real snapshot data — override LLM value
+        if snap_7 is not None and jobs_7 > 0:
+            raw_pct = (jobs_today - jobs_7) / jobs_7 * 100
+            if raw_pct > 5:
+                computed_outlook, computed_trend = "growing", "up"
+            elif raw_pct < -5:
+                computed_outlook, computed_trend = "slowing", "down"
+            else:
+                computed_outlook, computed_trend = "stable", "flat"
+        else:
+            computed_outlook, computed_trend = None, None
     else:
         hiring_velocity = HiringVelocity(
             jobs_today=0, jobs_7_days_ago=0, jobs_30_days_ago=0,
@@ -231,6 +243,7 @@ async def get_company(
             month_change=0, month_change_pct=0.0,
             trend="flat", data_available=False, snapshot_date=None,
         )
+        computed_outlook, computed_trend = None, None
 
     # ---- User feedback count ----
     fb_result = await session.execute(
@@ -253,12 +266,12 @@ async def get_company(
         website=row.website,
         logo_url=row.logo_url,
         summary=row.summary,
-        hiring_outlook=row.hiring_outlook,
+        hiring_outlook=computed_outlook,
         hiring_outlook_reason=row.hiring_outlook_reason,
         interview_difficulty=row.interview_difficulty,
         response_rate=row.response_rate,
         time_to_hire=row.time_to_hire,
-        hiring_trend=row.hiring_trend,
+        hiring_trend=computed_trend,
         overall_rating=row.overall_rating,
         rating_source=row.rating_source,
         pros=row.pros,
