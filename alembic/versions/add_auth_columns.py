@@ -1,14 +1,14 @@
 """add password auth columns to users
 
-Revision ID: a6b7c8d9e0f1
-Revises: z5a6b7c8d9e0
+Revision ID: 7d2c5b8e1a3f
+Revises: 3f8e9a1b2c4d
 Create Date: 2026-04-30
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = 'a6b7c8d9e0f1'
-down_revision = 'z5a6b7c8d9e0'
+revision = '7d2c5b8e1a3f'
+down_revision = '3f8e9a1b2c4d'
 branch_labels = None
 depends_on = None
 

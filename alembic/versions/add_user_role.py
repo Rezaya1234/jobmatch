@@ -1,14 +1,14 @@
 """add role column to users, drop is_admin
 
-Revision ID: z5a6b7c8d9e0
-Revises: y4z5a6b7c8d9
+Revision ID: 3f8e9a1b2c4d
+Revises: a7b8c9d0e1f2
 Create Date: 2026-04-30
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = 'z5a6b7c8d9e0'
-down_revision = 'y4z5a6b7c8d9'
+revision = '3f8e9a1b2c4d'
+down_revision = 'a7b8c9d0e1f2'
 branch_labels = None
 depends_on = None
 
