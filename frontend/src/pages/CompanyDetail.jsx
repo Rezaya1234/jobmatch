@@ -305,28 +305,6 @@ export default function CompanyDetail() {
                   </div>
                 </div>
 
-                {/* Department breakdown */}
-                {company.department_breakdown?.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 mb-3">Where they are hiring</p>
-                    <div className="space-y-1.5">
-                      {company.department_breakdown.map(d => (
-                        <div key={d.department} className="flex items-center gap-2">
-                          <span className="text-sm text-slate-500 w-28 shrink-0 truncate">{d.department}</span>
-                          <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
-                            <div
-                              className="h-5 rounded-full"
-                              style={{ width: `${d.pct}%`, backgroundColor: '#7c3aed' }}
-                            />
-                          </div>
-                          <span className="text-xs font-bold text-violet-700 w-10 text-right shrink-0">{d.pct}%</span>
-                          <span className="text-xs text-slate-400 w-8 text-right shrink-0">{d.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Last updated */}
                 {hv.snapshot_date && (
                   <p className="text-xs text-slate-400 mt-4">Last updated: {hv.snapshot_date}</p>

@@ -43,12 +43,6 @@ class HiringVelocity(BaseModel):
     snapshot_date: date | None
 
 
-class DepartmentBreakdownItem(BaseModel):
-    department: str
-    count: int
-    pct: float
-
-
 class CompanyDetail(BaseModel):
     slug: str
     company_name: str
@@ -75,7 +69,6 @@ class CompanyDetail(BaseModel):
     active_job_count: int
     generated_at: str | None
     hiring_velocity: HiringVelocity | None
-    department_breakdown: list[DepartmentBreakdownItem]
     user_feedback_count: int
 
 
@@ -214,24 +207,6 @@ async def get_company(
             data_available=True,
             snapshot_date=snap_date,
         )
-
-        dept_raw: dict = recent.jobs_by_department or {}
-        sorted_depts = sorted(dept_raw.items(), key=lambda x: x[1], reverse=True)
-        total = sum(dept_raw.values()) or 1
-        top6 = sorted_depts[:6]
-        other_count = sum(v for _, v in sorted_depts[6:])
-        department_breakdown: list[DepartmentBreakdownItem] = [
-            DepartmentBreakdownItem(department=k, count=v, pct=round(v / total * 100, 1))
-            for k, v in top6
-        ]
-        if other_count > 0:
-            department_breakdown.append(
-                DepartmentBreakdownItem(
-                    department="Other",
-                    count=other_count,
-                    pct=round(other_count / total * 100, 1),
-                )
-            )
     else:
         hiring_velocity = HiringVelocity(
             jobs_today=0, jobs_7_days_ago=0, jobs_30_days_ago=0,
@@ -239,7 +214,6 @@ async def get_company(
             month_change=0, month_change_pct=0.0,
             trend="flat", data_available=False, snapshot_date=None,
         )
-        department_breakdown = []
 
     # ---- User feedback count (distinct users who interacted with this company's jobs) ----
     fb_result = await session.execute(
@@ -275,7 +249,6 @@ async def get_company(
         active_job_count=live_active_count,
         generated_at=row.generated_at.isoformat() if row.generated_at else None,
         hiring_velocity=hiring_velocity,
-        department_breakdown=department_breakdown,
         user_feedback_count=user_feedback_count,
     )
 
