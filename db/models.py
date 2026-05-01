@@ -451,6 +451,7 @@ class CompanyInsight(Base):
     hq_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_size: Mapped[str | None] = mapped_column(String(50), nullable=True)
     company_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    ticker_symbol: Mapped[str | None] = mapped_column(String(20), nullable=True)
     sector: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     generated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)

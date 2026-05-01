@@ -65,6 +65,7 @@ class CompanyDetail(BaseModel):
     sector: str | None
     company_size: str | None
     company_type: str | None
+    ticker_symbol: str | None
     hq_location: str | None
     website: str | None
     logo_url: str | None
@@ -262,6 +263,7 @@ async def get_company(
         sector=row.sector,
         company_size=row.company_size,
         company_type=row.company_type,
+        ticker_symbol=row.ticker_symbol,
         hq_location=row.hq_location,
         website=row.website,
         logo_url=row.logo_url,

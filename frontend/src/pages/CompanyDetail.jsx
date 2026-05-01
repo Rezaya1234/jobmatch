@@ -123,6 +123,31 @@ function GradientBar({ position, label }) {
   )
 }
 
+function CompanyTypeBadge({ company_type, ticker_symbol }) {
+  if (!company_type) return null
+  const config = {
+    public:            { cls: 'border border-violet-300 text-violet-700 bg-white', label: ticker_symbol ? `Public · ${ticker_symbol}` : 'Public', tip: 'Publicly traded on a stock exchange. Offers liquid stock compensation, transparent financials, and generally stable employment. Equity value is known in real time.' },
+    private:           { cls: 'border border-slate-300 text-slate-600 bg-white', label: 'Private', tip: 'Privately held company. Financials not publicly disclosed. Employment stability depends on profitability and ownership structure.' },
+    startup_seed:      { cls: 'border border-amber-300 text-amber-700 bg-white', label: 'Startup · Seed', tip: 'Early stage startup. Product is being built. High risk, high potential reward. Expect limited processes, direct founder access, and significant equity opportunity.' },
+    startup_series_a:  { cls: 'border border-amber-300 text-amber-700 bg-white', label: 'Startup · Series A', tip: 'Early growth stage. Product exists and initial customers confirmed. Moderate risk. Equity meaningful. Expect rapid growth and some organizational uncertainty.' },
+    startup_series_b:  { cls: 'border border-blue-300 text-blue-700 bg-white', label: 'Startup · Series B', tip: 'Growth stage. Business model proven, now scaling aggressively. Lower risk than early stage. Equity still meaningful if company succeeds.' },
+    startup_series_c:  { cls: 'border border-blue-300 text-blue-700 bg-white', label: 'Startup · Series C', tip: 'Late stage startup. Preparing for IPO or acquisition. More stable than early stage. Equity less valuable — earlier investors received better terms.' },
+    startup_series_d:  { cls: 'border border-blue-300 text-blue-700 bg-white', label: 'Startup · Series D', tip: 'Late stage. Business well established. Equity diluted but meaningful if company succeeds at scale.' },
+    startup_series_e:  { cls: 'border border-blue-300 text-blue-700 bg-white', label: 'Startup · Series E+', tip: 'Very late stage. Near IPO or acquisition territory. Stability is high, equity upside is limited relative to early employees.' },
+    startup_pre_ipo:   { cls: 'bg-violet-600 text-white border border-violet-600', label: 'Pre-IPO', tip: 'Company is preparing to go public. Equity could be significant but timing and valuation are uncertain. Lock-up periods typically prevent selling shares for 6–12 months after IPO.' },
+  }
+  const c = config[company_type]
+  if (!c) return null
+  return (
+    <span className="relative group inline-block">
+      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full cursor-default ${c.cls}`}>{c.label}</span>
+      <span className="absolute bottom-full left-0 mb-2 w-60 bg-white text-slate-600 text-xs rounded-lg p-2.5 shadow-lg border border-slate-200 leading-relaxed opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20 block">
+        {c.tip}
+      </span>
+    </span>
+  )
+}
+
 function Section({ title, children }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -463,8 +488,12 @@ export default function CompanyDetail() {
         <div className="space-y-5">
           {/* Company Snapshot */}
           <Section title="Company Snapshot">
+            {company.company_type && (
+              <div className="py-2 border-b border-slate-100">
+                <CompanyTypeBadge company_type={company.company_type} ticker_symbol={company.ticker_symbol} />
+              </div>
+            )}
             <MetaRow label="Size" value={company.company_size ? `${company.company_size.charAt(0).toUpperCase() + company.company_size.slice(1)} (${sizeLabels[company.company_size] || company.company_size})` : null} />
-            <MetaRow label="Type" value={company.company_type ? company.company_type.charAt(0).toUpperCase() + company.company_type.slice(1) : null} />
             <MetaRow label="HQ" value={company.hq_location} />
             <MetaRow label="Sector" value={company.sector} />
             {company.website && (
