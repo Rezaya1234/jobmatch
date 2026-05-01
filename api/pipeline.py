@@ -410,9 +410,14 @@ async def trigger_step_score(
     session: AsyncSession = Depends(get_session),
     llm: LLMClient = Depends(get_llm),
 ) -> StepResult:
-    """Step 4: LLM scoring (Claude Haiku batch)."""
+    """Step 4: ANN embedding ranking + LLM scoring (Claude Haiku batch)."""
+    from agents.filter_agent import FilterAgent
     from agents.match_agent import MatchAgent
     try:
+        # Populate embedding_score on job_matches via ANN pool + soft filter.
+        # Without this, _get_top_candidates passes all hard-filtered jobs to the
+        # LLM because embedding_score IS NULL bypasses the threshold check.
+        await FilterAgent(session).get_candidates(user_id)
         result = await MatchAgent(session, llm).run(user_id)
         return StepResult(
             status="done",
