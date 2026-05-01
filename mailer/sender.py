@@ -4,8 +4,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -208,20 +207,26 @@ async def _send_reengagement(user: User, profile: UserProfile | None, session: A
 # ------------------------------------------------------------------
 
 def _send_via_sendgrid(to_email: str, subject: str, html: str, plain: str) -> None:
-    api_key = os.getenv("SENDGRID_API_KEY")
+    api_key = os.getenv("SENDGRID_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("SENDGRID_API_KEY is not set")
-    message = Mail(
-        from_email=(FROM_EMAIL, FROM_NAME),
-        to_emails=to_email,
-        subject=subject,
-        html_content=html,
-        plain_text_content=plain,
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": FROM_EMAIL, "name": FROM_NAME},
+        "subject": subject,
+        "content": [
+            {"type": "text/plain", "value": plain},
+            {"type": "text/html",  "value": html},
+        ],
+    }
+    response = requests.post(
+        "https://api.sendgrid.com/v3/mail/send",
+        json=payload,
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout=15,
     )
-    client = SendGridAPIClient(api_key)
-    response = client.send(message)
     if response.status_code >= 400:
-        raise RuntimeError(f"SendGrid returned {response.status_code}: {response.body}")
+        raise RuntimeError(f"SendGrid {response.status_code}: {response.text}")
 
 
 # ------------------------------------------------------------------
