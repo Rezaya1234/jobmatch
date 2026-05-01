@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { submitFeedback, deleteFeedback } from '../api'
+import { submitFeedback, deleteFeedback, recordSignal } from '../api'
 import CompanyLogo from './CompanyLogo'
 
 const DIMENSIONS = [
@@ -371,7 +371,7 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
   async function handleApply() {
     if (job.url) window.open(job.url, '_blank', 'noreferrer')
     try {
-      await submitFeedback(userId, job.job_id, 'thumbs_up', '', 2)
+      await recordSignal(userId, job.job_id, 'applied')
       onFeedback?.('thumbs_up', job.job_id)
     } catch { /* silent */ }
     onClose()

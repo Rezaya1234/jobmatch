@@ -88,6 +88,24 @@ async def submit_feedback(
     )
     feedback = fb_result.scalar_one_or_none()
 
+    if feedback is None and body.weight == 1:
+        # Passive link-click with no existing feedback — log the event but don't
+        # create a Feedback row, so it never inflates the "Feedback given" counter.
+        await log_event(
+            session, user_id, "link_click",
+            job_title=job.title, company=job.company,
+        )
+        await session.commit()
+        return FeedbackResponse(
+            id="00000000-0000-0000-0000-000000000000",
+            job_id=str(job.id),
+            job_title=job.title,
+            company=job.company,
+            rating="thumbs_up",
+            comment=None,
+            created_at=datetime.now(timezone.utc),
+        )
+
     if feedback is None:
         feedback = Feedback(
             user_id=user_id,
@@ -261,13 +279,15 @@ async def get_feedback_summary(
     # --- Windowed counts (for the selected date range) ---
     liked_count = (await session.scalar(
         select(func.count()).select_from(Feedback).where(
-            Feedback.user_id == uid, Feedback.rating == "thumbs_up", Feedback.created_at >= since,
+            Feedback.user_id == uid, Feedback.rating == "thumbs_up",
+            Feedback.weight >= 2, Feedback.created_at >= since,
         )
     )) or 0
 
     disliked_count = (await session.scalar(
         select(func.count()).select_from(Feedback).where(
-            Feedback.user_id == uid, Feedback.rating == "thumbs_down", Feedback.created_at >= since,
+            Feedback.user_id == uid, Feedback.rating == "thumbs_down",
+            Feedback.weight >= 2, Feedback.created_at >= since,
         )
     )) or 0
 

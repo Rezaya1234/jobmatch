@@ -13,6 +13,8 @@ export const submitFeedback = (id, jobId, rating, comment = '', weight = null) =
   http.post(`/users/${id}/feedback`, { job_id: jobId, rating, comment, weight }).then(r => r.data)
 export const getFeedback = (id) => http.get(`/users/${id}/feedback`).then(r => r.data)
 export const deleteFeedback = (id, jobId) => http.delete(`/users/${id}/feedback/${jobId}`)
+export const recordSignal = (id, jobId, signalType) =>
+  http.post(`/users/${id}/feedback/signal`, { job_id: jobId, signal_type: signalType }).then(r => r.data)
 export const listJobs = (params = {}) =>
   http.get('/jobs', { params }).then(r => r.data)
 export const getJobCount = (params = {}) =>
