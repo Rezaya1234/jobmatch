@@ -186,7 +186,7 @@ class FilterAgent:
     async def run(self, user_id: str, job_ids: list[str] | None = None) -> dict[str, int]:
         """
         Filter jobs for a user. If job_ids is None, processes all jobs not yet
-        matched for this user.
+        matched for this user. Processes in batches of 500 to avoid memory limits.
         Returns {"passed": N, "failed": N}.
         """
         profile = await self._get_profile(user_id)
@@ -194,37 +194,58 @@ class FilterAgent:
             logger.warning("No profile found for user %s — skipping filter", user_id)
             return {"passed": 0, "failed": 0}
 
-        jobs = await self._get_unmatched_jobs(user_id, job_ids)
-        if not jobs:
-            logger.info("No new jobs to filter for user %s", user_id)
+        try:
+            uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        except ValueError:
+            logger.error("Invalid user_id format: %s", user_id)
             return {"passed": 0, "failed": 0}
+
+        active_count = await self._session.scalar(
+            select(func.count()).select_from(Job).where(Job.is_active.is_(True))
+        )
+        match_count = await self._session.scalar(
+            select(func.count()).select_from(JobMatch).where(JobMatch.user_id == uid)
+        )
+        logger.info(
+            "User %s — active jobs: %d, existing job_match rows: %d",
+            user_id, active_count or 0, match_count or 0,
+        )
 
         counts = {"passed": 0, "failed": 0}
 
-        for job in jobs:
-            result = self._apply_constraints(job, profile)
-            self._session.add(JobMatch(
-                user_id=user_id,
-                job_id=str(job.id),
-                passed_hard_filter=result.passed,
-                hard_filter_reason=result.reason,
-            ))
-            counts["passed" if result.passed else "failed"] += 1
+        while True:
+            batch = await self._fetch_unmatched_batch(uid, job_ids, limit=500)
+            if not batch:
+                break
+            for job in batch:
+                result = self._apply_constraints(job, profile)
+                self._session.add(JobMatch(
+                    user_id=uid,
+                    job_id=job.id,
+                    passed_hard_filter=result.passed,
+                    hard_filter_reason=result.reason,
+                ))
+                counts["passed" if result.passed else "failed"] += 1
+            await self._session.flush()
+
+        total = counts["passed"] + counts["failed"]
+        if total == 0:
+            logger.info("No new jobs to filter for user %s", user_id)
+            return {"passed": 0, "failed": 0}
 
         await self._session.commit()
         logger.info(
             "User %s — filtered %d jobs: %d passed, %d failed",
-            user_id, len(jobs), counts["passed"], counts["failed"],
+            user_id, total, counts["passed"], counts["failed"],
         )
-        if len(jobs) > 0:
-            from db.activity import log_event
-            await log_event(
-                self._session, user_id, "filter_run",
-                total=len(jobs),
-                passed=counts["passed"],
-                failed=counts["failed"],
-            )
-            await self._session.commit()
+        from db.activity import log_event
+        await log_event(
+            self._session, user_id, "filter_run",
+            total=total,
+            passed=counts["passed"],
+            failed=counts["failed"],
+        )
+        await self._session.commit()
         return counts
 
     # ------------------------------------------------------------------
@@ -401,36 +422,21 @@ class FilterAgent:
         )
         return result.scalar_one_or_none()
 
-    async def _get_unmatched_jobs(
-        self, user_id: str, job_ids: list[str] | None
+    async def _fetch_unmatched_batch(
+        self, uid: uuid.UUID, job_ids: list[str] | None, limit: int
     ) -> list[Job]:
-        try:
-            uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-        except ValueError:
-            logger.error("Invalid user_id format: %s", user_id)
-            return []
-
-        active_count = await self._session.scalar(
-            select(func.count()).select_from(Job).where(Job.is_active.is_(True))
-        )
-        match_count = await self._session.scalar(
-            select(func.count()).select_from(JobMatch).where(JobMatch.user_id == uid)
-        )
-        logger.info(
-            "User %s — active jobs: %d, existing job_match rows: %d",
-            user_id, active_count or 0, match_count or 0,
-        )
-
         already_matched = (
             select(JobMatch.id)
             .where(JobMatch.user_id == uid, JobMatch.job_id == Job.id)
             .correlate(Job)
         )
-        stmt = select(Job).where(not_(already_matched.exists()), Job.is_active.is_(True))
-
+        stmt = (
+            select(Job)
+            .where(not_(already_matched.exists()), Job.is_active.is_(True))
+            .limit(limit)
+        )
         if job_ids:
             stmt = stmt.where(Job.id.in_(job_ids))
-
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
