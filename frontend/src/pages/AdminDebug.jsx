@@ -470,81 +470,13 @@ export default function AdminDebug() {
           )}
         </div>
 
-        {/* ── Section 5a: LLM 2 Reorder Results ── */}
-        {reorderData && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-800">LLM 2 — Career Advisor Results</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Haiku career advisor ranking after reviewing all 15 candidates</p>
-              </div>
-              {reorderData.swaps_made && (
-                <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">Swaps made</span>
-              )}
-            </div>
-            {reorderData.reasoning && (
-              <div className="mb-3 bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-100">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Reasoning (admin)</span>
-                <p className="text-sm text-slate-700 mt-1">{reorderData.reasoning}</p>
-              </div>
-            )}
-            {reorderData.profile_gap && (
-              <div className="mb-3 bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
-                <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Profile gap</span>
-                <p className="text-sm text-amber-800 mt-1">{reorderData.profile_gap}</p>
-              </div>
-            )}
-            {reorderData.ranking?.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-slate-500 border-b border-slate-100">
-                      <th className="pb-2 pr-3 font-medium w-16">LLM 1 #</th>
-                      <th className="pb-2 pr-3 font-medium w-16">LLM 2 #</th>
-                      <th className="pb-2 pr-3 font-medium">Title</th>
-                      <th className="pb-2 pr-3 font-medium">Company</th>
-                      <th className="pb-2 font-medium text-center">Industry</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reorderData.ranking.map(r => {
-                      const moved = r.llm1_rank !== r.llm2_rank
-                      const promoted = r.llm2_rank < r.llm1_rank
-                      return (
-                        <tr key={r.job_id} className={`border-b border-slate-50 ${moved ? (promoted ? 'bg-emerald-50/60' : 'bg-rose-50/40') : ''}`}>
-                          <td className="py-2 pr-3 text-slate-400 tabular-nums text-center">{r.llm1_rank}</td>
-                          <td className="py-2 pr-3 tabular-nums text-center font-semibold">
-                            <span className={r.llm2_rank <= 3 ? 'text-violet-600' : 'text-slate-500'}>
-                              {r.llm2_rank}
-                            </span>
-                            {moved && (
-                              <span className={`ml-1 text-xs ${promoted ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                {promoted ? '▲' : '▼'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2 pr-3 font-medium text-slate-700 max-w-[200px] truncate">{r.title}</td>
-                          <td className="py-2 pr-3 text-slate-500 max-w-[130px] truncate">{r.company}</td>
-                          <td className="py-2 text-center">
-                            <ScoreBar value={r.industry_alignment} />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Section 5: LLM Scores ── */}
+        {/* ── Section 5: LLM 1 Scores ── */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <SectionHeader
-            title="LLM Dimension Scores"
+            title="LLM 1 — Dimension Scores"
             subtitle={scored
               ? `${scored.total_scored} scored · ${scored.delivered_count} delivered`
-              : 'Claude Haiku dimension scores for all scored candidates'}
+              : 'Haiku batch scores all 15 candidates across 6 weighted dimensions'}
             onFetch={() => loadSection('scored', () => debugScored(userId), setScored)}
             loading={loading.scored}
             disabled={!userId}
@@ -559,12 +491,23 @@ export default function AdminDebug() {
                     <th className="pb-2 pr-2 font-medium w-6">#</th>
                     <th className="pb-2 pr-2 font-medium">Title</th>
                     <th className="pb-2 pr-2 font-medium">Company</th>
-                    <th className="pb-2 pr-2 font-medium text-center">Skills</th>
-                    <th className="pb-2 pr-2 font-medium text-center">Exp</th>
-                    <th className="pb-2 pr-2 font-medium text-center">Salary</th>
-                    <th className="pb-2 pr-2 font-medium text-center">Industry</th>
-                    <th className="pb-2 pr-2 font-medium text-center">Function</th>
-                    <th className="pb-2 pr-2 font-medium text-center">Trajectory</th>
+                    {[
+                      ['Skills', 'skills_match'],
+                      ['Exp', 'experience_level'],
+                      ['Salary', 'salary'],
+                      ['Industry', 'industry_alignment'],
+                      ['Function', 'function_type'],
+                      ['Trajectory', 'career_trajectory'],
+                    ].map(([label, key]) => (
+                      <th key={key} className="pb-2 pr-2 font-medium text-center">
+                        <div>{label}</div>
+                        {scored.weights?.[key] != null && (
+                          <div className="text-slate-300 font-normal text-xs">
+                            {Math.round(scored.weights[key] * 100)}%
+                          </div>
+                        )}
+                      </th>
+                    ))}
                     <th className="pb-2 pr-2 font-medium text-center">Score</th>
                     <th className="pb-2 font-medium text-center">Status</th>
                   </tr>
@@ -611,11 +554,85 @@ export default function AdminDebug() {
               </table>
             </div>
           ) : scored ? (
-            <EmptyState>No scored jobs yet — run LLM Score step first</EmptyState>
+            <EmptyState>No scored jobs yet — run LLM 1 Score step first</EmptyState>
           ) : (
-            <EmptyState>Fetch to see dimension scores for all candidates</EmptyState>
+            <EmptyState>Fetch to see dimension scores and weights for all candidates</EmptyState>
           )}
         </div>
+
+        {/* ── Section 6: LLM 2 Reorder Results ── */}
+        {reorderData && (
+          <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">LLM 2 — Career Advisor Ranking</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Haiku career advisor reviews all 15 and adjusts order to match stated goal</p>
+              </div>
+              {reorderData.swaps_made
+                ? <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">Swaps made</span>
+                : <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">Order confirmed</span>
+              }
+            </div>
+            {reorderData.reasoning && (
+              <div className="mb-3 bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-100">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Why (admin)</span>
+                <p className="text-sm text-slate-700 mt-1">{reorderData.reasoning}</p>
+              </div>
+            )}
+            {reorderData.profile_gap && (
+              <div className="mb-3 bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
+                <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Profile gap</span>
+                <p className="text-sm text-amber-800 mt-1">{reorderData.profile_gap}</p>
+              </div>
+            )}
+            {reorderData.ranking?.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-slate-500 border-b border-slate-100">
+                      <th className="pb-2 pr-3 font-medium w-14 text-center">LLM 1</th>
+                      <th className="pb-2 pr-3 font-medium w-14 text-center">LLM 2</th>
+                      <th className="pb-2 pr-3 font-medium">Job</th>
+                      <th className="pb-2 font-medium text-center w-20">Industry</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reorderData.ranking.map(r => {
+                      const moved = r.llm1_rank !== r.llm2_rank
+                      const promoted = r.llm2_rank < r.llm1_rank
+                      const rowBg = moved ? (promoted ? 'bg-emerald-50/60' : 'bg-rose-50/40') : ''
+                      return (
+                        <tr key={r.job_id} className={`border-b border-slate-50 ${rowBg}`}>
+                          <td className="py-2 pr-3 text-slate-400 tabular-nums text-center">{r.llm1_rank}</td>
+                          <td className="py-2 pr-3 tabular-nums text-center font-semibold">
+                            <span className={r.llm2_rank <= 3 ? 'text-violet-600' : 'text-slate-500'}>
+                              {r.llm2_rank}
+                            </span>
+                            {moved && (
+                              <span className={`ml-1 ${promoted ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                {promoted ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <div className="font-medium text-slate-700">{r.title}</div>
+                            <div className="text-slate-400">{r.company}</div>
+                            {r.reason && (
+                              <div className="mt-1 text-slate-500 italic leading-snug">{r.reason}</div>
+                            )}
+                          </td>
+                          <td className="py-2 text-center">
+                            <ScoreBar value={r.industry_alignment} />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

@@ -360,6 +360,7 @@ class MatchAgent:
                 "llm2_rank": llm2_rank,
                 "swapped": llm1_rank != llm2_rank,
                 "industry_alignment": round(ind_score or 0.0, 2),
+                "reason": reasons.get(jid),
             })
 
         detail = f"{changed} positions adjusted by career advisor" if changed else "Ranking preserved — no swaps needed"

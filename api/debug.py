@@ -105,6 +105,7 @@ class ScoredResponse(BaseModel):
     jobs: list[ScoredJob]
     total_scored: int
     delivered_count: int
+    weights: dict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -410,8 +411,11 @@ async def scored_jobs(
         for i, (match, job) in enumerate(rows)
     ]
 
+    weights = rows[0][0].weights_used if rows else None
+
     return ScoredResponse(
         jobs=jobs,
         total_scored=len(jobs),
         delivered_count=sum(1 for j in jobs if j.delivered),
+        weights=weights,
     )
