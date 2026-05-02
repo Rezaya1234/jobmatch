@@ -107,8 +107,8 @@ Production jobmatch-prod:
   DATABASE_URL          Internal PostgreSQL URL
   LLM_PROVIDER          claude
   ANTHROPIC_API_KEY     Anthropic API key
-  SENDGRID_API_KEY      Pending
-  FROM_EMAIL            digest@stellapath.app
+  SENDGRID_API_KEY      Configured
+  FROM_EMAIL            reza.rah@gmail.com  (temporary — switch to digest@stellapath.app once sender domain verified in SendGrid)
   FROM_NAME             Stellapath
   PIPELINE_TIMEZONE     UTC
 
