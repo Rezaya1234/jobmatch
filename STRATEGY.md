@@ -308,3 +308,107 @@ Business metrics:
 - MRR
 - Cost per user per month — target below $0.33
 - Gross margin — target above 95%
+
+---
+
+## Sprint Roadmap Summary
+
+### Development Philosophy
+
+Sprints are two weeks each.
+Each sprint targets one large task,
+three medium tasks, and three to four
+small tasks. Buffer is always maintained
+for beta user feedback and unexpected issues.
+
+Solo founder with full time job.
+Claude Code is the engineering team.
+Bolt admin agent in Sprint 1 increases
+daily productivity by 30-60 minutes.
+
+Cost constraint: no significant
+infrastructure cost increases until
+revenue justifies them.
+
+### Phase 2 — Sprints 1-5 (May-July 2026)
+
+Theme: Productivity, data foundation,
+scale infrastructure, intelligence layer.
+
+Key milestones:
+  Sprint 1: Bolt agent live, companies
+  table, data collection infrastructure
+  Sprint 2: Champion challenger live,
+  first generic ATS scrapers, beta users
+  Sprint 3: 100 companies, hiring
+  intelligence dashboard, tiered system
+  Sprint 4: Intelligence Agent, career
+  journey MVP, external signals begin
+  Sprint 5: 200 companies, Workday scraper,
+  hiring intensity score
+
+### Phase 2 — Sprints 6-10 (July-September 2026)
+
+Theme: Career intelligence, recruiter
+connections, network features, premium prep.
+
+Key milestones:
+  Sprint 6: Interview prep, visa data,
+  salary intelligence
+  Sprint 7: Career analytics, ATS
+  screening intelligence
+  Sprint 8: Recruiter access program,
+  monitoring service
+  Sprint 9: 300 companies, resume builder
+  Sprint 10: Network tab, recruiter
+  visibility opt-in
+
+### Phase 3 — Q4 2026+
+
+Theme: Revenue, scale, enterprise,
+Bloomberg Terminal vision.
+
+Key milestones:
+  Premium subscription launch
+  Direct recruiter placement
+  Scale to 1000 companies
+  Data licensing product
+  Enterprise career tracking
+  Full job intelligence platform
+
+### New Features Planned
+
+Beyond job matching Stellapath is building:
+
+Network and contacts tab:
+  Import contacts from email and social media.
+  Organize job-related contacts with templates
+  for coffee chats and role inquiries.
+  Quarterly reminders to reconnect.
+
+Resume builder and auto-apply:
+  In-app resume builder optimized for
+  target roles. One-click application
+  submission on behalf of user.
+
+Tiered intelligence:
+  Engagement unlocks deeper insights.
+  Tiers 1-5 based on reaction count.
+  Paid tier unlocks recruiter access
+  and premium career tools regardless
+  of engagement tier.
+
+Privacy commitment:
+  Interview outcomes and company names
+  never shared. Aggregate patterns
+  shared anonymously. Profile shared
+  with recruiters only on explicit
+  opt-in. Formal privacy policy
+  published in Sprint 3.
+
+Company structure:
+  Decision between C-Corp and PBC
+  (Public Benefit Corporation) in Sprint 1.
+  PBC considered given candidate-first
+  mission alignment and investor signaling.
+  Registration after C3.ai legal clears.

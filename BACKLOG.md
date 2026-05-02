@@ -24,155 +24,160 @@
 
 ---
 
-## Phase 1 — Beta Launch (Target: July 2026)
+## Sprint Plan — May 2026 onwards
 
-### Infrastructure and DevOps
-
-| # | Task | Status | Notes |
-|---|------|--------|-------|
-| 1 | Python environment setup | ✅ Complete | Python 3.12 |
-| 2 | Project folder structure | ✅ Complete | |
-| 3 | GitHub repo setup | ✅ Complete | Private, master/dev branches |
-| 4 | LLM abstraction layer | ✅ Complete | Claude/OpenAI/Gemini adapters |
-| 5 | Database models and migrations | ✅ Complete | Multiple migrations applied |
-| 6 | Production database on Render | ✅ Complete | jobmatch-db paid |
-| 7 | Dev database on Render | ✅ Complete | jobmatch-db-dev paid |
-| 8 | Backend API deployed | ✅ Complete | Endpoints live |
-| 9 | Frontend deployed | ✅ Complete | Pages live |
-| 10 | Dev and prod separation | ✅ Complete | Both environments live |
-| 11 | Python upgraded to 3.12 | ✅ Complete | runtime.txt updated |
-| 12 | SESSION_STARTER.txt created | ✅ Complete | Prevents session crashes |
-| 13 | SendGrid API key | 🔴 Pending | Unblocks email delivery |
-| 14 | Domain name registration | 🔴 Pending | stellapath.app or similar |
-| 15 | Company registration | 🔴 Pending | After legal review |
-| 16 | Recovery Kit saved | 🔴 Pending | Google Password Manager |
-
-### Agents and Pipeline
-
-| # | Task | Status | Notes |
-|---|------|--------|-------|
-| 17 | Job scraper — 21 tech companies | ✅ Complete | |
-| 18 | Job scraper — 10 upstream oil and gas | ✅ Complete | |
-| 19 | Job scraper — 10 oilfield services | ✅ Complete | |
-| 20 | Hard constraint filtering | ✅ Complete | 6 constraints |
-| 21 | Soft constraint filtering | ✅ Complete | Phase B of Filter Agent |
-| 22 | BGE embedding pipeline | ✅ Complete | Replaced by pgvector ANN pipeline (item 38e) — BGE code preserved in agents/embeddings.py for future local backend |
-| 23 | Source trust scoring | ✅ Complete | Phase A of Search Agent |
-| 24 | Match agent batch scoring Call 1 | ✅ Complete | |
-| 25 | Match agent Call 2 with caching | ✅ Complete | Active users, 7-day TTL, profile version + weight drift invalidation |
-| 26 | Feedback agent signals | ✅ Complete | |
-| 27 | Weight learning and drift protection | ✅ Complete | |
-| 28 | Orchestration agent | ✅ Complete | |
-| 29 | Daily scheduler | ✅ Complete | |
-| 30 | Email agent — daily digest | 🔴 Pending | Needs SendGrid key |
-| 31 | Email agent — weekly recap | 🔴 Pending | |
-| 32 | Company insight one-pagers | ✅ Complete | Insights Agent built |
-| 33 | Fallback delivery with labels | ✅ Complete | "Exploratory match" label in Dashboard + Matches pages |
-| 34 | 3-job delivery guarantee | ✅ Complete | 6-step fallback in orchestrator |
-| 35 | CompanyHiringSnapshot data collection | ✅ Complete | Wired into Search Agent |
-| 36 | Job description versioning hash-based | ✅ Complete | |
-| 37 | Admin dashboard — 11 sections | ✅ Complete | /admin route |
-| 38 | Test Agent implementation | ✅ Complete | agents/test_agent.py — precision@50, @15, recall, NDCG, coverage, FPR |
-| 38a | TestAgentMetrics table | ✅ Complete | db/models.py — daily snapshot with 7-day baseline and drift flags |
-| 38b | EvaluatedJob table | ✅ Complete | db/models.py — ground truth labels (LLM / user / human sources) |
-| 38c | Match Quality Charts | ✅ Complete | Admin Section 6 — 30-day trend line + score distribution bar (recharts) |
-| 38d | All 6 Test Agent metrics wired | ✅ Complete | Admin Section 4 — precision@50, @15, recall@50, NDCG, coverage, FPR with 7d baseline |
-| 38e | pgvector ANN embedding pipeline (text-embedding-3-small, 1536d, HNSW cosine) | ✅ Complete | Replaces BGE — backfill 6667 jobs ($0.04), new jobs embedded at ingestion, profile embedding via build_intent_query, aspiration blend 0.7/0.3 |
-| 38f | Outcome-anchored profile embedding | ✅ Complete | 0.8 × profile_embedding + 0.2 × job_embedding normalized on interview/applied signal |
-| 38g | Embedding health metrics + /admin/embedding-health | ✅ Complete | Job + profile coverage in TestAgentMetrics.label_sources, dedicated admin endpoint |
-| 39 | Prompts directory created | ✅ Complete | All 5 prompts in prompts/ + 3 agent implementation prompts in prompts/agents/ |
-| 55 | First-run pipeline on profile completion | ✅ Complete | POST /pipeline/run-for-user/{id} with 60s asyncio.timeout; loading overlay in Setup step 4; polls matches every 3s before redirect |
-| 56 | Match funnel delivered count fix | ✅ Complete | MatchFunnel.shown uses delivered_at filter; delivered_at added to MatchResponse |
-| 57 | Feedback count accuracy fix | ✅ Complete | Passive link-clicks (weight=1) no longer create Feedback rows; feedback_count filters weight>=2; Apply uses recordSignal('applied') |
-| 58 | Text feedback commentary + AI interpretation | ✅ Complete | Comment box in job modal + card chat icon; POST /users/{id}/feedback/event; Claude Haiku _COMMENTARY_SYSTEM → dimension/direction/confidence/hard_exclusion; ±0.01/0.03/0.05 delta |
-| 59 | Commentary prompt library files | ✅ Complete | prompts/agents/feedback_agent_commentary.txt + prompts/agents/matching_agent_weights.txt |
-
-### Frontend and UX
-
-| # | Task | Status | Notes |
-|---|------|--------|-------|
-| 40 | Dashboard UI — Stellapath branded | 🔴 In Progress | |
-| 41 | Profile page — 3 column AI onboarding | 🔴 In Progress | |
-| 42 | Profile step enforcement | ✅ Complete | Green step circles, progress bar, debounce auto-save, soft banners, mid default |
-| 43 | Visa and work authorization UI update | ✅ Complete | 4 PillWithSub pills in 2-col grid, sublabels, consistent violet styling |
-| 44 | Seniority level options update | ✅ Complete | 6 options: Entry Level, Mid Level, Senior, Manager, Director, Executive |
-| 45 | Landing page comparison table | ✅ Complete | Live on site |
-| 46 | Stellapath branding applied | 🔴 In Progress | |
-| 47 | Company insights page redesign | ✅ Complete | Two column layout, SLUG_DOMAINS shared util |
-| 48 | Hiring momentum section on insights | ✅ Complete | Velocity strip + department bar chart |
-| 49 | What to Expect redesign | ✅ Complete | Traffic light pill + gradient range bars |
-| 54 | Applications page | ✅ Complete | Table of applied/interview FeedbackSignal rows; replaces ComingSoon stub |
-
-### Quality and Legal
-
-| # | Task | Status | Notes |
-|---|------|--------|-------|
-| 50 | Fix failing tests | ✅ Complete | 14 failures → 0; filter logic, template signatures, stale assertions |
-| 51 | End-to-end QA | 🔴 Pending | Before beta users |
-| 52 | C3.ai contract legal review | 🔴 Pending | Deadline June 30 2026 |
-| 53 | Beta user recruitment | 🔴 Pending | 10 active job seekers |
+### Pre-Sprint — Complete
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Push dev to prod | Small | ✅ Complete |
 
 ---
 
-## Phase 2 — Post Beta (August 2026+)
-
-| # | Task | Category |
-|---|------|----------|
-| 1 | Hiring probability ML model | Core Product |
-| 2 | Interview preparation guide | Core Product |
-| 3 | Likelihood of acceptance score | Core Product |
-| 4 | ATS and screening filter intelligence | Core Product |
-| 5 | Premium subscription tier | Monetization |
-| 6 | Sponsored course recommendations | Monetization |
-| 7 | Recruiter connection feature | Monetization |
-| 8 | Early recruiter access program | Monetization |
-| 9 | Direct placement to recruiters | Monetization |
-| 10 | Career coaching marketplace | Monetization |
-| 11 | Company accountability score | Platform |
-| 12 | Company hiring behavior transparency | Platform |
-| 13 | Company improvement dashboard | Platform |
-| 14 | Post-application feedback collection | Platform |
-| 15 | LinkedIn profile connection | Data Enrichment |
-| 16 | GitHub profile analysis | Data Enrichment |
-| 17 | Salary benchmarking integration | Data Enrichment |
-| 18 | Company health signals | Data Enrichment |
-| 19 | Intelligence Agent | Infrastructure |
-| 20 | Crunchbase funding integration | Intelligence |
-| 21 | Layoffs.fyi integration | Intelligence |
-| 22 | News sentiment analysis | Intelligence |
-| 23 | Hiring intensity score | Intelligence |
-| 24 | Department-level growth signals | Intelligence |
-| 25 | Periodic preference check-ins | Product |
-| 26 | Early career module | Market Expansion |
-| 27 | Monitoring Service | Infrastructure |
-| 28 | Qdrant vector database | Infrastructure |
-| 29 | Redis and Celery job queue | Infrastructure |
-| 30 | LLM response caching | Infrastructure |
+### Sprint 1 — May 5-18
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Bolt admin agent chat interface with live metrics | Large | 🔴 Pending |
+| 2 | Companies database table — move COMPANY_SOURCES | Medium | 🔴 Pending |
+| 3 | Register stellapath.app domain | Small | 🔴 Pending |
+| 4 | Email hardening digest@stellapath.app SPF DKIM DMARC | Small | 🔴 Pending |
+| 5 | Salary extraction from job descriptions | Small | 🔴 Pending |
+| 6 | Time to fill tracking — add last_seen_at to jobs | Small | 🔴 Pending |
+| 7 | Data collection — daily role additions removals tenure | Medium | 🔴 Pending |
+| 8 | Weekly CompanyHiringTrend aggregate table | Medium | 🔴 Pending |
+| 9 | Company intelligence admin dashboard — job count per week per company role insights | Medium | 🔴 Pending |
+| 10 | Decide C-Corp vs PBC | Small | 🔴 Pending |
+| 11 | Bug fixes remaining from E2E testing | Medium | 🔴 Pending |
+| 12 | Confirm hiring velocity on company pages | Small | 🔴 Pending |
 
 ---
 
-## Phase 3 — Future (2027+)
-
-| # | Task | Category |
-|---|------|----------|
-| 1 | High school guidance module | Market Expansion |
-| 2 | Enterprise career tracking | Enterprise |
-| 3 | Cross-encoder reranking | ML |
-| 4 | Data licensing | Revenue |
-| 5 | Multilingual support | Market Expansion |
-| 6 | Earnings call sentiment analysis | Intelligence |
-| 7 | Revenue correlation modeling | Intelligence |
-| 8 | Macro sector rotation signals | Intelligence |
-| 9 | Full job intelligence platform | Vision |
+### Sprint 2 — May 19 - June 1
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Champion challenger framework shadow mode and admin Section 13 | Large | 🔴 Pending |
+| 2 | Spark autonomous experiments framework | Large | 🔴 Pending |
+| 3 | Generic ATS scrapers Greenhouse and Lever | Medium | 🔴 Pending |
+| 4 | Invite 4-5 beta users | Small | 🔴 Pending |
+| 5 | C3.ai lawyer consultation booked | Small | 🔴 Pending |
 
 ---
 
-## Prompts Queue — Ready to Run in Claude Code
+### Sprint 3 — June 2-15
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Scale to 100 companies using generic scrapers | Medium | 🔴 Pending |
+| 2 | Hiring intelligence admin dashboard Section 12 | Large | 🔴 Pending |
+| 3 | Tiered intelligence system Tier 1 through 3 | Medium | 🔴 Pending |
+| 4 | Privacy policy and data sharing rules | Medium | 🔴 Pending |
+| 5 | Company registration after legal review | Small | 🔴 Pending |
+| 6 | Automated follow-up notifications | Small | 🔴 Pending |
 
-| # | Prompt | Purpose |
-|---|--------|---------|
-| 1 | Prompts directory creation | Save all LLM prompts to GitHub |
-| 2 | Profile step enforcement | Enforce onboarding flow |
-| 3 | Visa and seniority UI updates | Profile page improvements |
-| 4 | Company insights page redesign | ~~Done~~ |
-| 5 | Test Agent implementation | Pipeline quality monitoring |
+---
+
+### Sprint 4 — June 16-29
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Intelligence Agent external signal collection | Large | 🔴 Pending |
+| 2 | Career journey tab MVP applications tracker | Medium | 🔴 Pending |
+| 3 | Layoff event tracking Layoffs.fyi integration | Medium | 🔴 Pending |
+| 4 | Funding stage data Crunchbase free tier | Medium | 🔴 Pending |
+| 5 | Competitive intelligence tab admin Section 12 Tab 5 | Small | 🔴 Pending |
+
+---
+
+### Sprint 5 — June 30 - July 13
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Workday ATS scraper | Large | 🔴 Pending |
+| 2 | Scale to 200 companies | Medium | 🔴 Pending |
+| 3 | Hiring intensity score composite calculation | Medium | 🔴 Pending |
+| 4 | Career journey follow-up system and rejection learning | Medium | 🔴 Pending |
+| 5 | Department-level growth signals | Small | 🔴 Pending |
+| 6 | LLM-generated recommended actions admin Section 2 upgrade | Small | 🔴 Pending |
+
+---
+
+### Sprint 6 — July 14-27
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Interview preparation guide per company | Medium | 🔴 Pending |
+| 2 | Tiered intelligence Tier 4 and 5 | Medium | 🔴 Pending |
+| 3 | Visa sponsorship intelligence USCIS H-1B data | Medium | 🔴 Pending |
+| 4 | Salary competitiveness score LCA DOL cross-reference | Medium | 🔴 Pending |
+| 5 | Company accountability score | Medium | 🔴 Pending |
+
+---
+
+### Sprint 7 — July 28 - August 10
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Career journey career analytics and timeline view | Large | 🔴 Pending |
+| 2 | ATS screening filter intelligence | Large | 🔴 Pending |
+| 3 | Likelihood of acceptance score | Medium | 🔴 Pending |
+| 4 | Sponsored course recommendations | Medium | 🔴 Pending |
+| 5 | Post-application feedback collection | Small | 🔴 Pending |
+
+---
+
+### Sprint 8 — August 11-24
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | GitHub profile analysis | Medium | 🔴 Pending |
+| 2 | Paid vs earned tier distinction define and implement | Medium | 🔴 Pending |
+| 3 | Early recruiter access program | Medium | 🔴 Pending |
+| 4 | User search journey tracking | Medium | 🔴 Pending |
+| 5 | Periodic preference check-ins | Small | 🔴 Pending |
+| 6 | News sentiment analysis | Medium | 🔴 Pending |
+| 7 | Monitoring Service split from Orchestration Agent | Large | 🔴 Pending |
+
+---
+
+### Sprint 9 — August 25 - September 7
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Scale to 300 companies | Medium | 🔴 Pending |
+| 2 | Early career module MVP | Large | 🔴 Pending |
+| 3 | Resume builder MVP | Large | 🔴 Pending |
+| 4 | Baker Hughes rig count integration | Small | 🔴 Pending |
+| 5 | Profile completion quality signals | Small | 🔴 Pending |
+
+---
+
+### Sprint 10 — September 8-21
+| # | Task | Size | Status |
+|---|------|------|--------|
+| 1 | Recruiter visibility opt-in | Medium | 🔴 Pending |
+| 2 | Network and contacts tab MVP | Large | 🔴 Pending |
+| 3 | Network reminders and templates | Medium | 🔴 Pending |
+| 4 | LinkedIn profile import | Medium | 🔴 Pending |
+
+---
+
+### Phase 3 — Future Sprints Q4 2026+
+| # | Task | Size |
+|---|------|------|
+| 1 | Auto-apply feature | Large |
+| 2 | Premium subscription Stripe integration | Large |
+| 3 | Direct placement to recruiters | Large |
+| 4 | Hiring probability ML model | Large |
+| 5 | Scale to 1000 companies | Large |
+| 6 | LCA salary data import | Medium |
+| 7 | SEC EDGAR financial parsing | Large |
+| 8 | Qdrant migration | Large |
+| 9 | Multilingual support | Large |
+| 10 | High school and college guidance module | Large |
+| 11 | Enterprise career tracking | Large |
+| 12 | Cross-encoder reranking evaluation | Medium |
+| 13 | Earnings call sentiment analysis | Large |
+| 14 | Revenue correlation modeling | Large |
+| 15 | Macro sector rotation signals | Large |
+| 16 | Data licensing product | Large |
+| 17 | Bloomberg Terminal full vision | Large |
+| 18 | Company improvement dashboard | Large |
+| 19 | Career coaching marketplace | Large |
+| 20 | Redis and Celery job queue | Large |
+| 21 | Rejection learning | Large |
+| 22 | Company structure final registration | Small |
+| 23 | Company headcount range | Medium |
+| 24 | Qualitative salary scale | Medium |
+| 25 | LCA DOL data integration | Medium |

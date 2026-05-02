@@ -381,24 +381,21 @@ lawyer consultation.
 
 ## Last Working On
 
-Bug fixes shipped to dev branch (May 2026).
+Completed full beta phase audit.
+All features verified and documented.
+Beta spec document complete and accurate.
 
-Changes made this session:
-- BUG 1: POST /pipeline/run-for-user/{id}
-  asyncio.timeout(60), Setup loading overlay
-- BUG 2: MatchFunnel uses delivered_at count
-- BUG 7: Passive clicks excluded from feedback
-  Apply uses recordSignal('applied')
-- BUG 8: Text commentary on modal + cards
-  Claude Haiku interprets dimension signals
-- prompts/agents/ two new files created
-- All four documentation files updated
+Approved sprint plan through Sprint 10
+covering May through September 2026.
 
-Remaining before beta:
-1. SendGrid API key on Render
-2. E2E QA full user flow
-3. Domain name registration
-4. C3.ai legal review June 30 2026
+Current priorities Sprint 1:
+  Bolt admin agent with voice
+  Companies database table
+  Domain registration
+  Email hardening
+  Data collection infrastructure
+  Company intelligence admin dashboard
+  C-Corp vs PBC decision
 
-Next session: configure SendGrid
-then run E2E QA.
+Next immediate action:
+  Start Sprint 1 tasks in Claude Code.

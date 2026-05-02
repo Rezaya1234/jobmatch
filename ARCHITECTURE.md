@@ -1305,3 +1305,106 @@ Upsert logic                      untouched
 Database schema                   additions only — no modifications to existing fields
 Search and filter functionality   untouched
 ```
+
+---
+
+## 14. Scaling Roadmap and Architecture Evolution
+
+### Current State (Beta)
+
+41 hand-coded company scrapers.
+COMPANY_SOURCES hardcoded in Python.
+APScheduler for pipeline scheduling.
+pgvector for vector search.
+Single Render web service.
+All processing synchronous.
+
+### Sprint 1-2 Changes
+
+Companies table in database:
+  Replaces hardcoded COMPANY_SOURCES.
+  Admin UI to add companies without
+  code changes. Prerequisite for
+  scaling to 1000 companies.
+  Schema: id, name, website, ats_type,
+  ats_url, sector, company_size,
+  headquarters, active, date_added.
+
+Generic ATS scrapers:
+  One scraper per ATS platform.
+  Greenhouse covers 40% of companies.
+  Lever covers 20% of companies.
+  Workday covers 60% of enterprise.
+  These three unlock 500+ companies
+  without writing individual scrapers.
+
+Champion challenger framework:
+  Shadow mode — challenger runs silently
+  alongside champion for same users.
+  ModelVersion table tracks all configs.
+  ExperimentResult table tracks outcomes.
+  Admin Section 13 shows comparisons.
+
+### Sprint 3-5 Changes
+
+Intelligence Agent (new ninth agent):
+  Dedicated agent for external signals.
+  Separate from Insights Agent which
+  generates user-facing content.
+  Owns: Crunchbase, Layoffs.fyi,
+  news sentiment, SEC EDGAR,
+  sector aggregation.
+  Runs on its own schedule separate
+  from daily pipeline.
+
+Data collection infrastructure:
+  Daily role addition and removal tracking.
+  Time to fill per role type.
+  Department-level growth signals.
+  Weekly CompanyHiringTrend aggregates.
+  These build the proprietary dataset
+  that becomes licensable in Phase 3.
+
+Scale targets:
+  Sprint 3: 100 companies
+  Sprint 5: 200 companies
+  Sprint 9: 300 companies
+  Phase 3: 1000 companies
+
+### Sprint 6-10 Changes
+
+Monitoring Service split:
+  Pipeline monitoring separated from
+  Orchestration Agent into dedicated
+  service. Required at 10K+ users.
+  Metrics, logs, alerts, costs move
+  to dedicated Monitoring Service.
+
+### Phase 3 Architecture Changes
+
+Qdrant migration:
+  Replace pgvector at 10K-50K users.
+  Self-hosted Qdrant first ($50-200/month).
+  Qdrant cluster or Pinecone at 50K+.
+  Do not build before needed.
+
+Redis and Celery:
+  Replace APScheduler at 10K+ users.
+  Proper async job queue for pipeline.
+  Do not build before needed.
+
+### Cost Guardrails
+
+No significant infrastructure cost
+increases until revenue justifies them.
+
+Current monthly cost: ~$14/month.
+Sprint 1-2 target: $14/month no change.
+Sprint 3-5 target: $20-30/month maximum.
+Sprint 6-10 target: $50/month maximum.
+
+Avoid until revenue justifies:
+  Qdrant migration
+  Redis and Celery
+  Render plan upgrades beyond current
+  Premium paid APIs
