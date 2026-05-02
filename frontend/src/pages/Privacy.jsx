@@ -28,7 +28,6 @@ export default function Privacy() {
               ['Feedback signals', 'Thumbs up/down reactions, clicks, and application events. Used to improve match quality over time.'],
               ['Job interaction data', 'Which roles you view, save, or apply to. Used to personalize future recommendations.'],
               ['Contact information', 'Your email address, used as your account identifier and for sending match digests.'],
-              ['Connected network data (optional)', 'If you choose to connect a LinkedIn URL, it is stored against your profile. We do not access your LinkedIn data without explicit permission.'],
             ].map(([title, desc]) => (
               <li key={title} className="flex gap-3 items-start">
                 <span className="mt-1 w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />

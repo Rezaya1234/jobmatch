@@ -167,35 +167,6 @@ export default function Settings() {
         />
       </Section>
 
-      {/* Connected sources */}
-      <Section title="Connected sources">
-        <p className="text-xs text-slate-500 mb-4">
-          Connect your LinkedIn profile to help StellaPath surface warm introductions.
-          StellaPath works without this — it's an optional enhancement.
-        </p>
-        <form onSubmit={saveLinkedin} className="flex gap-2">
-          <input
-            type="url"
-            value={linkedinUrl}
-            onChange={e => setLinkedinUrl(e.target.value)}
-            placeholder="https://linkedin.com/in/your-profile"
-            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-300"
-          />
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </form>
-        {savedMsg && (
-          <p className={`text-xs mt-2 ${savedMsg === 'Saved' ? 'text-green-600' : 'text-rose-500'}`}>
-            {savedMsg}
-          </p>
-        )}
-      </Section>
-
       {/* Privacy & data */}
       <Section title="Privacy & data">
         <div className="space-y-3 text-sm text-slate-600">
