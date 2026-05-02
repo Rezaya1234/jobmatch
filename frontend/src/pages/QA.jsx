@@ -23,6 +23,7 @@ const EVENT_META = {
   llm_scored:           { icon: '🤖', label: 'LLM scored',           color: 'bg-orange-50 text-orange-700 border-orange-200' },
   jobs_delivered:       { icon: '📦', label: 'Jobs delivered',       color: 'bg-violet-100 text-violet-700 border-violet-200' },
   filter_run:           { icon: '🔍', label: 'Filter run',           color: 'bg-slate-100 text-slate-600 border-slate-200' },
+  commentary:           { icon: '💬', label: 'Comment left',         color: 'bg-amber-50 text-amber-700 border-amber-200' },
 }
 
 const DIMENSIONS = ['skills_match', 'industry_alignment', 'experience_level', 'function_type', 'salary', 'career_trajectory']
@@ -172,6 +173,9 @@ function ActivityCard({ item }) {
       case 'email_thumbs_down':
         return <p className="text-sm text-slate-700">{m.job_title} <span className="text-slate-400">· {m.company}</span>{m.comment && <span className="text-slate-500 italic"> — "{m.comment}"</span>}</p>
 
+      case 'commentary':
+        return <p className="text-sm text-slate-700">{m.job_title} <span className="text-slate-400">· {m.company}</span>{m.commentary && <span className="text-slate-500 italic"> — "{m.commentary}"</span>}</p>
+
       case 'click':
       case 'applied':
       case 'interview':
@@ -280,7 +284,7 @@ function ActivityCard({ item }) {
 
 const FILTERS = [
   { key: 'all',       label: 'All' },
-  { key: 'signals',   label: 'Signals',   match: e => ['thumbs_up','thumbs_down','email_thumbs_up','email_thumbs_down','link_click','click','applied','interview'].includes(e) },
+  { key: 'signals',   label: 'Signals',   match: e => ['thumbs_up','thumbs_down','email_thumbs_up','email_thumbs_down','link_click','click','applied','interview','commentary'].includes(e) },
   { key: 'scoring',   label: 'Scoring',   match: e => ['llm_scored','filter_run','jobs_delivered'].includes(e) },
   { key: 'learning',  label: 'Learning',  match: e => ['weights_updated','profile_updated','cold_start_graduated'].includes(e) },
   { key: 'email',     label: 'Email',     match: e => ['email_sent','recap_sent'].includes(e) },

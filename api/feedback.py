@@ -667,7 +667,8 @@ async def submit_commentary(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="commentary must not be empty")
 
     job_result = await session.execute(select(Job).where(Job.id == body.job_id))
-    if job_result.scalar_one_or_none() is None:
+    job = job_result.scalar_one_or_none()
+    if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Job not found")
 
     event = FeedbackEvent(
@@ -679,6 +680,12 @@ async def submit_commentary(
         commentary=text,
     )
     session.add(event)
+    await log_event(user_id, "commentary", {
+        "job_id": str(body.job_id),
+        "job_title": job.title,
+        "company": job.company,
+        "commentary": text,
+    }, session)
     await session.commit()
     background_tasks.add_task(_run_commentary_learning, user_id, llm)
     return {"status": "received"}
