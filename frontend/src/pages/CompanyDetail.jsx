@@ -94,35 +94,6 @@ function DifficultyPill({ level }) {
   return <span className="text-sm font-bold px-3 py-1 rounded-full bg-red-600 text-white">Very Hard</span>
 }
 
-function GradientBar({ position, label }) {
-  const pos = Math.max(0, Math.min(100, position ?? 50))
-  const dotColor = pos < 33 ? '#EF4444' : pos < 66 ? '#F59E0B' : '#22C55E'
-  return (
-    <div className="mt-3 mb-7">
-      <div className="relative">
-        <div
-          className="h-1.5 rounded-full w-full"
-          style={{ background: 'linear-gradient(to right, #EF4444, #F59E0B, #22C55E)' }}
-        />
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 border-white shadow"
-          style={{ left: `calc(${pos}% - 7px)`, backgroundColor: dotColor }}
-        />
-      </div>
-      {label && (
-        <div className="relative mt-2">
-          <span
-            className="absolute -translate-x-1/2 text-xs text-slate-500 whitespace-nowrap"
-            style={{ left: `${pos}%` }}
-          >
-            {label}
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function CompanyTypeBadge({ company_type, ticker_symbol }) {
   if (!company_type) return null
   const config = {

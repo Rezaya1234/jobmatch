@@ -46,7 +46,7 @@ Target users: 10 beta users initially
 ## Infrastructure
 
 GitHub: github.com/Rezaya1234/jobmatch
-Branches: master (prod) / dev (dev)
+Branches: dev (dev Render) / prod (prod Render) / master (unused)
 
 Render services:
   jobmatch-prod     backend Python 3.12

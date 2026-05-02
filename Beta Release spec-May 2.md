@@ -75,6 +75,7 @@ Mixing these causes feedback loop corruption. They are stored in separate tables
 ### 3.1 Sign Up → Onboarding
 
 1. **Landing page** — Value proposition, sign-up CTA
+   - **Sign-in page:** Two-column layout. Left: sign in form with email and password. Right: product preview showing 3 real job cards and modal overlay — gives new users a clear picture of the product before signing up.
 2. **Sign-up** — Email + password (email normalized to lowercase)
 3. **Profile Setup Wizard** — 4-step wizard, gated: dashboard inaccessible until `profile_complete = true`
 
@@ -116,6 +117,7 @@ Mixing these causes feedback loop corruption. They are stored in separate tables
 - Thumbs up / Thumbs down (immediate weight update on strong signals)
 - Click through to DetailsDrawer
 - Comment inline with text
+- Optional text comment box appears after clicking Good fit or Not a fit in DetailsDrawer. Comment icon on Open Positions cards opens inline text box. Commentary processed by Feedback Agent via Claude Haiku.
 
 **DetailsDrawer (right overlay):**
 - Full job description
@@ -200,13 +202,15 @@ Two fixes required for deep routes (e.g. `/dashboard` on browser refresh):
 | `MissedOpportunities` | Weekly high-score (≥85%) jobs user didn't interact with |
 | `ScoreChart` | 14-day match score trend line (Recharts) |
 | `ProfileSetup` | Wizard with StepNav, AI preview panel, debounce auto-save |
-| `StepNav` | 4-step progress nav — active purple, completed green checkmark, clickable |
+| `StepNav` | 4-step progress nav — active purple, completed purple filled circle with white checkmark, clickable |
 | `ProgressBar` | 4px violet bar at top of wizard advancing 25% per step |
 | `PillWithSub` | Pill selector with main label + sublabel (used for visa options, 2-col grid) |
-| `GradientRangeBar` | Red→amber→green gradient track with throttle dot at calculated position |
 | `DifficultyPill` | Traffic-light pill for interview difficulty: Easy/Moderate/Hard/Very Hard |
-| `HiringMomentum` | Velocity strip (week/month deltas) + department bar chart in CompanyDetail |
+| `HiringMomentum` | Velocity strip (week/month deltas) only. Department bar chart removed — classification unreliable across sectors. |
 | `SignalTimeline` | Vertical timeline for recent company signals, colored dots + type badges |
+| `CompanyTypeBadge` | Shows Public/Private/Startup with series stage. Tooltip on hover explains what each stage means for candidates. 8 types: public, private, startup_seed, startup_series_a through c, pre_ipo. |
+| `NotificationBell` | Connected to GET /users/{id}/notifications. 6 notification types: unreviewed matches, missed opportunities, profile incomplete, match quality improving, no activity 3 days, interview follow-up. |
+| `RecentNews` | Fetches Google News RSS for company name. Shows last 5 headlines with source and date. Links open in new tab. Replaced LLM-generated Recent Signals. |
 
 ---
 
@@ -769,7 +773,7 @@ LLM_PROVIDER        claude
 ANTHROPIC_API_KEY   Anthropic API key
 OPENAI_API_KEY      OpenAI API key (embeddings)
 SENDGRID_API_KEY    SendGrid (pending configuration)
-FROM_EMAIL          digest@stellapath.app
+FROM_EMAIL          reza.rah@gmail.com (temporary — switch to digest@stellapath.app once sender domain verified in SendGrid)
 FROM_NAME           Stellapath
 PIPELINE_TIMEZONE   UTC
 EMBEDDING_BACKEND   openai

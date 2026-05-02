@@ -74,6 +74,10 @@ deployments. If there is a Render error
 I will paste the error text and you
 tell me the exact fix to make locally.
 
+RULE 9 — Deployment flow: dev → prod directly.
+Never push to master for deployment.
+Master branch is unused.
+
 ---
 
 ## Step 3 — Ask what we are working on today
