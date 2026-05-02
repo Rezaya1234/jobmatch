@@ -2,16 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import {
   triggerCollect, triggerResetFilters, triggerTestEmail,
   triggerCompanyInsights, getInsightsStatus, backfillLogos, getJobCount, getMatchCount,
-  getPipelineStatus, triggerStepReset, triggerStepFilter, triggerStepCandidates,
+  getPipelineStatus, triggerStepReset, triggerStepFilter,
   triggerStepScore, triggerStepDeliver,
 } from '../api'
 
 const STEP_META = [
-  { id: 1, label: 'Search',      sub: 'Scrape 41 career pages'        },
-  { id: 2, label: 'Hard Filter', sub: 'Job type, location, visa'       },
-  { id: 3, label: 'Candidates',  sub: 'Soft + heuristic + embedding'  },
-  { id: 4, label: 'LLM Score',   sub: 'Claude Haiku batch scoring'    },
-  { id: 5, label: 'Deliver',     sub: 'Select top 3 → mark shown'     },
+  { id: 1, label: 'Search',       sub: 'Scrape 41 career pages'     },
+  { id: 2, label: 'Hard Filter',  sub: 'Job type, location, visa'    },
+  { id: 3, label: 'LLM 1 Score',  sub: 'Haiku batch scoring'        },
+  { id: 4, label: 'Deliver',      sub: 'Select top 3 → mark shown'  },
 ]
 
 function Spinner({ size = 4 }) {
@@ -155,7 +154,6 @@ export default function Pipeline() {
       2: { status: 'idle', detail: '' },
       3: { status: 'idle', detail: '' },
       4: { status: 'idle', detail: '' },
-      5: { status: 'idle', detail: '' },
     })
     try {
       const res = await triggerStepReset(id)
@@ -204,7 +202,6 @@ export default function Pipeline() {
       2: { status: 'idle', detail: '' },
       3: { status: 'idle', detail: '' },
       4: { status: 'idle', detail: '' },
-      5: { status: 'idle', detail: '' },
     })
 
     try {
@@ -232,12 +229,11 @@ export default function Pipeline() {
         }, 2000)
       })
 
-      // Steps 2–5 — synchronous
+      // Steps 2–4 — synchronous
       for (const [num, apiFn] of [
         [2, () => triggerStepFilter(id)],
-        [3, () => triggerStepCandidates(id)],
-        [4, () => triggerStepScore(id)],
-        [5, () => triggerStepDeliver(id)],
+        [3, () => triggerStepScore(id)],
+        [4, () => triggerStepDeliver(id)],
       ]) {
         setStepState(s => ({ ...s, [num]: { status: 'running', detail: '' } }))
         const res = await apiFn()
@@ -360,7 +356,7 @@ export default function Pipeline() {
           </span>
         </div>
 
-        <div className="grid grid-cols-5 gap-2 mb-3">
+        <div className="grid grid-cols-4 gap-2 mb-3">
           {STEP_META.map(meta => (
             <StepCard
               key={meta.id}
@@ -371,9 +367,8 @@ export default function Pipeline() {
                 const id = uid()
                 if (meta.id === 1) return handleStep1()
                 if (meta.id === 2) return runStep(2, () => triggerStepFilter(id))
-                if (meta.id === 3) return runStep(3, () => triggerStepCandidates(id))
-                if (meta.id === 4) return runStep(4, () => triggerStepScore(id))
-                if (meta.id === 5) return runStep(5, () => triggerStepDeliver(id))
+                if (meta.id === 3) return runStep(3, () => triggerStepScore(id))
+                if (meta.id === 4) return runStep(4, () => triggerStepDeliver(id))
               }}
             />
           ))}
@@ -381,7 +376,7 @@ export default function Pipeline() {
 
         {/* Results row */}
         {Object.values(stepState).some(s => s.status === 'done' || s.status === 'error') && (
-          <div className="grid grid-cols-5 gap-2 mb-3">
+          <div className="grid grid-cols-4 gap-2 mb-3">
             {STEP_META.map(meta => {
               const s = stepState[meta.id]
               if (s.status === 'idle' || s.status === 'running') return <div key={meta.id} />
@@ -399,7 +394,7 @@ export default function Pipeline() {
           disabled={anyStepRunning}
           className="w-full bg-violet-600 text-white py-2.5 rounded-lg font-semibold text-sm hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
         >
-          {runAllActive ? <><Spinner size={4} /> Running all steps…</> : '▶  Run All Steps  (1 → 5)'}
+          {runAllActive ? <><Spinner size={4} /> Running all steps…</> : '▶  Run All Steps  (1 → 4)'}
         </button>
       </div>
 
