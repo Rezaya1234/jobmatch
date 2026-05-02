@@ -528,20 +528,19 @@ class FilterAgent:
             for alias in _US_ALIASES:
                 if _alias_in_location(alias, job_location):
                     return FilterResult(passed=True)
+            # Block explicit non-US BEFORE state/city code matching —
+            # "IN" (Indiana) also appears in Indian addresses ("Bangalore, KA, IN, 560066")
+            # and would otherwise produce a false US-state match.
+            if not _is_us_compatible_location(job.location_raw):
+                logger.debug("Blocked non-US location '%s' for US user", job.location_raw)
+                return FilterResult(
+                    passed=False,
+                    reason=f"location '{job.location_raw}' is outside the US",
+                )
             if _contains_us_state(job.location_raw):
                 return FilterResult(passed=True)
             if _contains_us_city(job.location_raw):
                 return FilterResult(passed=True)
-
-        # Block jobs with an explicit non-US location for US-only users.
-        # This must come after the accepted-location loop so that multi-country
-        # profiles (e.g. "United States" + "Canada") still pass their other country.
-        if accepts_us and not _is_us_compatible_location(job.location_raw):
-            logger.debug("Blocked non-US location '%s' for US user", job.location_raw)
-            return FilterResult(
-                passed=False,
-                reason=f"location '{job.location_raw}' is outside the US",
-            )
 
         # Remote jobs: pass if user accepts remote
         # (non-US remotes already blocked above for US-only users)
