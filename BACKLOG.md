@@ -20,6 +20,7 @@
 | B10 | End-to-end QA with real users | 🔴 Pending | Needs B9 |
 | B11 | Domain registered (stellapath.app) | 🔴 Pending | Business |
 | B12 | Beta user recruitment (10 active job seekers) | 🔴 Pending | Needs B10 |
+| B13 | Switch FROM_EMAIL from reza.rah@gmail.com → digest@stellapath.app (verify sender domain in SendGrid after B11) | 🔴 Pending | Needs B11 |
 
 ---
 
