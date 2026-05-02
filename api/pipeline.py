@@ -509,11 +509,32 @@ async def trigger_step_score(
         # Pass their IDs directly so the LLM sees only those jobs.
         candidates = await FilterAgent(session).get_candidates(user_id)
         candidate_ids = [str(j.id) for j in candidates]
-        result = await MatchAgent(session, llm).run(user_id, candidate_job_ids=candidate_ids)
+        result = await MatchAgent(session, llm).run(
+            user_id, candidate_job_ids=candidate_ids, skip_reorder=True
+        )
         return StepResult(
             status="done",
             detail=f"{result.scored} jobs scored",
             count=result.scored,
+        )
+    except Exception as exc:
+        return StepResult(status="error", detail=str(exc))
+
+
+@router.post("/step/reorder/{user_id}", response_model=StepResult, status_code=200)
+async def trigger_step_reorder(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+    llm: LLMClient = Depends(get_llm),
+) -> StepResult:
+    """Step 5: Haiku career advisor reviews all 15 scored jobs and adjusts top-3 if goal misaligned."""
+    from agents.match_agent import MatchAgent
+    try:
+        result = await MatchAgent(session, llm).run_reorder_only(user_id)
+        return StepResult(
+            status="done",
+            detail=result["detail"],
+            count=result["reordered"],
         )
     except Exception as exc:
         return StepResult(status="error", detail=str(exc))

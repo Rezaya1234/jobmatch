@@ -35,7 +35,7 @@ ALLOWED_DIMENSIONS = [
 
 _COST_PER_BATCH_USD = 0.00125   # Haiku Call 1, ~10-job batch
 _COST_PER_CALL2_USD = 0.003     # Sonnet Call 2, per job
-_REORDER_TOP_N = 7              # candidates reviewed by the reorder pass
+_REORDER_TOP_N = 15             # reorder pass reviews the full candidate pool
 
 _REORDER_SYSTEM = (
     "You are a senior career advisor reviewing AI job match rankings. "
@@ -77,6 +77,7 @@ class MatchAgent:
         user_id: str,
         match_run_id: str | None = None,
         candidate_job_ids: list[str] | None = None,
+        skip_reorder: bool = False,
     ) -> MatchRunResult:
         """Score top candidates (Call 1), then enrich with Call 2 for active users.
 
@@ -111,7 +112,7 @@ class MatchAgent:
             _apply_function_floor(raw_scores, weighted_scores)
             normalized = _normalize(weighted_scores)
 
-            if profile.goals_text or profile.preferred_sectors:
+            if not skip_reorder and (profile.goals_text or profile.preferred_sectors):
                 normalized = await self._run_reorder_pass(
                     profile, matches, jobs_by_id, normalized, raw_scores
                 )
@@ -262,6 +263,59 @@ class MatchAgent:
             logger.exception("Call 2 failed for match %s", match.id)
         return None
 
+    async def run_reorder_only(self, user_id: str) -> dict:
+        """Run just the reorder pass on already-scored matches. Used by the debug step endpoint."""
+        profile = await self._get_profile(user_id)
+        if profile is None:
+            return {"reordered": 0, "detail": "No profile found"}
+        if not profile.goals_text and not profile.preferred_sectors:
+            return {"reordered": 0, "detail": "No intent signals set — reorder not applicable"}
+
+        result = await self._session.execute(
+            select(JobMatch)
+            .join(Job, JobMatch.job_id == Job.id)
+            .where(
+                JobMatch.user_id == user_id,
+                JobMatch.score.isnot(None),
+                JobMatch.normalized_score.isnot(None),
+                Job.is_active.is_(True),
+            )
+            .order_by(JobMatch.normalized_score.desc())
+            .limit(_REORDER_TOP_N)
+        )
+        matches = list(result.scalars().all())
+        if not matches:
+            return {"reordered": 0, "detail": "No scored matches found — run LLM 1 Score first"}
+
+        job_ids = [str(m.job_id) for m in matches]
+        jobs_by_id = await self._load_jobs(job_ids)
+
+        raw_scores: dict[str, dict[str, float]] = {}
+        normalized: dict[str, float] = {}
+        for match in matches:
+            jid = str(match.job_id)
+            dim = match.dimension_scores or {}
+            raw_scores[jid] = {d: (_get_score(dim.get(d)) or 0.5) for d in ALLOWED_DIMENSIONS}
+            normalized[jid] = match.normalized_score or 0.0
+
+        adjusted = await self._run_reorder_pass(profile, matches, jobs_by_id, normalized, raw_scores)
+
+        changed = sum(
+            1 for jid in normalized
+            if abs(adjusted.get(jid, normalized[jid]) - normalized[jid]) > 0.001
+        )
+        if changed == 0:
+            return {"reordered": 0, "detail": "Ranking preserved — no swaps needed"}
+
+        for match in matches:
+            jid = str(match.job_id)
+            new_score = adjusted.get(jid)
+            if new_score is not None:
+                match.normalized_score = round(new_score, 4)
+                match.score = round(new_score, 4)
+        await self._session.commit()
+        return {"reordered": changed, "detail": f"{changed} positions adjusted by career advisor"}
+
     async def _run_reorder_pass(
         self,
         profile: UserProfile,
@@ -322,7 +376,7 @@ class MatchAgent:
             response = await self._llm.complete(
                 messages=[Message(role="user", content=user_prompt)],
                 system=_REORDER_SYSTEM,
-                tier=ModelTier.STANDARD,
+                tier=ModelTier.FAST,
                 max_tokens=256,
             )
             start, end = response.find("{"), response.rfind("}")

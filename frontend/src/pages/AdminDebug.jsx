@@ -5,8 +5,8 @@ import {
   triggerStepEmbedJobs,
   triggerStepReset,
   triggerStepFilter,
-  triggerStepCandidates,
   triggerStepScore,
+  triggerStepReorder,
   triggerStepDeliver,
   debugUserLookup,
   debugHardFilterSummary,
@@ -104,13 +104,13 @@ function formatReason(r) {
 // ---------------------------------------------------------------------------
 
 const INITIAL_STEPS = {
-  collect:    { status: 'idle', result: '' },
-  embed:      { status: 'idle', result: '' },
-  reset:      { status: 'idle', result: '' },
-  filter:     { status: 'idle', result: '' },
-  candidates: { status: 'idle', result: '' },
-  score:      { status: 'idle', result: '' },
-  deliver:    { status: 'idle', result: '' },
+  collect:  { status: 'idle', result: '' },
+  embed:    { status: 'idle', result: '' },
+  reset:    { status: 'idle', result: '' },
+  filter:   { status: 'idle', result: '' },
+  score:    { status: 'idle', result: '' },
+  reorder:  { status: 'idle', result: '' },
+  deliver:  { status: 'idle', result: '' },
 }
 
 export default function AdminDebug() {
@@ -194,12 +194,12 @@ export default function AdminDebug() {
       fn: () => triggerStepFilter(userId), needsUser: true,
     },
     {
-      key: 'candidates', label: 'Check Candidates', desc: 'Count hard-passed unseen jobs',
-      fn: () => triggerStepCandidates(userId), needsUser: true,
+      key: 'score', label: 'LLM 1 Score', desc: 'Haiku batch scores all 15 candidates on 6 dimensions',
+      fn: () => triggerStepScore(userId), needsUser: true,
     },
     {
-      key: 'score', label: 'LLM Score', desc: 'Claude Haiku batch scoring',
-      fn: () => triggerStepScore(userId), needsUser: true,
+      key: 'reorder', label: 'LLM 2 Score', desc: 'Haiku career advisor reviews all 15, adjusts top-3 if goal misaligned',
+      fn: () => triggerStepReorder(userId), needsUser: true,
     },
     {
       key: 'deliver', label: 'Deliver Top 3', desc: 'Mark top 3 as shown',
@@ -283,7 +283,7 @@ export default function AdminDebug() {
               <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-xs text-amber-700">Load a user above to enable steps 2–6. Step 1 (Collect) runs globally and is always available.</p>
+              <p className="text-xs text-amber-700">Load a user above to enable steps 3–7. Steps 1–2 (Collect, Embed) run globally and are always available.</p>
             </div>
           )}
           <div className="grid grid-cols-3 gap-3">
