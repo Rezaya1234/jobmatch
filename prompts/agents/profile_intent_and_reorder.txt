@@ -91,8 +91,8 @@ Added a reorder pass between normalization and delivery:
   profile.preferred_sectors is non-empty, call _run_reorder_pass().
 
 _run_reorder_pass():
-  - Takes top-7 ranked jobs (by normalized score)
-  - Sends to Sonnet with: profile background, stated goal, target sectors,
+  - Takes all 15 ranked candidates (the full scored pool)
+  - Sends to Haiku with: profile background, stated goal, target sectors,
     seniority — plus each job's title, company, industry_alignment score,
     and function_type score
   - Asks: "Given this candidate's stated career direction, identify the 3 jobs
@@ -112,16 +112,26 @@ highest score that was already present in the batch. The job in position 2
 shows the second highest. The visual scores remain consistent with the
 dimension breakdown — only the order of which job gets which rank changes.
 
-### Why Sonnet (not Haiku) for the reorder pass?
-This is a holistic career judgment call requiring the LLM to reason about:
-  1. The candidate's stated career direction
-  2. The industry/function alignment of each job
-  3. Whether skills overlap across industries constitutes genuine career fit
+### Why Haiku (not Sonnet) for the reorder pass?
+The reorder task is structured and constrained: given a short list of job titles,
+companies, and two dimension scores, pick 3 that best match a stated goal.
+This is not open-ended reasoning — it is a selection problem with clear inputs.
+Haiku handles this reliably and costs significantly less than Sonnet.
+The reorder pass already runs once per user per pipeline run (not per job),
+so the per-user cost remains low even at scale.
 
-Haiku handles fast dimension scoring well but produces less reliable holistic
-judgment. A misfire here directly affects delivery — the wrong job gets shown.
-Sonnet is used despite the higher cost because the reorder pass runs once per
-pipeline run per user (not per job), and only when goals are set.
+### Why all 15 candidates, not top-7 or top-3?
+Top-3: too narrow — the LLM can only see the current top-3, cannot promote anything from below.
+
+Top-7: an arbitrary middle ground. If the correct match is ranked #9 (e.g., a strong
+ExxonMobil leadership role that scored below Databricks on skills), it is invisible.
+
+All 15: the reorder pass was introduced specifically because the scoring step can
+systematically mis-rank sector-mismatched jobs. The whole pool that survived hard
+filtering and ANN recall should be visible to the career advisor — that is the set
+of jobs the system believes are plausible candidates. Restricting the view to a
+subset defeats the purpose.
+Token cost of passing 15 job summaries to Haiku is negligible.
 
 ### When does the reorder pass NOT fire?
 When profile.goals_text and profile.preferred_sectors are both empty.
@@ -129,19 +139,6 @@ Unchanged behavior for users without stated goals — no regression risk.
 
 Also: if the pass raises an exception or returns invalid IDs, the original
 normalized ranking is preserved (fail-safe fallback with logger.exception).
-
-### Why top-7, not top-3 or top-15?
-Top-3: too narrow — the LLM can only see the current top-3, so it cannot
-promote anything from positions 4+.
-
-Top-15: too wide — the LLM would need to reason across all 15 jobs, which
-increases token cost, response length, and the chance of hallucinating job IDs.
-Also, promoting a job ranked #14 to #1 would be a very aggressive swap that
-may not be reliable.
-
-Top-7: the LLM sees the top-3 plus the 4 most likely alternatives.
-It can catch cases where #4 or #5 is clearly better than something in top-3,
-without making implausibly large promotions.
 
 ---
 
@@ -158,14 +155,47 @@ the reorder pass catches the remaining ranking errors.
 
 ---
 
-## Files changed (commit 9f611b7)
+## Debug step separation (commit dde7267)
+# File: api/pipeline.py, frontend/src/pages/AdminDebug.jsx
 
-  api/users.py          — parse prompt role_description instruction updated;
-                          upsert_profile detects intent changes + adds llm dep;
-                          _regenerate_description_bg new helper
-  agents/match_agent.py — _REORDER_SYSTEM + _REORDER_TOP_N constants;
-                          _run_reorder_pass() method;
-                          run() wires reorder pass after normalization
+The reorder pass runs inside MatchAgent.run() in production (LLM 1 and LLM 2
+back-to-back in one pipeline call). For the debug page, they are exposed as
+separate triggerable steps so the operator can inspect the LLM 1 scoring table
+before and after LLM 2 runs.
+
+Implementation:
+  - MatchAgent.run() gains skip_reorder: bool = False param
+  - /step/score endpoint passes skip_reorder=True (LLM 1 only)
+  - New /step/reorder endpoint calls run_reorder_only() (LLM 2 only)
+  - run_reorder_only() loads already-scored matches from DB, reconstructs
+    raw_scores and normalized from stored dimension_scores, runs the reorder
+    pass, and commits any score adjustments
+
+Debug page step flow (was 7 steps, now 7 steps with different content):
+  Removed: Check Candidates (redundant — Hard Filter already shows passed count)
+  Renamed: LLM Score → LLM 1 Score
+  Added:   LLM 2 Score (Haiku career advisor, all 15 candidates)
+
+---
+
+## Files changed
+
+  commit 9f611b7:
+    api/users.py          — parse prompt role_description instruction updated;
+                            upsert_profile detects intent changes + adds llm dep;
+                            _regenerate_description_bg new helper
+    agents/match_agent.py — _REORDER_SYSTEM + _REORDER_TOP_N constants;
+                            _run_reorder_pass() method;
+                            run() wires reorder pass after normalization
+
+  commit dde7267:
+    agents/match_agent.py — _REORDER_TOP_N 7 → 15; ModelTier STANDARD → FAST;
+                            skip_reorder param on run(); run_reorder_only() method
+    api/pipeline.py       — trigger_step_score passes skip_reorder=True;
+                            new trigger_step_reorder endpoint
+    frontend/src/api.js   — triggerStepCandidates removed; triggerStepReorder added
+    frontend/src/pages/AdminDebug.jsx — candidates step removed; score renamed to
+                            LLM 1 Score; reorder step added as LLM 2 Score
 
 ---
 
