@@ -53,20 +53,30 @@ Test on dev before merging:
 
 ## Deploying to Production
 
-Before merging to master checklist:
+Before deploying checklist:
   □ Tests passing: pytest
   □ Tested manually on dev URL
-  □ Env vars updated on Render prod
-  □ DB migrations run on prod
+  □ Env vars updated on Render prod if needed
+  □ DB migrations run on prod if schema changed
   □ No console errors in frontend
   □ Email tested if email changes made
   □ git status clean
 
-Deploy:
-  git checkout master
-  git merge dev
-  git push
-  Watch Render dashboard Events tab
+Deploy (dev → prod directly, skip master):
+  git stash   (if any uncommitted local changes)
+  git checkout prod
+  git merge dev --no-edit
+  git push origin prod
+  git checkout dev
+  git stash pop
+  Watch Render dashboard — both jobmatch-76c4
+  (frontend) and jobmatch-qqms (backend) should
+  auto-deploy within 1-2 minutes.
+
+IMPORTANT: Always ask for explicit confirmation
+before pushing to prod. Never auto-push.
+`master` branch has no Render service — do not
+deploy via master.
 
 ---
 
@@ -145,9 +155,33 @@ Weekly Monday:
 4. Verify LLM_PROVIDER=claude in env vars
 
 ### Frontend not loading
-1. Check Render → jobmatch-static → Status
+1. Check Render → jobmatch-76c4 → Status
 2. Check browser console for errors
-3. Verify API base URL in frontend config
+3. Verify VITE_API_URL env var is set on Render
+
+### Deep routes return "Not found" (e.g. /dashboard, /signin)
+Root cause: Render static sites return 404 for any URL that
+doesn't map to a physical file. React's client-side router
+never gets a chance to run.
+
+Two fixes are in place — both required:
+  1. frontend/public/_redirects — must have LF line endings
+     (not CRLF). CRLF causes Render to silently ignore the
+     file. Windows Git autocrlf can reintroduce this.
+     Check with: python -c "d=open('frontend/public/_redirects','rb').read(); print('CRLF:',b'\r\n' in d)"
+     Fix with:   python -c "open('frontend/public/_redirects','wb').write(b'/* /index.html 200\n')"
+  2. frontend/package.json build script copies index.html →
+     404.html after every build. Render serves 404.html as a
+     fallback when no matching file exists, so React loads and
+     handles routing client-side.
+
+If this breaks again: verify both fixes are present, and
+trigger a manual deploy on jobmatch-76c4.
+
+### "Not found" after push to prod but old UI still visible
+Cause: changes were pushed to `master` or `dev` but not to
+`prod`. Render deploys from the `prod` branch only.
+Fix: run the deploy procedure above (dev → prod).
 
 ### Jobs not appearing
 1. Check if scraper ran at 3:00 AM UTC
@@ -172,12 +206,17 @@ Weekly Monday:
 
 | Service | Type | Branch | URL |
 |---------|------|--------|-----|
-| jobmatch-prod | Web Service | master | jobmatch-qqms.onrender.com |
-| jobmatch-dev | Web Service | dev | jobmatch-dev.onrender.com |
-| jobmatch-static | Static Site | master | jobmatch-76c4.onrender.com |
-| jobmatch-dev-static | Static Site | dev | jobmatch-dev-static.onrender.com |
+| jobmatch-qqms | Web Service (backend) | prod | jobmatch-qqms.onrender.com |
+| jobmatch-dev | Web Service (backend) | dev | jobmatch-dev.onrender.com |
+| jobmatch-76c4 | Static Site (frontend) | prod | jobmatch-76c4.onrender.com |
+| jobmatch-dev-static | Static Site (frontend) | dev | jobmatch-dev-static.onrender.com |
 | jobmatch-db | PostgreSQL | - | Internal only |
 | jobmatch-db-dev | PostgreSQL | - | Internal only |
+
+Branch structure:
+  dev    → tested here first
+  prod   → Render deploys this (both frontend + backend)
+  master → no Render service, effectively unused
 
 ---
 
