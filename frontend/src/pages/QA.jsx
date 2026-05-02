@@ -343,8 +343,8 @@ export default function QA() {
         }
       })
       .catch(() => {
-        // Not admin — fall back to own activity only
-        setUsers(myUserId ? [{ id: myUserId, email: 'My account' }] : [])
+        // Not admin or endpoint unavailable — show only own account
+        if (myUserId) setUsers([{ id: myUserId, email: localStorage.getItem('userEmail') || myUserId }])
       })
   }, [])
 
@@ -397,7 +397,7 @@ export default function QA() {
       </div>
 
       {/* User selector */}
-      {users.length > 1 && (
+      {users.length > 0 && (
         <div className="mb-5">
           <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Viewing user</label>
           <select
