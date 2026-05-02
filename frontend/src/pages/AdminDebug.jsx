@@ -561,18 +561,20 @@ export default function AdminDebug() {
         </div>
 
         {/* ── Section 6: LLM 2 Reorder Results ── */}
-        {reorderData && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-800">LLM 2 — Career Advisor Ranking</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Haiku career advisor reviews all 15 and adjusts order to match stated goal</p>
-              </div>
-              {reorderData.swaps_made
-                ? <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">Swaps made</span>
-                : <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">Order confirmed</span>
-              }
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">LLM 2 — Career Advisor Ranking</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Haiku career advisor reviews all 15 and adjusts order to match stated goal</p>
             </div>
+            {reorderData && (reorderData.swaps_made
+              ? <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">Swaps made</span>
+              : <span className="bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">Order confirmed</span>
+            )}
+          </div>
+          {!reorderData ? (
+            <EmptyState>Run the LLM 2 Score step above to see career advisor ranking</EmptyState>
+          ) : (<>
             {reorderData.reasoning && (
               <div className="mb-3 bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-100">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Why (admin)</span>
@@ -631,8 +633,8 @@ export default function AdminDebug() {
                 </table>
               </div>
             )}
-          </div>
-        )}
+          </>)}
+        </div>
 
       </div>
     </div>
