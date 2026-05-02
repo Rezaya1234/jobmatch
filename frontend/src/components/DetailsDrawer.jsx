@@ -339,6 +339,7 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
   if (!job) return null
 
   const pct = Math.round((job.score || 0) * 100)
+  const notRecommended = job.call2_content?.not_recommended === true
   const scoreColor = pct >= 85 ? 'text-green-600 bg-green-50 border-green-200'
     : pct >= 70 ? 'text-amber-600 bg-amber-50 border-amber-200'
     : 'text-slate-500 bg-slate-50 border-slate-200'
@@ -434,9 +435,15 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Meta chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${scoreColor}`}>
-              {scoreLabel(pct)}
-            </span>
+            {notRecommended ? (
+              <span className="text-sm font-semibold px-3 py-1 rounded-full border text-amber-700 bg-amber-50 border-amber-200">
+                Advisor caution
+              </span>
+            ) : (
+              <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${scoreColor}`}>
+                {scoreLabel(pct)}
+              </span>
+            )}
             {job.work_mode && (
               <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">{job.work_mode}</span>
             )}
@@ -451,30 +458,42 @@ export default function DetailsDrawer({ job, userId, profile, currentRating, onC
             )}
           </div>
 
-          {/* 1. Why this could be a good fit */}
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Why this could be a good fit</p>
-            {job.call2_content?.why_worth_pursuing ? (
-              <p className="text-sm text-slate-700 leading-relaxed mb-3">{job.call2_content.why_worth_pursuing}</p>
-            ) : reasoning ? (
-              <p className="text-sm text-slate-700 leading-relaxed mb-3">{reasoning}</p>
-            ) : null}
-            {fitBullets.length > 0 && (
-              <div className="space-y-2">
-                {fitBullets.map((text, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-sm text-slate-700">{text}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {!job.call2_content?.why_worth_pursuing && !reasoning && fitBullets.length === 0 && (
-              <p className="text-sm text-slate-400">Analysis in progress.</p>
-            )}
-          </div>
+          {/* 1. Why this could be a good fit / Advisor caution */}
+          {notRecommended ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-xs font-semibold text-amber-600 uppercase tracking-widest mb-2">Career advisor note</p>
+              <p className="text-sm text-amber-900 leading-relaxed">
+                {job.call2_content?.advisor_summary || 'Our advisor flagged concerns with this match.'}
+              </p>
+              <p className="text-xs text-amber-600 mt-2">
+                We surfaced this role because it matches your stated preferences, but it may not be the best fit for your career direction.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2.5">Why this could be a good fit</p>
+              {job.call2_content?.why_worth_pursuing ? (
+                <p className="text-sm text-slate-700 leading-relaxed mb-3">{job.call2_content.why_worth_pursuing}</p>
+              ) : reasoning ? (
+                <p className="text-sm text-slate-700 leading-relaxed mb-3">{reasoning}</p>
+              ) : null}
+              {fitBullets.length > 0 && (
+                <div className="space-y-2">
+                  {fitBullets.map((text, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <svg className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm text-slate-700">{text}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!job.call2_content?.why_worth_pursuing && !reasoning && fitBullets.length === 0 && (
+                <p className="text-sm text-slate-400">Analysis in progress.</p>
+              )}
+            </div>
+          )}
 
           {/* 2. Where you might need to stretch */}
           <div>

@@ -257,7 +257,11 @@ class MatchAgent:
             '"potential_gaps": ["gap 1", "gap 2"], '
             '"course_gaps": ["what to learn if relevant"], '
             '"confidence": "high|medium|low", '
-            '"advisor_summary": "one direct candid sentence"}'
+            '"advisor_summary": "one direct candid sentence", '
+            '"not_recommended": true|false}'
+            "\n\nSet not_recommended=true when the job is a poor fit despite a high dimension score — "
+            "e.g. the role contradicts the candidate's stated direction, or the advisor_summary is "
+            "predominantly negative. Set false when the job is genuinely worth pursuing."
         )
 
         try:
