@@ -75,6 +75,7 @@ export default function Pipeline() {
   })
   const [totals, setTotals]           = useState({ jobs: 0, matches: 0 })
   const [emailStatus, setEmailStatus] = useState('')
+  const [emailError, setEmailError]   = useState('')
   const [insightsState, setInsightsState] = useState({ status: 'idle', processed: 0, total: 0, error: '' })
   const insightsPollRef = useRef(null)
   const [logoStatus, setLogoStatus]   = useState('')
@@ -257,11 +258,20 @@ export default function Pipeline() {
     const id = uid()
     if (!id) return
     setEmailStatus('sending')
+    setEmailError('')
     try {
       const res = await triggerTestEmail(id)
-      setEmailStatus(res.status === 'sent' ? 'sent' : 'empty')
-    } catch { setEmailStatus('error') }
-    finally { setTimeout(() => setEmailStatus(''), 5000) }
+      if (res.status === 'sent') {
+        setEmailStatus('sent')
+      } else {
+        setEmailStatus('error')
+        setEmailError(res.detail || 'Unknown error')
+      }
+    } catch (e) {
+      setEmailStatus('error')
+      setEmailError(e?.response?.data?.detail || e?.message || 'Request failed')
+    }
+    finally { setTimeout(() => { setEmailStatus(''); setEmailError('') }, 8000) }
   }
 
   function stopInsightsPoll() {
@@ -443,13 +453,16 @@ export default function Pipeline() {
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
         <h2 className="text-sm font-semibold text-slate-700 mb-3">Utilities</h2>
         <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={handleTestEmail}
-            disabled={emailStatus === 'sending'}
-            className="bg-green-600 text-white py-2 rounded-lg font-medium text-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
-          >
-            {emailStatus === 'sending' ? 'Sending…' : emailStatus === 'sent' ? '✓ Email sent!' : emailStatus === 'error' ? 'Failed' : 'Send Test Email'}
-          </button>
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={handleTestEmail}
+              disabled={emailStatus === 'sending'}
+              className={`py-2 rounded-lg font-medium text-sm text-white disabled:opacity-50 transition-colors ${emailStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
+            >
+              {emailStatus === 'sending' ? 'Sending…' : emailStatus === 'sent' ? '✓ Email sent!' : emailStatus === 'error' ? '✗ Failed' : 'Send Test Email'}
+            </button>
+            {emailError && <p className="text-xs text-red-600 break-words">{emailError}</p>}
+          </div>
           <button
             onClick={handleCompanyInsights}
             disabled={insightsState.status === 'running'}
