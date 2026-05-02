@@ -99,6 +99,7 @@ class MatchAgent:
         matches = await self._get_top_candidates(user_id, job_ids=candidate_job_ids)
         jobs_by_id: dict[str, Job] = {}
         scored = 0
+        reorder_meta: dict = {}
 
         if matches:
             jobs_by_id = await self._load_jobs([str(m.job_id) for m in matches])
@@ -113,7 +114,7 @@ class MatchAgent:
             normalized = _normalize(weighted_scores)
 
             if not skip_reorder and (profile.goals_text or profile.preferred_sectors):
-                normalized = await self._run_reorder_pass(
+                normalized, reorder_meta = await self._run_reorder_pass(
                     profile, matches, jobs_by_id, normalized, raw_scores
                 )
 
@@ -159,6 +160,16 @@ class MatchAgent:
                         match.call2_profile_version = current_pv
                         match.call2_weights_snapshot = dict(weights)
                         call2_count += 1
+
+        if reorder_meta:
+            top_3_ids = set(str(i) for i in reorder_meta.get("top_3_ids", []))
+            reasons = reorder_meta.get("top_3_reasons", {})
+            for match in matches:
+                jid = str(match.job_id)
+                if jid in top_3_ids and jid in reasons:
+                    existing = dict(match.call2_content or {})
+                    existing["reorder_reason"] = reasons[jid]
+                    match.call2_content = existing
 
         await self._session.commit()
 
@@ -265,11 +276,12 @@ class MatchAgent:
 
     async def run_reorder_only(self, user_id: str) -> dict:
         """Run just the reorder pass on already-scored matches. Used by the debug step endpoint."""
+        _empty = {"reordered": 0, "swaps_made": False, "reasoning": "", "profile_gap": None, "ranking": []}
         profile = await self._get_profile(user_id)
         if profile is None:
-            return {"reordered": 0, "detail": "No profile found"}
+            return {**_empty, "detail": "No profile found"}
         if not profile.goals_text and not profile.preferred_sectors:
-            return {"reordered": 0, "detail": "No intent signals set — reorder not applicable"}
+            return {**_empty, "detail": "No intent signals set — reorder not applicable"}
 
         result = await self._session.execute(
             select(JobMatch)
@@ -285,36 +297,80 @@ class MatchAgent:
         )
         matches = list(result.scalars().all())
         if not matches:
-            return {"reordered": 0, "detail": "No scored matches found — run LLM 1 Score first"}
+            return {**_empty, "detail": "No scored matches found — run LLM 1 Score first"}
 
         job_ids = [str(m.job_id) for m in matches]
         jobs_by_id = await self._load_jobs(job_ids)
 
         raw_scores: dict[str, dict[str, float]] = {}
         normalized: dict[str, float] = {}
+        original_order = [str(m.job_id) for m in matches]
         for match in matches:
             jid = str(match.job_id)
             dim = match.dimension_scores or {}
             raw_scores[jid] = {d: (_get_score(dim.get(d)) or 0.5) for d in ALLOWED_DIMENSIONS}
             normalized[jid] = match.normalized_score or 0.0
 
-        adjusted = await self._run_reorder_pass(profile, matches, jobs_by_id, normalized, raw_scores)
+        adjusted, meta = await self._run_reorder_pass(profile, matches, jobs_by_id, normalized, raw_scores)
 
         changed = sum(
             1 for jid in normalized
             if abs(adjusted.get(jid, normalized[jid]) - normalized[jid]) > 0.001
         )
-        if changed == 0:
-            return {"reordered": 0, "detail": "Ranking preserved — no swaps needed"}
 
+        if changed > 0:
+            for match in matches:
+                jid = str(match.job_id)
+                new_score = adjusted.get(jid)
+                if new_score is not None:
+                    match.normalized_score = round(new_score, 4)
+                    match.score = round(new_score, 4)
+
+        top_3_ids = set(str(i) for i in meta.get("top_3_ids", []))
+        reasons = meta.get("top_3_reasons", {})
+        stored_reasons = False
         for match in matches:
             jid = str(match.job_id)
-            new_score = adjusted.get(jid)
-            if new_score is not None:
-                match.normalized_score = round(new_score, 4)
-                match.score = round(new_score, 4)
-        await self._session.commit()
-        return {"reordered": changed, "detail": f"{changed} positions adjusted by career advisor"}
+            if jid in top_3_ids and jid in reasons:
+                existing = dict(match.call2_content or {})
+                existing["reorder_reason"] = reasons[jid]
+                match.call2_content = existing
+                stored_reasons = True
+
+        if changed > 0 or stored_reasons:
+            await self._session.commit()
+
+        sorted_after = sorted(
+            matches,
+            key=lambda m: adjusted.get(str(m.job_id), normalized.get(str(m.job_id), 0.0)),
+            reverse=True,
+        )
+        ranking = []
+        for llm2_rank, match in enumerate(sorted_after, 1):
+            jid = str(match.job_id)
+            job = jobs_by_id.get(jid)
+            llm1_rank = original_order.index(jid) + 1 if jid in original_order else 0
+            dim = match.dimension_scores or {}
+            ind_score = _get_score(dim.get("industry_alignment"))
+            ranking.append({
+                "job_id": jid,
+                "title": job.title if job else "Unknown",
+                "company": job.company if job else "Unknown",
+                "llm1_rank": llm1_rank,
+                "llm2_rank": llm2_rank,
+                "swapped": llm1_rank != llm2_rank,
+                "industry_alignment": round(ind_score or 0.0, 2),
+            })
+
+        detail = f"{changed} positions adjusted by career advisor" if changed else "Ranking preserved — no swaps needed"
+        return {
+            "reordered": changed,
+            "detail": detail,
+            "swaps_made": meta.get("swaps_made", False),
+            "reasoning": meta.get("reasoning", ""),
+            "profile_gap": meta.get("profile_gap"),
+            "ranking": ranking,
+        }
 
     async def _run_reorder_pass(
         self,
@@ -361,15 +417,21 @@ class MatchAgent:
             )
 
         if len(job_lines) < 3:
-            return normalized
+            return normalized, {}
 
         user_prompt = (
             f"Candidate:\n{chr(10).join(goal_parts)}\n\n"
             f"Current ranking (top {len(job_lines)}):\n" + "\n".join(job_lines) + "\n\n"
-            "Given the candidate's stated goal, identify the 3 jobs from this list that best serve "
-            "their career direction — not just skills overlap.\n"
+            "Tasks:\n"
+            "1. Identify the 3 jobs that best serve this candidate's stated career direction.\n"
+            "2. For each of those 3 jobs, write one sentence as if speaking directly to the candidate "
+            "about why that specific role fits them — no mention of rankings or other jobs reviewed.\n"
+            "3. Note any missing profile information limiting ranking quality (one sentence, or null).\n"
             "Return JSON only:\n"
-            '{"top_3_ids": ["id1", "id2", "id3"], "swaps_made": true|false, "reasoning": "one sentence"}'
+            '{"top_3_ids": ["id1", "id2", "id3"], "swaps_made": true|false, '
+            '"reasoning": "one admin sentence explaining why order changed", '
+            '"top_3_reasons": {"id1": "...", "id2": "...", "id3": "..."}, '
+            '"profile_gap": "one sentence or null"}'
         )
 
         try:
@@ -377,20 +439,28 @@ class MatchAgent:
                 messages=[Message(role="user", content=user_prompt)],
                 system=_REORDER_SYSTEM,
                 tier=ModelTier.FAST,
-                max_tokens=256,
+                max_tokens=512,
             )
             start, end = response.find("{"), response.rfind("}")
             if start == -1 or end == -1:
-                return normalized
+                return normalized, {}
             data = json.loads(response[start:end + 1])
-
-            if not data.get("swaps_made"):
-                return normalized
 
             top3_ids = [str(i) for i in data.get("top_3_ids", [])]
             if len(top3_ids) != 3 or not all(i in original_ids for i in top3_ids):
                 logger.warning("Reorder pass returned invalid top_3_ids — ignoring")
-                return normalized
+                return normalized, {}
+
+            meta = {
+                "top_3_ids": top3_ids,
+                "swaps_made": bool(data.get("swaps_made", False)),
+                "reasoning": data.get("reasoning", ""),
+                "top_3_reasons": {str(k): v for k, v in data.get("top_3_reasons", {}).items()},
+                "profile_gap": data.get("profile_gap") or None,
+            }
+
+            if not meta["swaps_made"]:
+                return normalized, meta
 
             # New order: promoted top-3 first, remaining in their original sequence
             rest_ids = [jid for jid in original_ids if jid not in set(top3_ids)]
@@ -405,13 +475,13 @@ class MatchAgent:
                 adjusted[job_id] = score_values[rank]
 
             logger.info(
-                "Reorder pass adjusted top-3 for user — %s", data.get("reasoning", "")
+                "Reorder pass adjusted top-3 for user — %s", meta["reasoning"]
             )
-            return adjusted
+            return adjusted, meta
 
         except Exception:
             logger.exception("Reorder pass failed — keeping original ranking")
-            return normalized
+            return normalized, {}
 
     async def _get_top_candidates(
         self, user_id: str, job_ids: list[str] | None = None

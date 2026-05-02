@@ -129,6 +129,7 @@ export default function AdminDebug() {
   const [annPool, setAnnPool]         = useState(null)
   const [softFilter, setSoftFilter]   = useState(null)
   const [scored, setScored]           = useState(null)
+  const [reorderData, setReorderData] = useState(null)
   const [loading, setLoading]         = useState({})
 
   // ── User lookup ──────────────────────────────────────────────────────────
@@ -168,9 +169,10 @@ export default function AdminDebug() {
   const runStep = async (key, fn) => {
     patchStep(key, { status: 'running', result: '' })
     try {
-      const data = await fn()
-      const result = data.detail ?? (data.count != null ? `${data.count} jobs` : 'done')
+      const resp = await fn()
+      const result = resp.detail ?? (resp.count != null ? `${resp.count} jobs` : 'done')
       patchStep(key, { status: 'done', result })
+      if (key === 'reorder' && resp.data) setReorderData(resp.data)
     } catch (e) {
       patchStep(key, { status: 'error', result: e?.response?.data?.detail || 'Error' })
     }
@@ -467,6 +469,74 @@ export default function AdminDebug() {
             <EmptyState>Fetch to see all 50 with soft filter and diversification results</EmptyState>
           )}
         </div>
+
+        {/* ── Section 5a: LLM 2 Reorder Results ── */}
+        {reorderData && (
+          <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-800">LLM 2 — Career Advisor Results</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Haiku career advisor ranking after reviewing all 15 candidates</p>
+              </div>
+              {reorderData.swaps_made && (
+                <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0">Swaps made</span>
+              )}
+            </div>
+            {reorderData.reasoning && (
+              <div className="mb-3 bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-100">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Reasoning (admin)</span>
+                <p className="text-sm text-slate-700 mt-1">{reorderData.reasoning}</p>
+              </div>
+            )}
+            {reorderData.profile_gap && (
+              <div className="mb-3 bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
+                <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Profile gap</span>
+                <p className="text-sm text-amber-800 mt-1">{reorderData.profile_gap}</p>
+              </div>
+            )}
+            {reorderData.ranking?.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-slate-500 border-b border-slate-100">
+                      <th className="pb-2 pr-3 font-medium w-16">LLM 1 #</th>
+                      <th className="pb-2 pr-3 font-medium w-16">LLM 2 #</th>
+                      <th className="pb-2 pr-3 font-medium">Title</th>
+                      <th className="pb-2 pr-3 font-medium">Company</th>
+                      <th className="pb-2 font-medium text-center">Industry</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reorderData.ranking.map(r => {
+                      const moved = r.llm1_rank !== r.llm2_rank
+                      const promoted = r.llm2_rank < r.llm1_rank
+                      return (
+                        <tr key={r.job_id} className={`border-b border-slate-50 ${moved ? (promoted ? 'bg-emerald-50/60' : 'bg-rose-50/40') : ''}`}>
+                          <td className="py-2 pr-3 text-slate-400 tabular-nums text-center">{r.llm1_rank}</td>
+                          <td className="py-2 pr-3 tabular-nums text-center font-semibold">
+                            <span className={r.llm2_rank <= 3 ? 'text-violet-600' : 'text-slate-500'}>
+                              {r.llm2_rank}
+                            </span>
+                            {moved && (
+                              <span className={`ml-1 text-xs ${promoted ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                {promoted ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3 font-medium text-slate-700 max-w-[200px] truncate">{r.title}</td>
+                          <td className="py-2 pr-3 text-slate-500 max-w-[130px] truncate">{r.company}</td>
+                          <td className="py-2 text-center">
+                            <ScoreBar value={r.industry_alignment} />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Section 5: LLM Scores ── */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">

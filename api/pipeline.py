@@ -75,6 +75,7 @@ class StepResult(BaseModel):
     status: str
     detail: str
     count: int = 0
+    data: dict | None = None
 
 class InsightStatusResponse(BaseModel):
     status: str
@@ -535,6 +536,12 @@ async def trigger_step_reorder(
             status="done",
             detail=result["detail"],
             count=result["reordered"],
+            data={
+                "swaps_made": result.get("swaps_made", False),
+                "reasoning": result.get("reasoning", ""),
+                "profile_gap": result.get("profile_gap"),
+                "ranking": result.get("ranking", []),
+            },
         )
     except Exception as exc:
         return StepResult(status="error", detail=str(exc))
