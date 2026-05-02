@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getActivity } from '../api'
+import { getActivity, adminListUsers } from '../api'
 
 // ---------------------------------------------------------------------------
 // Event metadata
@@ -323,25 +323,56 @@ function StatsBar({ activity }) {
 // ---------------------------------------------------------------------------
 
 export default function QA() {
-  const userId = localStorage.getItem('userId')
+  const myUserId = localStorage.getItem('userId')
+  const [users, setUsers] = useState([])
+  const [selectedUserId, setSelectedUserId] = useState(myUserId || '')
   const [activity, setActivity] = useState([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('all')
 
-  async function load() {
-    if (!userId) return
+  // Load user list for dropdown
+  useEffect(() => {
+    adminListUsers()
+      .then(list => {
+        setUsers(list)
+        // Default to the logged-in user if present in the list
+        if (myUserId && list.some(u => u.id === myUserId)) {
+          setSelectedUserId(myUserId)
+        } else if (list.length > 0) {
+          setSelectedUserId(list[0].id)
+        }
+      })
+      .catch(() => {
+        // Not admin — fall back to own activity only
+        setUsers(myUserId ? [{ id: myUserId, email: 'My account' }] : [])
+      })
+  }, [])
+
+  async function load(uid) {
+    const target = uid || selectedUserId
+    if (!target) return
     setLoading(true)
     try {
-      const data = await getActivity(userId)
+      const data = await getActivity(target)
       setActivity(data)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [userId])
+  useEffect(() => {
+    if (selectedUserId) load(selectedUserId)
+  }, [selectedUserId])
 
-  if (!userId) {
+  function handleUserChange(e) {
+    setSelectedUserId(e.target.value)
+    setFilter('all')
+    setActivity([])
+  }
+
+  const selectedEmail = users.find(u => u.id === selectedUserId)?.email || ''
+
+  if (!myUserId) {
     return (
       <div className="text-center py-20 text-slate-500">
         <p className="text-base font-semibold mb-1">No account found</p>
@@ -360,10 +391,26 @@ export default function QA() {
           <h1 className="text-2xl font-bold text-slate-900">QA Dashboard</h1>
           <p className="text-sm text-slate-500 mt-1">{activity.length} events logged</p>
         </div>
-        <button onClick={load} disabled={loading} className="text-sm text-violet-600 hover:text-violet-800 font-semibold disabled:opacity-40">
+        <button onClick={() => load()} disabled={loading} className="text-sm text-violet-600 hover:text-violet-800 font-semibold disabled:opacity-40">
           {loading ? 'Loading…' : 'Refresh'}
         </button>
       </div>
+
+      {/* User selector */}
+      {users.length > 1 && (
+        <div className="mb-5">
+          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Viewing user</label>
+          <select
+            value={selectedUserId}
+            onChange={handleUserChange}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+          >
+            {users.map(u => (
+              <option key={u.id} value={u.id}>{u.email}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <StatsBar activity={activity} />
 
@@ -388,7 +435,11 @@ export default function QA() {
       {visible.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <p className="text-base font-medium text-slate-500 mb-1">No events yet</p>
-          <p className="text-sm">Start using the app — every action will appear here.</p>
+          <p className="text-sm">
+            {selectedUserId === myUserId
+              ? 'Start using the app — every action will appear here.'
+              : `No activity recorded for ${selectedEmail}.`}
+          </p>
         </div>
       ) : (
         <div>{visible.map(item => <ActivityCard key={item.id} item={item} />)}</div>

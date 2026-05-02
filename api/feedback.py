@@ -680,12 +680,12 @@ async def submit_commentary(
         commentary=text,
     )
     session.add(event)
-    await log_event(user_id, "commentary", {
-        "job_id": str(body.job_id),
-        "job_title": job.title,
-        "company": job.company,
-        "commentary": text,
-    }, session)
+    await log_event(session, user_id, "commentary",
+        job_id=str(body.job_id),
+        job_title=job.title,
+        company=job.company,
+        commentary=text,
+    )
     await session.commit()
     background_tasks.add_task(_run_commentary_learning, user_id, llm)
     return {"status": "received"}

@@ -937,6 +937,25 @@ async def admin_check(
 
 
 # ---------------------------------------------------------------------------
+# User list — for QA page dropdown
+# ---------------------------------------------------------------------------
+
+class UserListItem(BaseModel):
+    id: str
+    email: str
+
+
+@router.get("/users", response_model=list[UserListItem])
+async def list_users(
+    user_id: str = Query(...),
+    session: AsyncSession = Depends(get_session),
+) -> list[UserListItem]:
+    await _require_admin(user_id, session)
+    result = await session.execute(select(User).order_by(User.email))
+    return [UserListItem(id=str(u.id), email=u.email) for u in result.scalars().all()]
+
+
+# ---------------------------------------------------------------------------
 # Admin seeding — promote/revoke by email, guarded by ADMIN_SEED_SECRET
 # ---------------------------------------------------------------------------
 

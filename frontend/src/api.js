@@ -100,6 +100,7 @@ export const debugAnnPool = (userId) => http.get(`/debug/ann-pool/${userId}`).th
 export const debugSoftFilter = (userId) => http.get(`/debug/soft-filter/${userId}`).then(r => r.data)
 export const debugScored = (userId) => http.get(`/debug/scored/${userId}`).then(r => r.data)
 
+export const adminListUsers = () => adm('users')
 export const adminUpdateThresholds = (thresholds) => {
   const uid = localStorage.getItem('userId')
   return http.patch('/admin/thresholds', { thresholds }, { params: { user_id: uid } }).then(r => r.data)
